@@ -24,32 +24,23 @@ def index(request):
       # If this is a POST request then process the Form data
     if request.method == 'POST':
         
-        if 'start_button' in request.POST:
-            print('Ini start')
-            bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=1000000)
+        if 'start_button' in request.POST:            
             pcan_instance = PcanInstance()
-            pcan_instance.gc.actual_bus = bus
-            pcan_instance.bus_is_active = True
-                              
-            t_receive = threading.Thread(target=pcan_instance.gc.receive, args=(bus, pcan_instance.stop_event))
+            pcan_instance.gc.start_thread_gimbal()   
             pcan_instance.save()
-            t_receive.start()
             
             pcan_is_active = True
-            print('Fin start')
             
         elif 'stop_button' in request.POST:
-            print('Ini stop')
-            pcan.stop_event.set()
+            pcan.gc.stop_thread_gimbal()
             
-            # A delay is required:tested
+            # A delay is required
             time.sleep(0.01) 
        
             pcan.gc.actual_bus.shutdown()
-            
             pcan.delete()
+            
             pcan_is_active = False
-            print('Fin stop')
             
             return HttpResponseRedirect( reverse('index') )
 

@@ -1,2 +1,1 @@
-ERROR: failed to scan directory (errno=2) '/sys/class/pcan'
-ERROR: failed to open file (errno=2) '/sys/class/pcan/version'.
+Error unhandled errno (16 / 0x10).

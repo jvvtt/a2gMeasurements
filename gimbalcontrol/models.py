@@ -22,10 +22,7 @@ class MyClass():
 class PcanInstance(models.Model):
     bus_is_active = models.BooleanField(default=False)
     
-    gc = GimbalRS2()
-        
-    stop_event = threading.Event()
-    
+    gc = GimbalRS2()    
 
 class ManualMove(models.Model):
     # Campos

@@ -5,6 +5,7 @@ from check_sum import *
 from pynput import keyboard
 import can
 import socket
+import threading
 
 class GimbalRS2(object):
     def __init__(self):
@@ -384,6 +385,15 @@ class GimbalRS2(object):
                 # Returning False Stops the listener
                 return False
     
+    def start_thread_gimbal(self, bitrate=1000000):
+        bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=bitrate)
+        self.actual_bus = bus
 
-    
+        self.event_stop_thread_gimbal = threading.Event()                              
+        t_receive = threading.Thread(target=self.receive, args=(self.actual_bus,self.event_stop_thread_gimbal))
+        t_receive.start()
+
+    def stop_thread_gimbal(self):
+        self.event_stop_thread_gimbal.set()
+
    
