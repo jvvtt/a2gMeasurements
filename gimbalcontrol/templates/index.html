@@ -1,0 +1,22 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>Home</h1>
+
+  <h2>Gimbal RS2</h2>
+  <p>Welcome to the Gimbal RS2 control tool. Here you can retrieve and set gimbal's position.</p>
+
+  <form action="" method="post">
+      {% csrf_token %}
+
+      {% if pcan_is_active%}
+        <input type="submit" class="btn btn-primary" value="START RECEIVING" name="start_button" disabled/>
+        <input type="submit" class="btn btn-primary" value="STOP RECEIVING" name="stop_button" />
+      {% else %}
+        <input type="submit" class="btn btn-primary" value="START RECEIVING" name="start_button" />
+        <input type="submit" class="btn btn-primary" value="STOP RECEIVING" name="stop_button" disabled />
+      {% endif %}
+
+  </form>
+
+{% endblock %}
