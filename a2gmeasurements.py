@@ -6,6 +6,7 @@ from pynput import keyboard
 import can
 import socket
 import threading
+import pynmea2
 
 class GimbalRS2(object):
     def __init__(self):
@@ -386,6 +387,13 @@ class GimbalRS2(object):
                 return False
     
     def start_thread_gimbal(self, bitrate=1000000):
+        """
+
+        Starts the thread for 'listening' the incoming data from pcan
+
+        Args:
+            bitrate (int, optional): Bitrate used for pcan device. Defaults to 1000000.
+        """
         bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=bitrate)
         self.actual_bus = bus
 
@@ -394,6 +402,74 @@ class GimbalRS2(object):
         t_receive.start()
 
     def stop_thread_gimbal(self):
+        """
+
+        Stops the gimbal thread
+
+        """
         self.event_stop_thread_gimbal.set()
 
-   
+class GpsSignaling(object):
+    def __init__(self, gpsID):
+        # Initializations
+        # Dummy initialization
+        self.gpsID = gpsID
+        
+    def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1'):
+        """
+        Creates a socket to connect to the command-line terminal provided by Septentrio receiver. 
+        Sends the first command (in Septentrio-defined 'language') to set-up a regular retrieve of gps info
+
+        Args:
+            HOST (str, optional): IP address where the server is allocated. Defaults to "192.168.3.1".
+            PORT (int, optional): PORT number of the application. Defaults to 28784.
+            time (str, optional): How regular get updates of the gps data. Defaults to 'sec1'.
+        """
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket = s
+        
+        self.socket.connect((HOST, PORT))
+        #data = s.recv(64)
+
+        cmd_set_gps = 'sno, Stream 3, IP11, GGA, ' + time + '\n'
+        self.socket.sendall(cmd_set_gps.encode('utf-8'))
+
+        self.event_stop_thread_socket = threading.Event()
+        t_receive = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_socket))
+        t_receive.start()
+
+    def socket_receive(self, stop_event):
+        """
+        Callback function to be called when incoming gps data
+
+        Args:
+            stop_event (threading): the threading event that stops the TCP/IP com
+        """
+
+        while not stop_event.is_set():
+            data = self.socket.recv(64)
+            self.process_input_data(data)
+            
+            
+    def process_input_data(self, data):
+        """
+
+        Translates gps data in NMEA format into a dictionary
+
+        Args:
+            data (list): list of gps data in NMEA format
+
+        Returns:
+            dict: dictionary with the gps data
+        """
+
+        nmeaobj = pynmea2.parse(data.decode('utf-8'))
+        gps_list = ['%s: %s' % (nmeaobj.fields[i][0], nmeaobj.data[i]) for i in range(len(nmeaobj.fields))]
+        
+        gps_data = {}
+        for item in gps_list:
+            tmp = item.split(': ')
+            gps_data[tmp[0]] = tmp[1]
+
+
+        return gps_data
