@@ -7,6 +7,22 @@ import can
 import socket
 import threading
 import pynmea2
+import serial
+import sys
+from serial.tools.list_ports import comports
+
+"""
+
+Author: Julian D. Villegas G.
+Organization: VTT
+Version: 1.1
+e-mail: julian.villegas@vtt.fi
+
+Gimbal control adapted and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software.
+
+"""
+
+
 
 class GimbalRS2(object):
     def __init__(self):
@@ -414,8 +430,9 @@ class GpsSignaling(object):
         # Initializations
         # Dummy initialization
         self.gpsID = gpsID
+        self.gps_rx_buffer = [] 
         
-    def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1'):
+    def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1', ip_port_number='IP11'):
         """
         Creates a socket to connect to the command-line terminal provided by Septentrio receiver. 
         Sends the first command (in Septentrio-defined 'language') to set-up a regular retrieve of gps info
@@ -424,6 +441,7 @@ class GpsSignaling(object):
             HOST (str, optional): IP address where the server is allocated. Defaults to "192.168.3.1".
             PORT (int, optional): PORT number of the application. Defaults to 28784.
             time (str, optional): How regular get updates of the gps data. Defaults to 'sec1'.
+            ip_port_number (str, optional): the number of the IP terminal emulator port. 
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket = s
@@ -431,7 +449,7 @@ class GpsSignaling(object):
         self.socket.connect((HOST, PORT))
         #data = s.recv(64)
 
-        cmd_set_gps = 'sno, Stream 3, IP11, GGA, ' + time + '\n'
+        cmd_set_gps = 'sno, Stream 3, ' + ip_port_number + ', GGA, ' + time + '\n'
         self.socket.sendall(cmd_set_gps.encode('utf-8'))
 
         self.event_stop_thread_socket = threading.Event()
@@ -450,26 +468,225 @@ class GpsSignaling(object):
             data = self.socket.recv(64)
             self.process_input_data(data)
             
-            
-    def process_input_data(self, data):
+    def serial_connect(self, port='COM11'):
+        """
+        
+        Open a serial connection with one of the 2 virtual ports provided by Septentrio mosaic-go.
+        
+        Args:
+            port (str, optional): virtual serial port. Defaults to 'COM11'.
+        """
+        serial_instance = None
+        while serial_instance is None:
+            try:
+                serial_instance = serial.serial_for_url(port,
+                                                        9600,
+                                                        parity='N',
+                                                        rtscts=False,
+                                                        xonxoff=False,
+                                                        do_not_open=True)
+
+                serial_instance.timeout = 1
+                            
+                serial_instance.exclusive = True
+                serial_instance.open()
+                                
+            except serial.SerialException as e:
+                sys.stderr.write('could not open port {!r}: {}\n'.format(port, e))
+
+            else:
+                break
+        
+        self.serial_instance = serial_instance
+        self.serial_port = port
+    
+    def process_gps_nmea_data(self, data):
         """
 
-        Translates gps data in NMEA format into a dictionary
+        Process the received data of the gps coming from the virtual serial port.
 
         Args:
-            data (list): list of gps data in NMEA format
+            data (str): line of read data. We assume that the format followed by the data retrieved (the string) is the NMEA.
+        """
+        
+        try:
+            nmeaobj = pynmea2.parse(data.decode('utf-8'))
+            extracted_data = ['%s: %s' % (nmeaobj.fields[i][0], nmeaobj.data[i]) for i in range(len(nmeaobj.fields))]
+            gps_data = {}
+            for item in extracted_data:
+                tmp = item.split(': ')
+                gps_data[tmp[0]] = tmp[1]
+        except:
+            # Do not save any other comand line
+            return
+        
+        self.gps_rx_buffer.append(gps_data)
+        
+    def serial_receive(self, serial_instance_actual, stop_event):
+        """
+        
+        The callback function invoked by the serial thread.
+
+        Args:
+            serial_instance_actual (Serial): serial connection.
+            stop_event (threading): stop event for stop reading the serial com port.
+        """
+        
+        while not stop_event.is_set():
+            rx_msg = serial_instance_actual.readline()
+            #cnt = cnt+1
+            if rx_msg is not None:
+                self.process_gps_nmea_data(rx_msg)
+    
+    def start_thread_serial(self):
+        """
+        
+        Starts the serial read thread.
+        
+        """
+        
+        self.event_stop_thread_serial = threading.Event()
+        t_receive = threading.Thread(target=self.serial_receive, args=(self.serial_instance, self.event_stop_thread_serial))
+        t_receive.start()
+    
+    def stop_thread_serial(self):
+        """
+        
+        Stops the serial read thread.
+        
+        """
+        
+        self.event_stop_thread_serial.set()
+        self.serial_instance.close()
+        
+    def sendCommandGps(self, cmd):
+        """
+        
+        Send a command to the Septentrio gps, following their command format.
+
+        Args:
+            cmd (_type_): _description_
+        """        
+        
+        cmd_eof = cmd + '\n'
+        self.serial_instance.write(cmd_eof.encode('utf-8'))
+    
+    def ask_for_port(self):
+        """
+        
+        Utility function that asks the user to choose the COM port (windows) from the list of available ports.
+        Extracted and adapted from miniterm python code.
 
         Returns:
-            dict: dictionary with the gps data
+            str: the name of the com port chosen
+        """
+        sys.stderr.write('\n--- Available ports:\n')
+        ports = []
+        for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
+            sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
+            ports.append(port)
+        while True:
+            sys.stderr.write('--- Enter port index or full name: ')
+            port = input('')
+            try:
+                index = int(port) - 1
+                if not 0 <= index < len(ports):
+                    sys.stderr.write('--- Invalid index!\n')
+                    continue
+            except ValueError:
+                pass
+            else:
+                port = ports[index]
+            return port
+        
+class myAnritsuSpectrumAnalyzer(object):
+    def __init__(self, is_debug=True, is_config=True):
+        self.model = 'MS2760A'
+        self.is_debug = is_debug # Print debug messages
+        self.is_config = is_config # True if you want to configure the Spectrum Analyzer
+        
+    def sepectrum_analyzer_connect(self, HOST='127.0.0.1', PORT=9001):
+        """
+        
+        Create a socket and connect to the spectrum analyzer
+
+        Args:
+            HOST (str, optional): IP address. Defaults to '127.0.0.1'.
+            PORT (int, optional): TCP/IP port. Defaults to 9001.
+        """
+                
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.anritsu_con_socket = s
+        self.anritsu_con_socket.connect((HOST, PORT))
+        
+    def retrieve_max_pow(self, method=2):
+        """
+        Obtain the maximum power and its correspondent frequency
+
+        Args:
+            method (int, optional): for developer. It is indisctintive for user. Defaults to 2.
+
+        Raises:
+            Exception: _description_
+
+        Returns:
+            dictionary: magnitude of power, units of magnitude, frequency, units of frequency
         """
 
-        nmeaobj = pynmea2.parse(data.decode('utf-8'))
-        gps_list = ['%s: %s' % (nmeaobj.fields[i][0], nmeaobj.data[i]) for i in range(len(nmeaobj.fields))]
+        # Read the ID of the Spectrum Analyzer.
+        if self.is_debug:
+            self.anritsu_con_socket.send(b"*IDN?\n")
+            self.anritsu_con_socket.settimeout(20)
+            rsp = self.anritsu_con_socket.recv(1024)
+            self.model = rsp.decode()
+
+        # Configure the Spectrum Analyzer
+        if self.is_config:
+            self.anritsu_con_socket.send(b"SENS:FREQ:START 59.95 GHz\n")
+            self.anritsu_con_socket.send(b"SENS:FREQ:STOP 60.05 GHz\n")
+            self.anritsu_con_socket.send(b"BAND:RES 200 KHz\n")
+            self.anritsu_con_socket.send(b":DISPLAY:POINTCOUNT 101\n")
+            self.anritsu_con_socket.send(b":CALCulate:MARKer1:STATe 1\n")
+
+        # Find the maximum power
+        # 1. Pause the measurement collection
+        self.anritsu_con_socket.send(b"INIT:CONT OFF\n")
+        if method == 1:
+            # 2.1 Place Marker 1 at maximum peak
+            self.anritsu_con_socket.send(b":CALCulate:MARKer1:MAXimum\n")
+
+            # 2.2 Find the frequency in Hz
+            self.anritsu_con_socket.send(b":CALCulate:MARKer1:X?\n")
+            freq = self.anritsu_con_socket.recv(1024)
+
+            # 2.3 Find the maximum power in dBm
+            self.anritsu_con_socket.send(b":CALCulate:MARKer1:Y?\n")
+            pwr = self.anritsu_con_socket.recv(1024)
+        elif method == 2:
+            # 3.1 Find the maximum peak
+            self.anritsu_con_socket.send(b":CALCulate:PEAK:COUNt 1\n")
+
+            # 3.2 Read the frequency and power
+            self.anritsu_con_socket.send(b":FETCh:PEAK?\n")
+            rsp = self.anritsu_con_socket.recv(4096)
+            freq, pwr = rsp.decode().split(',')
+        else:
+            raise Exception("Error: Method not supported.")
+        # 4. Resume the measurement collection
+        self.anritsu_con_socket.send(b"INIT:CONT ON\n")
+
+        #print(f"Max power {float(pwr):.2f} dBm at {float(freq)*1e-9:.3f} GHz")
         
-        gps_data = {}
-        for item in gps_list:
-            tmp = item.split(': ')
-            gps_data[tmp[0]] = tmp[1]
+        return {'MAG': float(pwr), 'MAG_UNITS': 'dBm', 'FREQ': float(freq), 'FREQ_UNITS': 'Hz'}
 
+    def spectrum_analyzer_close(self):
+        """
+        
+        Wrapper to close the spectrum analyzer socket
+        
+        """
+        
+        self.anritsu_con_socket.close()
 
-        return gps_data
+        
+        
