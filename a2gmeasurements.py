@@ -12,17 +12,13 @@ import sys
 from serial.tools.list_ports import comports
 
 """
-
 Author: Julian D. Villegas G.
 Organization: VTT
 Version: 1.1
 e-mail: julian.villegas@vtt.fi
 
 Gimbal control adapted and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software.
-
 """
-
-
 
 class GimbalRS2(object):
     def __init__(self):
@@ -55,10 +51,11 @@ class GimbalRS2(object):
         #self.actual_bus = busObj
    
     def seq_num(self):
-        """_summary_ : updates the sequence number and outputs it in an string array
-                    Each array entry is a digit from the 4-digit hex string
+        """
+        Updates the sequence number of the gimbal data.
+
         Returns:
-            _type_: sequence number string array
+            hex: number in hexadecimal
         """
 
         if self.seq >= 0xFFFD:
@@ -69,9 +66,12 @@ class GimbalRS2(object):
         return seq_str[2:] + ":" + seq_str[0:2]
 
     def can_buffer_to_full_frame(self):
-        '''
-
-        '''
+        """
+        Saves the full DJI R frame message: its format is explaind in the DJI R SDK Protocol and User Interface
+        
+        Returns:
+            list: full frame 
+        """
         full_msg_frames = []
         full_frame_counter = 0
         for i in range(len(self.can_recv_msg_buffer)):
@@ -91,6 +91,15 @@ class GimbalRS2(object):
         return full_msg_frames
 
     def validate_api_call(self, data_frame):
+        """
+        CRC error check.
+
+        Args:
+            data_frame (list): DJI frame message
+
+        Returns:
+            boolean: pass the CRC32 check or not
+        """
         validated = False
         check_sum = ':'.join(data_frame[-4:])
         data = ':'.join(data_frame[:-4])
@@ -106,6 +115,12 @@ class GimbalRS2(object):
         return validated
 
     def parse_position_response(self, data_frame):
+        """
+        Retrieve the position from the full DJI frame message
+
+        Args:
+            data_frame (): DJI frame message
+        """
         pos_data = data_frame[16:-4]
         yaw = int(
             '0x' + pos_data[1] + pos_data[0], base=16)
@@ -136,6 +151,12 @@ class GimbalRS2(object):
         print(output)
         
     def can_callback(self, data):
+        """
+        Callback for can recv.
+
+        Args:
+            data (): DJI frame message
+        """
         #if data.id == self.recv_id:
             # print(len(data.data))
             # print(data)
@@ -166,6 +187,20 @@ class GimbalRS2(object):
                     self.parse_position_response(hex_data)
 
     def setPosControl(self, yaw, roll, pitch, ctrl_byte=0x01, time_for_action=0x14):
+        """
+        Set the gimbal position by providing the yaw, roll and pitch
+
+        Args:
+            yaw (int): yaw value
+            roll (int): roll value
+            pitch (int): pitch value
+            ctrl_byte (hexadecimal, optional): _description_. Defaults to 0x01.
+            time_for_action (hexadecimal, optional): _description_. Defaults to 0x14.
+
+        Returns:
+            _type_: _description_
+        """
+        
         # yaw, roll, pitch in 0.1 steps (-1800,1800)
         # ctrl_byte always to 1
         # time_for_action to define speed in 0.1sec
@@ -179,43 +214,45 @@ class GimbalRS2(object):
                                     cmd_id='00', data=cmd_data)
 
         self.send_cmd(cmd)
-        return True
-
-    def send_joint_pos(self, req):
-        # print("Returning [%s + %s +%s ]" % (req.pitch, req.yaw, req.roll))
-
-        yaw = 10 * req.yaw
-        roll = 10 * req.roll
-        pitch = 10 * req.pitch
-        success = False
-        if -1800 <= yaw <= 1800 and -1800 <= roll <= 1800 and -1800 <= pitch <= 1800:
-            success = self.setPosControl(yaw, roll, pitch)
-        #return SendJointPosResponse(success)
-
-    def send_joint_speed_cmd(self, req):
-        # Angular speeds in 0.1 deg/sec
-        yaw = req.yaw * 10
-        pitch = req.pitch * 10
-        roll = req.roll * 10
-
-        success = False
-        if -3600 <= yaw <= 3600 and -3600 <= roll <= 3600 and -3600 <= pitch <= 3600:
-            success = self.setSpeedControl(yaw, roll, pitch)
-        #return SendJointSpeedResponse(success)
+        return True    
 
     def setSpeedControl(self, yaw, roll, pitch, ctrl_byte=0x80):
-        hex_data = struct.pack('<3hB', yaw, roll, pitch, ctrl_byte)
-        pack_data = ['{:02X}'.format(struct.unpack('<1B', i)[
-            0]) for i in hex_data]
-        cmd_data = ':'.join(pack_data)
+        """
+        
+        Sets speed for each axis of the gimbal.
 
-        cmd = self.assemble_can_msg(cmd_type='03', cmd_set='0E',
-                                    cmd_id='01', data=cmd_data)
-        # print('cmd---data {}'.format(cmd))
-        self.send_cmd(cmd)
-        return True
+        Args:
+            yaw (int): yaw speed in units of 0.1 deg/s
+            roll (int): roll speed in units of 0.1 deg/s
+            pitch (int): pitch speed in units of 0.1 deg/s
+            ctrl_byte (hexadecimal, optional): _description_. Defaults to 0x80.
+
+        Returns:
+            _type_: _description_
+        """
+        
+        if -3600 <= yaw <= 3600 and -3600 <= roll <= 3600 and -3600 <= pitch <= 3600:
+        
+            hex_data = struct.pack('<3hB', yaw, roll, pitch, ctrl_byte)
+            pack_data = ['{:02X}'.format(struct.unpack('<1B', i)[
+                0]) for i in hex_data]
+            cmd_data = ':'.join(pack_data)
+
+            cmd = self.assemble_can_msg(cmd_type='03', cmd_set='0E',
+                                        cmd_id='01', data=cmd_data)
+            # print('cmd---data {}'.format(cmd))
+            self.send_cmd(cmd)
+            
+            return True
+        else:
+            return False
 
     def request_current_position(self):
+        """
+        Sends command to request the current position of the gimbal
+        
+        """
+        
         hex_data = [0x01]
         pack_data = ['{:02X}'.format(i)
                      for i in hex_data]
@@ -225,6 +262,19 @@ class GimbalRS2(object):
         self.send_cmd(cmd)
 
     def assemble_can_msg(self, cmd_type, cmd_set, cmd_id, data):
+        """
+        Builds a DJI message frame based on the command to be sent.
+
+        Args:
+            cmd_type (hex): see DJI R SDK Protocol and User Interface document for a description
+            cmd_set (hex): see DJI R SDK Protocol and User Interface document for a description
+            cmd_id (hex): see DJI R SDK Protocol and User Interface document for a description
+            data (hex): see DJI R SDK Protocol and User Interface document for a description
+
+        Returns:
+            hex: the dji frame message 
+        """
+        
         if data == "":
             can_frame_data = "{prefix}" + \
                 ":{cmd_set}:{cmd_id}".format(
@@ -266,11 +316,25 @@ class GimbalRS2(object):
         return whole_can_frame
 
     def send_cmd(self, cmd):
+        """
+        Wrapper to send a comand 
+
+        Args:
+            cmd (str): command fields separated by ':'
+        """
+        
         data = [int(i, 16) for i in cmd.split(":")]
-        #print(data)
         self.send_data(self.send_id, data)
 
     def send_data(self, can_id, data):
+        """
+        Sends a command through the can bus
+
+        Args:
+            can_id (hex): _description_
+            data (list): list with the fields of the frame 
+        """
+        
         data_len = len(data)
         full_frame_num, left_len = divmod(data_len, self.MAX_CAN_FRAME_LEN)
 
@@ -404,12 +468,12 @@ class GimbalRS2(object):
     
     def start_thread_gimbal(self, bitrate=1000000):
         """
-
         Starts the thread for 'listening' the incoming data from pcan
 
         Args:
             bitrate (int, optional): Bitrate used for pcan device. Defaults to 1000000.
         """
+        
         bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=bitrate)
         self.actual_bus = bus
 
@@ -419,10 +483,10 @@ class GimbalRS2(object):
 
     def stop_thread_gimbal(self):
         """
-
         Stops the gimbal thread
 
         """
+        
         self.event_stop_thread_gimbal.set()
 
 class GpsSignaling(object):
@@ -470,7 +534,6 @@ class GpsSignaling(object):
             
     def serial_connect(self, port='COM11'):
         """
-        
         Open a serial connection with one of the 2 virtual ports provided by Septentrio mosaic-go.
         
         Args:
@@ -502,7 +565,6 @@ class GpsSignaling(object):
     
     def process_gps_nmea_data(self, data):
         """
-
         Process the received data of the gps coming from the virtual serial port.
 
         Args:
@@ -524,7 +586,6 @@ class GpsSignaling(object):
         
     def serial_receive(self, serial_instance_actual, stop_event):
         """
-        
         The callback function invoked by the serial thread.
 
         Args:
@@ -540,7 +601,6 @@ class GpsSignaling(object):
     
     def start_thread_serial(self):
         """
-        
         Starts the serial read thread.
         
         """
@@ -551,7 +611,6 @@ class GpsSignaling(object):
     
     def stop_thread_serial(self):
         """
-        
         Stops the serial read thread.
         
         """
@@ -561,7 +620,6 @@ class GpsSignaling(object):
         
     def sendCommandGps(self, cmd):
         """
-        
         Send a command to the Septentrio gps, following their command format.
 
         Args:
@@ -573,7 +631,6 @@ class GpsSignaling(object):
     
     def ask_for_port(self):
         """
-        
         Utility function that asks the user to choose the COM port (windows) from the list of available ports.
         Extracted and adapted from miniterm python code.
 
@@ -607,7 +664,6 @@ class myAnritsuSpectrumAnalyzer(object):
         
     def sepectrum_analyzer_connect(self, HOST='127.0.0.1', PORT=9001):
         """
-        
         Create a socket and connect to the spectrum analyzer
 
         Args:
@@ -681,7 +737,6 @@ class myAnritsuSpectrumAnalyzer(object):
 
     def spectrum_analyzer_close(self):
         """
-        
         Wrapper to close the spectrum analyzer socket
         
         """
