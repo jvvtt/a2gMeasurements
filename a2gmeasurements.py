@@ -530,7 +530,14 @@ class GpsSignaling(object):
 
         while not stop_event.is_set():
             data = self.socket.recv(64)
-            self.process_input_data(data)
+            self.process_gps_nmea_data(data)
+    
+    def stop_thread_socket(self):
+        """
+        Stops the socket for receiving gps data.
+        """
+        
+        self.event_stop_thread_socket.set()
             
     def serial_connect(self, port='COM11'):
         """
@@ -628,7 +635,21 @@ class GpsSignaling(object):
         
         cmd_eof = cmd + '\n'
         self.serial_instance.write(cmd_eof.encode('utf-8'))
-    
+   
+    def start_gps_data_retrieval(self, stream_number=1, interface='USB1', interval='sec1'):
+        """
+        Wrapper to sendCommandGps for a specific command to send.
+
+        Args:
+            stream_number(int, optional): stream number. Defaults to 1.
+            interface (str, optional): Interface: can be 'USB1', 'USB2' or 'IP'+ number_of_ip_terminal_emulator. Defaults to 'USB1'. 
+            interval (str, optional): can be any of: 'msec10', 'msec20', 'msec40', 'msec50', 'msec100', 'msec200', 'msec500',
+                                                     'sec1', 'sec2', 'sec5', 'sec10', 'sec15', 'sec30', 'sec60', 
+                                                     'min2', 'min5', 'min10', 'min15', 'min30', 'min60'
+        """
+        cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + ', GGA, ' + interval
+        self.sendCommandGps(cmd)
+     
     def ask_for_port(self):
         """
         Utility function that asks the user to choose the COM port (windows) from the list of available ports.
