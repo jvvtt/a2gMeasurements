@@ -1,0 +1,22 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>STATIC DRONE, MOVING GIMBAL</h1>
+<h2> Instructions to review before pressing start </h2>
+
+  <p>1. .</p>
+  <p>2. .</p>
+  <p>3. .</p>
+  <p>4. .</p>
+  
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary" name="start">START</button>
+  </form>
+
+  {% if gps_ready %}  
+  {% else %}
+  <p>Gps signal is not ready (not connected to any satellite).</p>
+  {% endif %}
+
+{% endblock %}

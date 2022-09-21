@@ -573,6 +573,25 @@ class GpsSignaling(object):
     def process_gps_nmea_data(self, data):
         """
         Process the received data of the gps coming from the virtual serial port.
+        
+        The labels of the items of the returned dictionary are the following ones:
+        
+        'Timestamp'
+        'Latitude'
+        'Latitude'
+        'Latitude Direction'
+        'Longitude'
+        'Longitude Direction'
+        'GPS Quality Indicator'
+        'Number of Satellites in use'
+        'Horizontal Dilution of Precision'
+        'Antenna Alt above sea level (mean)'
+        'Units of altitude (meters)'
+        'Geoidal Separation'
+        'Units of Geoidal Separation (meters)'
+        'Age of Differential GPS Data (secs)'
+        'Differential Reference Station ID'
+        
 
         Args:
             data (str): line of read data. We assume that the format followed by the data retrieved (the string) is the NMEA.
@@ -589,7 +608,9 @@ class GpsSignaling(object):
             # Do not save any other comand line
             return
         
-        self.gps_rx_buffer.append(gps_data)
+        # Only save gps info when GPS is connected to satellites
+        if gps_data['Number of Satellites in use'] != '00':
+            self.gps_rx_buffer.append(gps_data)
         
     def serial_receive(self, serial_instance_actual, stop_event):
         """
