@@ -1,13 +1,15 @@
 from django.shortcuts import render, get_object_or_404
-from .models import ManualMove, PcanInstance
+from .models import ManualMove, AutomaticMove, PcanInstance, SeptentrioGpsInstance, GpsDataBase
 from django.http import HttpResponseRedirect, Http404
 from django.urls import reverse
 from django.views import generic
 from .forms import GimbalSetPositionForm
 import datetime, can, time, threading
-
+import numpy as np
 
 def index(request):
+    
+    # When opening the index page, instances of all devices must be retrieved.
     
     # There should be only 1 pcan instance, so either there is one object in th db or not
     try:
@@ -17,19 +19,36 @@ def index(request):
         # means it is retrieved each time we point to the index page
         pcan_is_active = pcan.bus_is_active
         
+        septentrio = SeptentrioGpsInstance.objects.all.last()
+        
+        septentrio_is_active = septentrio.gps_is_active
+        
     # If there is no object, then pcan has not been initialized
     except:
         pcan_is_active = False
         
+        septentrio_is_active = False
+        
       # If this is a POST request then process the Form data
     if request.method == 'POST':
         
-        if 'start_button' in request.POST:            
+        if 'start_button' in request.POST:     
+            # Start gimbal thread       
             pcan_instance = PcanInstance()
             pcan_instance.gc.start_thread_gimbal()   
             pcan_instance.save()
             
             pcan_is_active = True
+            
+            # Start gps thread
+            gps_instance = SeptentrioGpsInstance()
+            gps_instance.gps.serial_connect()
+            gps_instance.gps.start_thread_serial()
+            gps_instance.save()
+            
+            septentrio_is_active = True
+            gps_instance.gps.start_gps_data_retrieval()
+            
             
         elif 'stop_button' in request.POST:
             pcan.gc.stop_thread_gimbal()
@@ -144,3 +163,47 @@ def myManualViewView(request):
         form = GimbalSetPositionForm(initial={'yaw_angle': 0, 'roll_angle': 0, 'pitch_angle': 0, 'type_movement': m_move[0].type_movement})
 
     return render(request, 'manual_move.html', context={'form': form, 'last_yaw': m_move[0].yaw, 'last_roll': m_move[0].roll, 'last_pitch': m_move[0].pitch, 'last_date': m_move[0].time_tag})
+
+def myAutomaticViewView(request):
+     # There should be only 1 gps instance: either there is one gps object in the model class or none
+    try:
+        mygps = SeptentrioGpsInstance.objects.all().last()
+        pcan = PcanInstance.objects.all().last()
+        
+    # If there is no object, then pcan has not been initialized, and we redirect to the index page
+    except:
+        return render(request, 'index.html', context={'pcan_is_active':False, 'septentrio_is_active': False})    
+    
+    # IMPORTANT NOTE: THERE MUST BE AT LEAST ONE DEFAULT ENTRY IN THE DATABASE (i.e. THE lo)
+    a_move = AutomaticMove.objects.order_by('-time_tag')[:1]
+    
+    if len(mygps.gps.gps_rx_buffer) == 0:
+        gps_ready = False
+    else:
+        gps_ready = True
+    
+    # If this is a POST request then process the Form data
+    if request.method == 'POST':
+        
+        # Should be the planar coordinates : ---TO BE CHECKED
+        lat = mygps.gps.gps_rx_buffer['Latitude']
+        lon = mygps.gps.gps_rx_buffer['Longitude']
+        
+        alpha = np.arctan2(mygps.gps.drone_pos_lat - lat, mygps.gps.drone_pos_lon - lon)
+        beta = np.pi/2 - alpha
+        
+        if beta > np.pi:
+            beta = np.pi - beta
+                  
+        manual_move = AutomaticMove(yaw=yw, roll=rll, pitch=ptch, time_tag=datetime.datetime.now())
+        manual_move.save()
+
+        pcan.gc.setPosControl(yw, roll=rll, pitch=ptch, time_for_action=0x1A)
+                
+        return HttpResponseRedirect( reverse('automatic-move') )
+            
+    # If this is a GET (or any other method) create the default form.
+    else:
+        1
+
+    return render(request, 'automatic_move.html', context={'gps_ready': gps_ready})
