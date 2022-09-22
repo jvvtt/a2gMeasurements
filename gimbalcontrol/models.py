@@ -4,25 +4,19 @@ import uuid
 import datetime
 from django.utils import timezone
 #from GimbalRS2 import GimbalRS2
-from a2gmeasurements import GimbalRS2
+from a2gmeasurements import GimbalRS2, GpsSignaling
 import can
 import threading
-
-class MyClass():
-    def __init__(self, name, lastname):
-        self.name = name
-        self.lastname = lastname
-        
-    def dummy1(self):
-        return self.name + str(2*7)
-    
-    def dummy2(self):
-        return self.lastname + str(2*10)
-    
+  
 class PcanInstance(models.Model):
     bus_is_active = models.BooleanField(default=False)
     
     gc = GimbalRS2()    
+
+class SeptentrioGpsInstance(models.Model):
+    gps_is_active = models.BooleanField(default=False)
+    
+    gps = GpsSignaling(1)
 
 class ManualMove(models.Model):
     # Campos
@@ -55,9 +49,27 @@ class ManualMove(models.Model):
         """
         return 'YAW: %d, ROLL: %d, PITCH: %d' % (self.yaw, self.roll, self.pitch)
     
-
+class GpsDataBase(models.Model):
+    latitude = models.FloatField(default=0)
+    longitude = models.FloatField(default=0)
+    gps_time_tag = models.DateTimeField('GPS Time Tag')
+    
+    # More gps info to be entered here
+    
+    def __str__(self):
+        return  'LAT: %.7f, LON: %.7f' % (self.latitude, self.longitude)
+    
 class AutomaticMove(models.Model):
-    2
+    # It is a replica of the ManualMove class, but it is created to save the automatic gimbal movements in another database TABLE.
+    # We could add another field to the ManualMove class to differentiate between a manual movement and an automatic one,
+    # but then the name of the class (ManualMove) would be not crystal-clear
+                
+    yaw = models.IntegerField(default=0, help_text='Enter yaw integer')
+    roll = models.IntegerField(default=0, help_text='Enter roll integer')
+    pitch = models.IntegerField(default=0, help_text='Enter pitch integer')
+    
+    time_tag = models.DateTimeField('Time tag')
+    
     
 class Presets(models.Model):
     3
