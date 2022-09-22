@@ -494,7 +494,8 @@ class GpsSignaling(object):
         # Initializations
         # Dummy initialization
         self.gpsID = gpsID
-        self.gps_rx_buffer = [] 
+        self.SBF_frame_buffer = []
+        self.NMEA_buffer = []
         
     def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1', ip_port_number='IP11'):
         """
@@ -539,17 +540,25 @@ class GpsSignaling(object):
         
         self.event_stop_thread_socket.set()
             
-    def serial_connect(self, port='COM11'):
+    def serial_connect(self):
         """
         Open a serial connection with one of the 2 virtual ports provided by Septentrio mosaic-go.
         
         Args:
             port (str, optional): virtual serial port. Defaults to 'COM11'.
         """
+        
+        # Look for the first Virtual Com in Septentrio receiver. It is assumed that it is available, 
+        # meaning that it has been closed by user if was used before.        
+        for (this_port, desc, _) in sorted(comports()):
+            if 'Septentrio Virtual USB COM Port 1' in desc:
+                self.serial_port = this_port
+                self.virtual_serial_port_number = 1
+        
         serial_instance = None
         while serial_instance is None:
             try:
-                serial_instance = serial.serial_for_url(port,
+                serial_instance = serial.serial_for_url(self.serial_port,
                                                         9600,
                                                         parity='N',
                                                         rtscts=False,
@@ -562,13 +571,12 @@ class GpsSignaling(object):
                 serial_instance.open()
                                 
             except serial.SerialException as e:
-                sys.stderr.write('could not open port {!r}: {}\n'.format(port, e))
+                sys.stderr.write('could not open port {!r}: {}\n'.format(self.serial_port, e))
 
             else:
                 break
         
         self.serial_instance = serial_instance
-        self.serial_port = port
     
     def process_gps_nmea_data(self, data):
         """
@@ -578,7 +586,7 @@ class GpsSignaling(object):
         
         'Timestamp'
         'Latitude'
-        'Latitude'
+        'Longitude'
         'Latitude Direction'
         'Longitude'
         'Longitude Direction'
@@ -597,8 +605,11 @@ class GpsSignaling(object):
             data (str): line of read data. We assume that the format followed by the data retrieved (the string) is the NMEA.
         """
         
+        DEBUG = False
+        
         try:
-            nmeaobj = pynmea2.parse(data.decode('utf-8'))
+            #nmeaobj = pynmea2.parse(data.decode('utf-8'))
+            nmeaobj = pynmea2.parse(data.decode())
             extracted_data = ['%s: %s' % (nmeaobj.fields[i][0], nmeaobj.data[i]) for i in range(len(nmeaobj.fields))]
             gps_data = {}
             for item in extracted_data:
@@ -608,10 +619,67 @@ class GpsSignaling(object):
             # Do not save any other comand line
             return
         
-        # Only save gps info when GPS is connected to satellites
-        if gps_data['Number of Satellites in use'] != '00':
-            self.gps_rx_buffer.append(gps_data)
+        # Save data if there are satellites
+        #if gps_data['Number of Satellites in use'] != '00' or DEBUG:
         
+        # Save data if there is information (there is no any blank space in the dictionary of gps data)
+        if not any([True for key, items in gps_data.items() if items == '']) or DEBUG:
+            self.NMEA_buffer.append(gps_data)
+        
+    def process_pvtcart_sbf_data(self, data):
+        """
+        Process the PVTCart data type
+        
+        Args:
+            data (list): _description_
+        """
+        
+        data = struct.unpack('<1c3H1I1H2B3d5fdf4B2H1I2B4H1B1B', data)
+        
+        pvt_msg_format = {'SYNC2': data[0], 'CRC': data[1], 'ID': data[2], 'LEN': data[3], 'TOW': data[4],
+                          'WNc': data[5], 'MODE': data[6], 'ERR': data[7], 'X': data[8], 'Y': data[9], 'Z': data[10],
+                          'Undulation': data[11], 'Vx': data[12], 'Vy': data[13], 'Vz': data[14], 'COG': data[15],
+                          'RxClkBias': data[16], 'RxClkDrift': data[17], 'TimeSystem': data[18], 'Datum': data[19],
+                          'NrSV': data[20], 'WACorrInfo': data[21], 'ReferenceID': data[22], 'MeanCorrAge': data[23],
+                          'SignalInfo': data[24], 'AlertFlag': data[25], 'NrBases': data[26], 'PPPInfo': data[27],
+                          'Latency': data[28], 'HAccuracy': data[29], 'VAccuracy': data[30], 'Misc': data[31],
+                          'Padding': data[32]}        
+
+        self.SBF_frame_buffer.append(pvt_msg_format)
+        
+    def parse_septentrio_msg(self, rx_msg):
+        """
+        Parse the received message and process it depending if it is a SBF or NMEA message
+        
+        Args:
+            rx_msg (bytes or str): received message
+
+        Raises:
+            Exception: _description_
+        """        
+        DEBUG = False
+        
+        try:
+            # The SBF output follows the $ sync1 byte, with a second sync byte that is the symbol @ or in utf-8 the decimal 64
+            if rx_msg[0] == 64: 
+                ID_SBF_msg = struct.unpack('<1H', rx_msg[3:5])
+                
+                # PVTCart SBF sentence identified by ID 4006
+                if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
+                    self.process_pvtcart_sbf_data(rx_msg[:-1])
+                
+                
+                # Implement other  SBF sentences.
+                # ...
+                
+            
+            # NMEA Output starts with the letter G, that in utf-8 is the decimal 71
+            elif rx_msg[0] == 71:
+                self.process_gps_nmea_data(rx_msg[:-1])
+        except:
+            if DEBUG:
+                print(rx_msg, sys.getsizeof(rx_msg))
+    
     def serial_receive(self, serial_instance_actual, stop_event):
         """
         The callback function invoked by the serial thread.
@@ -622,10 +690,14 @@ class GpsSignaling(object):
         """
         
         while not stop_event.is_set():
-            rx_msg = serial_instance_actual.readline()
-            #cnt = cnt+1
-            if rx_msg is not None:
-                self.process_gps_nmea_data(rx_msg)
+            # This is if only NMEA messages are received
+            #rx_msg = serial_instance_actual.readline()
+            
+            # This looks for the start of a sentence in either NMEA or SBF messages
+            rx_msg = serial_instance_actual.read_until(expected='$'.encode('utf-8'))
+            if len(rx_msg) > 0:
+                #self.process_gps_nmea_data(rx_msg)
+                self.parse_septentrio_msg(rx_msg)
     
     def start_thread_serial(self):
         """
@@ -657,7 +729,7 @@ class GpsSignaling(object):
         cmd_eof = cmd + '\n'
         self.serial_instance.write(cmd_eof.encode('utf-8'))
    
-    def start_gps_data_retrieval(self, stream_number=1, interface='USB1', interval='sec1'):
+    def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', nmea_type='GGA'):
         """
         Wrapper to sendCommandGps for a specific command to send.
 
@@ -668,9 +740,38 @@ class GpsSignaling(object):
                                                      'sec1', 'sec2', 'sec5', 'sec10', 'sec15', 'sec30', 'sec60', 
                                                      'min2', 'min5', 'min10', 'min15', 'min30', 'min60'
         """
-        cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + ', GGA, ' + interval
+        
+        if interface == 'USB':
+            if msg_type == 'SBF':
+                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', PVTCartesian, ' + interval
+            elif msg_type == 'NMEA':
+                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', ' + nmea_type + ', ' + interval
+        
         self.sendCommandGps(cmd)
+        print(cmd)
      
+    def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='NMEA'):
+        """
+        Stop the streaming of data using septentrio commands. 
+        
+        DEVELOPER NOTE: it seems that if the stream is not stopped by the time the serial connection is closed, then when the
+        user opens a new serial connection, Septentrio will start sending all the SBF or NMEA messages that were produced
+        between the last time the serial connection was closed and the time it is opened again.
+
+        Args:
+            stream_number (int, optional): _description_. Defaults to 1.
+            interface (str, optional): _description_. Defaults to 'USB'.
+            msg_type (str, optional): _description_. Defaults to 'NMEA'.
+        """
+        
+        if interface == 'USB':
+            if msg_type == 'SBF':
+                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', none '
+            elif msg_type == 'NMEA':
+                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', none ' 
+     
+        self.sendCommandGps(cmd)
+        
     def ask_for_port(self):
         """
         Utility function that asks the user to choose the COM port (windows) from the list of available ports.
