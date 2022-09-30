@@ -48,9 +48,7 @@ class GimbalRS2(object):
         self.keyboard_buff = []
 
         self.cntBytes = 0
-    
-        #self.actual_bus = busObj
-   
+  
     def seq_num(self):
         """
         Updates the sequence number of the gimbal data.
@@ -491,12 +489,14 @@ class GimbalRS2(object):
         self.event_stop_thread_gimbal.set()
 
 class GpsSignaling(object):
-    def __init__(self, gpsID):
+    def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False):
         # Initializations
         # Dummy initialization
-        self.gpsID = gpsID
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
+        self.DBG_LVL_1 = DBG_LVL_1
+        self.DBG_LVL_2 = DBG_LVL_2
+        self.DBG_LVL_0 = DBG_LVL_0
         
     def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1', ip_port_number='IP11'):
         """
@@ -513,15 +513,7 @@ class GpsSignaling(object):
         self.socket = s
         
         self.socket.connect((HOST, PORT))
-        #data = s.recv(64)
-
-        cmd_set_gps = 'sno, Stream 3, ' + ip_port_number + ', GGA, ' + time + '\n'
-        self.socket.sendall(cmd_set_gps.encode('utf-8'))
-
-        self.event_stop_thread_socket = threading.Event()
-        t_receive = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_socket))
-        t_receive.start()
-
+     
     def socket_receive(self, stop_event):
         """
         Callback function to be called when incoming gps data
@@ -533,13 +525,6 @@ class GpsSignaling(object):
         while not stop_event.is_set():
             data = self.socket.recv(64)
             self.process_gps_nmea_data(data)
-    
-    def stop_thread_socket(self):
-        """
-        Stops the socket for receiving gps data.
-        """
-        
-        self.event_stop_thread_socket.set()
             
     def serial_connect(self):
         """
@@ -554,7 +539,7 @@ class GpsSignaling(object):
         for (this_port, desc, _) in sorted(comports()):
             if 'Septentrio Virtual USB COM Port 1' in desc:
                 self.serial_port = this_port
-                self.virtual_serial_port_number = 1
+                self.interface_number = 1
         
         serial_instance = None
         while serial_instance is None:
@@ -576,6 +561,9 @@ class GpsSignaling(object):
 
             else:
                 break
+        
+        if self.DBG_LVL_0:
+            print('CONNECTED TO VIRTUAL SERIAL PORT IN SEPTENTRIO\r\n')
         
         self.serial_instance = serial_instance
     
@@ -606,9 +594,9 @@ class GpsSignaling(object):
             data (str): line of read data. We assume that the format followed by the data retrieved (the string) is the NMEA.
         """
         
-        DEBUG = False
-        
         try:
+            if self.DBG_LVL_0:
+                print('STARTS NMEA PARSING\r\n')
             #nmeaobj = pynmea2.parse(data.decode('utf-8'))
             nmeaobj = pynmea2.parse(data.decode())
             extracted_data = ['%s: %s' % (nmeaobj.fields[i][0], nmeaobj.data[i]) for i in range(len(nmeaobj.fields))]
@@ -618,13 +606,14 @@ class GpsSignaling(object):
                 gps_data[tmp[0]] = tmp[1]
         except:
             # Do not save any other comand line
+            if self.DBG_LVL_0:
+                print('EXCEPTION PROCESSING NMEA\r\n')
             return
         
-        # Save data if there are satellites
-        #if gps_data['Number of Satellites in use'] != '00' or DEBUG:
-        
         # Save data if there is information (there is no any blank space in the dictionary of gps data)
-        if not any([True for key, items in gps_data.items() if items == '']) or DEBUG:
+        if not any([True for key, items in gps_data.items() if items == '']) or self.DBG_LVL_2:
+            if self.DBG_LVL_0:
+                print('SAVES NMEA DATA INTO BUFFER\r\n')
             self.NMEA_buffer.append(gps_data)
         
     def process_pvtcart_sbf_data(self, data):
@@ -657,12 +646,17 @@ class GpsSignaling(object):
 
         Raises:
             Exception: _description_
-        """        
-        DEBUG = False
-        
+        """                
         try:
+            if self.DBG_LVL_0:
+                print('STARTS RECEPTION OF MSG\r\n')
+            if self.DBG_LVL_1:
+                print('MSG: ', rx_msg)
+            
             # The SBF output follows the $ sync1 byte, with a second sync byte that is the symbol @ or in utf-8 the decimal 64
             if rx_msg[0] == 64: 
+                if self.DBG_LVL_0:
+                    print('DETECTS SBF\r\n')
                 ID_SBF_msg = struct.unpack('<1H', rx_msg[3:5])
                 
                 # PVTCart SBF sentence identified by ID 4006
@@ -676,10 +670,14 @@ class GpsSignaling(object):
             
             # NMEA Output starts with the letter G, that in utf-8 is the decimal 71
             elif rx_msg[0] == 71:
+                if self.DBG_LVL_0:
+                    print('DETECTS NMEA\r\n')
                 self.process_gps_nmea_data(rx_msg[:-1])
         except:
-            if DEBUG:
-                print(rx_msg, sys.getsizeof(rx_msg))
+            if self.DBG_LVL_0:
+                print('EXCEPTION IN parse_septentrio_msg\r\n')
+            if self.DBG_LVL_1:
+                print('MSG:', rx_msg, ' SIZE: ', sys.getsizeof(rx_msg), '\r\n')
     
     def serial_receive(self, serial_instance_actual, stop_event):
         """
@@ -697,29 +695,36 @@ class GpsSignaling(object):
             # This looks for the start of a sentence in either NMEA or SBF messages
             rx_msg = serial_instance_actual.read_until(expected='$'.encode('utf-8'))
             if len(rx_msg) > 0:
-                #self.process_gps_nmea_data(rx_msg)
                 self.parse_septentrio_msg(rx_msg)
     
-    def start_thread_serial(self):
+    def start_thread_gps(self, interface='USB'):
         """
         Starts the serial read thread.
         
         """
         
-        self.event_stop_thread_serial = threading.Event()
-        t_receive = threading.Thread(target=self.serial_receive, args=(self.serial_instance, self.event_stop_thread_serial))
+        self.event_stop_thread_gps = threading.Event()
+        
+        if interface == 'USB':
+            t_receive = threading.Thread(target=self.serial_receive, args=(self.serial_instance, self.event_stop_thread_gps))
+            
+        elif interface == 'IP':
+            t_receive = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_gps))
+
         t_receive.start()
-    
-    def stop_thread_serial(self):
+        
+    def stop_thread_gps(self, interface='USB'):
         """
         Stops the serial read thread.
         
         """
         
-        self.event_stop_thread_serial.set()
-        self.serial_instance.close()
+        self.event_stop_thread_gps.set()
         
-    def sendCommandGps(self, cmd):
+        if interface =='USB':
+            self.serial_instance.close()
+        
+    def sendCommandGps(self, cmd, interface='USB'):
         """
         Send a command to the Septentrio gps, following their command format.
 
@@ -728,8 +733,12 @@ class GpsSignaling(object):
         """        
         
         cmd_eof = cmd + '\n'
-        self.serial_instance.write(cmd_eof.encode('utf-8'))
-   
+        
+        if interface =='USB':
+            self.serial_instance.write(cmd_eof.encode('utf-8'))
+        elif interface == 'IP':
+            self.socket.sendall(cmd_eof.encode('utf-8'))
+            
     def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', nmea_type='GGA'):
         """
         Wrapper to sendCommandGps for a specific command to send.
@@ -744,12 +753,14 @@ class GpsSignaling(object):
         
         if interface == 'USB':
             if msg_type == 'SBF':
-                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', PVTCartesian, ' + interval
+                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', PVTCartesian, ' + interval
             elif msg_type == 'NMEA':
-                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', ' + nmea_type + ', ' + interval
+                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', ' + nmea_type + ', ' + interval
         
         self.sendCommandGps(cmd)
-        print(cmd)
+        
+        if self.DBG_LVL_1:
+            print(cmd)
      
     def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='NMEA'):
         """
@@ -767,9 +778,9 @@ class GpsSignaling(object):
         
         if interface == 'USB':
             if msg_type == 'SBF':
-                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', none '
+                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none '
             elif msg_type == 'NMEA':
-                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.virtual_serial_port_number) + ', none ' 
+                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none ' 
      
         self.sendCommandGps(cmd)
         
@@ -799,35 +810,6 @@ class GpsSignaling(object):
             else:
                 port = ports[index]
             return port
-    
-    def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
-        """_summary_
-
-        Args:
-            input_lon (_type_): _description_
-            input_lat (_type_): _description_
-            offset (dictionary, optional): Lower left coordinates. Defaults to None.
-            epsg_in (int, optional): _description_. Defaults to 4326.
-            epsg_out (int, optional): _description_. Defaults to 3901. Finland EPSG Uniform Coordinate System
-
-        Returns:
-            _type_: _description_
-        """
-        
-        # setup your projections, assuming you're using WGS84 geographic
-        crs_wgs = proj.Proj(init='epsg:' + str(epsg_in))
-        crs_bng = proj.Proj(init='epsg:' + str(epsg_out))  # use the Belgium epsg code
-
-        # then cast your geographic coordinate pair to the projected system
-        lon_planar, lat_planar = proj.transform(crs_wgs, crs_bng, input_lon, input_lat)
-
-        # Remove offset
-        if offset is not None:
-            offset_lon_planar, offset_lat_planar = proj.transform(crs_wgs, crs_bng, offset['lon'], offset['lat'])
-            lon_planar = lon_planar - offset_lon_planar
-            lat_planar = lat_planar - offset_lat_planar
-
-        return lat_planar, lon_planar
     
 class myAnritsuSpectrumAnalyzer(object):
     def __init__(self, is_debug=True, is_config=True):
@@ -916,10 +898,10 @@ class myAnritsuSpectrumAnalyzer(object):
         
         self.anritsu_con_socket.close()
 
-
 class HelperA2GMeasurements(object):
-    def __init__(self):
-        1
+    def __init__(self, ID):
+        # ID should be 'DRONE' or 'GROUND'
+        self.ID = ID
         
     def mobile_gimbal_follows_drone(self, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
         """_summary_
@@ -963,6 +945,35 @@ class HelperA2GMeasurements(object):
         
         return yaw, roll
         
-        
-        
-        
+    def HelperGimbalTracksDrone(self):
+        myGPS = GpsSignaling()    
+        myGimbal = GimbalRS2()
+    
+    def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
+            """_summary_
+
+            Args:
+                input_lon (scalar): _description_
+                input_lat (scalar): _description_
+                offset (dictionary, optional): The coordinates of the (0, 0) coordinate in the planar system with meter units. Defaults to None.
+                epsg_in (int, optional): _description_. Defaults to 4326.
+                epsg_out (int, optional): _description_. Defaults to 3901. Finland EPSG Uniform Coordinate System
+
+            Returns:
+                _type_: _description_
+            """
+            
+            # setup your projections, assuming you're using WGS84 geographic
+            crs_wgs = proj.Proj(init='epsg:' + str(epsg_in))
+            crs_bng = proj.Proj(init='epsg:' + str(epsg_out))  # use the Belgium epsg code
+
+            # then cast your geographic coordinate pair to the projected system
+            lon_planar, lat_planar = proj.transform(crs_wgs, crs_bng, input_lon, input_lat)
+
+            # Remove offset
+            if offset is not None:
+                offset_lon_planar, offset_lat_planar = proj.transform(crs_wgs, crs_bng, offset['lon'], offset['lat'])
+                lon_planar = lon_planar - offset_lon_planar
+                lat_planar = lat_planar - offset_lat_planar
+
+            return lat_planar, lon_planar
