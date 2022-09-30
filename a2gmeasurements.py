@@ -10,6 +10,7 @@ import pynmea2
 import serial
 import sys
 from serial.tools.list_ports import comports
+import pyproj as proj
 
 """
 Author: Julian D. Villegas G.
@@ -798,14 +799,43 @@ class GpsSignaling(object):
             else:
                 port = ports[index]
             return port
+    
+    def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
+        """_summary_
+
+        Args:
+            input_lon (_type_): _description_
+            input_lat (_type_): _description_
+            offset (dictionary, optional): Lower left coordinates. Defaults to None.
+            epsg_in (int, optional): _description_. Defaults to 4326.
+            epsg_out (int, optional): _description_. Defaults to 3901. Finland EPSG Uniform Coordinate System
+
+        Returns:
+            _type_: _description_
+        """
         
+        # setup your projections, assuming you're using WGS84 geographic
+        crs_wgs = proj.Proj(init='epsg:' + str(epsg_in))
+        crs_bng = proj.Proj(init='epsg:' + str(epsg_out))  # use the Belgium epsg code
+
+        # then cast your geographic coordinate pair to the projected system
+        lon_planar, lat_planar = proj.transform(crs_wgs, crs_bng, input_lon, input_lat)
+
+        # Remove offset
+        if offset is not None:
+            offset_lon_planar, offset_lat_planar = proj.transform(crs_wgs, crs_bng, offset['lon'], offset['lat'])
+            lon_planar = lon_planar - offset_lon_planar
+            lat_planar = lat_planar - offset_lat_planar
+
+        return lat_planar, lon_planar
+    
 class myAnritsuSpectrumAnalyzer(object):
     def __init__(self, is_debug=True, is_config=True):
         self.model = 'MS2760A'
         self.is_debug = is_debug # Print debug messages
         self.is_config = is_config # True if you want to configure the Spectrum Analyzer
         
-    def sepectrum_analyzer_connect(self, HOST='127.0.0.1', PORT=9001):
+    def spectrum_analyzer_connect(self, HOST='127.0.0.1', PORT=9001):
         """
         Create a socket and connect to the spectrum analyzer
 
@@ -886,5 +916,53 @@ class myAnritsuSpectrumAnalyzer(object):
         
         self.anritsu_con_socket.close()
 
+
+class HelperA2GMeasurements(object):
+    def __init__(self):
+        1
+        
+    def mobile_gimbal_follows_drone(self, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
+        """_summary_
+
+        Args:
+            lat_gimbal (scalar): _description_
+            lon_gimbal (scalar): _description_
+            height_gimbal (scalar): _description_
+            lat_drone (scalar): _description_
+            lon_drone (scalar): _description_
+            height_drone (scalar): _description_
+
+        Returns:
+            _type_: _description_
+        """''
+        
+        lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
+        lat_gimbal_planar, lon_gimbal_planar = self.convert_DDMMS_to_planar(lon_gimbal, lat_gimbal, offset=None, epsg_in=4326, epsg_out=3901)
+        
+        position_drone = np.array([lon_drone_planar, lat_drone_planar, height_drone])
+        position_gimbal = np.array([lon_gimbal_planar, lat_gimbal_planar, height_gimbal])
+        
+        #d_mobile_drone_3D = np.linalg.norm(position_drone - position_gimbal)
+        d_mobile_drone_2D = np.linalg.norm(position_drone[:-1] - position_gimbal[:-1])
+                
+        # Elevation and roll angle
+        roll = np.arctan2(height_drone - height_gimbal, d_mobile_drone_2D)
+                
+        # Frome the gimbal in the car, this is the direction pointing towards the drone
+        alpha = np.arctan2(lat_drone_planar - lat_gimbal_planar, lon_drone_planar - lon_gimbal_planar)
+        
+        # This is the yaw angle of the gimbal
+        yaw = np.pi/2 - alpha
+        
+        # Yaw is in the interval [180, -180] but in units of 0.1 deg, so multiply by 10
+        if yaw > np.pi:
+            yaw = np.pi - yaw
+        
+        yaw = np.rad2deg(yaw)*10
+        roll = np.rad2deg(roll)*10
+        
+        return yaw, roll
+        
+        
         
         
