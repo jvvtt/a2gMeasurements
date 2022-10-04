@@ -1,3 +1,4 @@
+import time
 import struct
 from ctypes import *
 import numpy as np
@@ -11,6 +12,7 @@ import serial
 import sys
 from serial.tools.list_ports import comports
 import pyproj as proj
+import json
 
 """
 Author: Julian D. Villegas G.
@@ -147,7 +149,8 @@ class GimbalRS2(object):
         output = "Pitch: " + \
             str(self.pitch) + ", Yaw: " + \
             str(self.yaw) + ", Roll: " + str(self.roll)
-        print(output)
+        
+        print(output + '\n')
         
     def can_callback(self, data):
         """
@@ -359,9 +362,9 @@ class GimbalRS2(object):
         for m in full_msg:
             try:
                 self.actual_bus.send(m)
-                print(f"Message sent on {self.actual_bus.channel_info}")
+                print(f"Message sent on {self.actual_bus.channel_info}" + '\n')
             except can.CanError:
-                print("Message NOT sent")
+                print("Message NOT sent\n")
                 return
 
     def receive(self, bus, stop_event):
@@ -488,6 +491,20 @@ class GimbalRS2(object):
         
         self.event_stop_thread_gimbal.set()
 
+    def send_N_azimuth_angles(self, az_now, Naz, el_now=None, Nel=None):
+        
+        for i in range(Naz):
+            ang = int((i+1)*3600/Naz)
+            ang = az_now + ang
+            if ang > 1800:
+                ang = ang - 3600
+            if ang < -1800:
+                ang = ang + 3600
+            #print('ANGLE TO BE SENT: ', ang, type(ang))    
+            self.setPosControl(yaw=ang, roll=0, pitch=0)
+            
+            input('Press ENTER when ready to move Gimbal RS2 to next angle')
+            
 class GpsSignaling(object):
     def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False):
         # Initializations
@@ -720,9 +737,13 @@ class GpsSignaling(object):
         """
         
         self.event_stop_thread_gps.set()
+        time.sleep(0.1)
         
         if interface =='USB':
             self.serial_instance.close()
+            
+        elif interface =='IP':
+            self.socket.close()
         
     def sendCommandGps(self, cmd, interface='USB'):
         """
@@ -899,9 +920,22 @@ class myAnritsuSpectrumAnalyzer(object):
         self.anritsu_con_socket.close()
 
 class HelperA2GMeasurements(object):
-    def __init__(self, ID):
-        # ID should be 'DRONE' or 'GROUND'
+    def __init__(self, ID, SERVER_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False):
+        """
+        
+        GROUND station is the server and AIR station is the client.
+
+        Args:
+            ID (_type_): _description_
+            SERVER_ADDRESS (str): the IP address of the server (the ground station)
+        """
+        
         self.ID = ID
+        self.SERVER_ADDRESS = SERVER_ADDRESS  
+        self.SOCKET_BUFFER = []
+        self.SAVE_BUFFER = []
+        self.DBG_LVL_0 = DBG_LVL_0
+        self.DBG_LVL_1 = DBG_LVL_1
         
     def mobile_gimbal_follows_drone(self, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
         """_summary_
@@ -920,12 +954,13 @@ class HelperA2GMeasurements(object):
         
         lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
         lat_gimbal_planar, lon_gimbal_planar = self.convert_DDMMS_to_planar(lon_gimbal, lat_gimbal, offset=None, epsg_in=4326, epsg_out=3901)
-        
+                
         position_drone = np.array([lon_drone_planar, lat_drone_planar, height_drone])
         position_gimbal = np.array([lon_gimbal_planar, lat_gimbal_planar, height_gimbal])
         
         #d_mobile_drone_3D = np.linalg.norm(position_drone - position_gimbal)
         d_mobile_drone_2D = np.linalg.norm(position_drone[:-1] - position_gimbal[:-1])
+        print(d_mobile_drone_2D)
                 
         # Elevation and roll angle
         roll = np.arctan2(height_drone - height_gimbal, d_mobile_drone_2D)
@@ -938,17 +973,15 @@ class HelperA2GMeasurements(object):
         
         # Yaw is in the interval [180, -180] but in units of 0.1 deg, so multiply by 10
         if yaw > np.pi:
-            yaw = np.pi - yaw
+            yaw = yaw - np.pi*2
+        if yaw < np.pi:
+            yaw = yaw + np.pi*2
         
-        yaw = np.rad2deg(yaw)*10
-        roll = np.rad2deg(roll)*10
+        yaw = int(np.rad2deg(yaw)*10)
+        roll = int(np.rad2deg(roll)*10)
         
         return yaw, roll
         
-    def HelperGimbalTracksDrone(self):
-        myGPS = GpsSignaling()    
-        myGimbal = GimbalRS2()
-    
     def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
             """_summary_
 
@@ -977,3 +1010,68 @@ class HelperA2GMeasurements(object):
                 lat_planar = lat_planar - offset_lat_planar
 
             return lat_planar, lon_planar
+    
+    def parse_rx_data(self, data):
+        self.SOCKET_BUFFER.append(data)
+    
+    def socket_receive(self, stop_event):
+        while not stop_event.is_set():
+            try:
+                if self.ID == 'GROUND':
+                    data = json.loads(self.a2g_conn.recv(1024).decode())
+                    #data = self.a2g_conn.recv(1024).decode()
+                elif self.ID == 'DRONE':
+                    data = json.loads(self.socket.recv(1024).decode())
+                    #data = self.socket.recv(1024).decode()
+                if data:
+                    if self.DBG_LVL_0:
+                        print(data)
+                    self.parse_rx_data(data)
+                else:
+                    break
+            except Exception as e:
+                if self.DBG_LVL_0:
+                    print('[SOCKET RECEIVE EXCEPTION]: ', e)
+            
+    def HelperStartA2GCom(self, PORT=12000):
+        
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket = s
+        self.socket.settimeout(10) # Block up to 5 sec
+        
+        # CLIENT
+        if self.ID == 'DRONE':
+            self.socket.connect((self.SERVER_ADDRESS, PORT))
+            if self.DBG_LVL_1:
+                print('CONNECTION ESTABLISHED with SERVER ', self.SERVER_ADDRESS)
+        
+        # SERVER
+        elif self.ID == 'GROUND':            
+
+            # Bind the socket to the port
+            self.socket.bind((self.SERVER_ADDRESS, PORT))
+
+            # Listen for incoming connections
+            self.socket.listen()
+
+            # BLOCKS UNTIL ESTABLISHING A CONNECTION
+            a2g_connection, client_address = self.socket.accept()
+            
+            if self.DBG_LVL_1:
+                print('CONNECTION ESTABLISHED with CLIENT ', client_address)
+            
+            self.a2g_conn = a2g_connection
+            self.CLIENT_ADDRESS = client_address
+            
+        self.event_stop_thread_helper = threading.Event()
+        thread_rx_helper = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_helper,))
+        thread_rx_helper.start()
+        
+    def HelperA2GStopCom(self):        
+        if self.ID == 'DRONE':
+            self.socket.close()
+        elif self.ID == 'GROUND':
+            self.a2g_conn.close()
+            
+        self.event_stop_thread_helper.set()
