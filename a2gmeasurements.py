@@ -920,7 +920,7 @@ class myAnritsuSpectrumAnalyzer(object):
         self.anritsu_con_socket.close()
 
 class HelperA2GMeasurements(object):
-    def __init__(self, ID, SERVER_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False):
+    def __init__(self, ID, SERVER_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=False, IsGPS=False):
         """
         
         GROUND station is the server and AIR station is the client.
@@ -936,8 +936,23 @@ class HelperA2GMeasurements(object):
         self.SAVE_BUFFER = []
         self.DBG_LVL_0 = DBG_LVL_0
         self.DBG_LVL_1 = DBG_LVL_1
+        self.IsGimbal = IsGimbal
+        self.IsGPS = IsGPS
         
-    def mobile_gimbal_follows_drone(self, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
+        if IsGimbal:
+            self.myGimbal = GimbalRS2()
+            self.myGimbal.start_thread_gimbal()
+            print('Setting Gimbal RS2...\n')
+            time.sleep(0.5)
+        if IsGPS:
+            self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
+            self.mySeptentrioGPS.serial_connect()
+            self.mySeptentrioGPS.start_thread_gps()
+            self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
+            print('Setting GPS...\n')
+            time.sleep(0.5)
+        
+    def mobile_gimbal_follows_drone(self, yaw_now_gimbal, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
         """_summary_
 
         Args:
@@ -954,33 +969,45 @@ class HelperA2GMeasurements(object):
         
         lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
         lat_gimbal_planar, lon_gimbal_planar = self.convert_DDMMS_to_planar(lon_gimbal, lat_gimbal, offset=None, epsg_in=4326, epsg_out=3901)
-                
+        
         position_drone = np.array([lon_drone_planar, lat_drone_planar, height_drone])
         position_gimbal = np.array([lon_gimbal_planar, lat_gimbal_planar, height_gimbal])
+        print(f"[DEBUG]: POS_DRONE: {position_drone}, POS_GROUND: {position_gimbal}")
         
         #d_mobile_drone_3D = np.linalg.norm(position_drone - position_gimbal)
         d_mobile_drone_2D = np.linalg.norm(position_drone[:-1] - position_gimbal[:-1])
-        print(d_mobile_drone_2D)
+        print(f"[DEBUG]: Azimuth distance from ground to drone station: {d_mobile_drone_2D}")
                 
-        # Elevation and roll angle
-        roll = np.arctan2(height_drone - height_gimbal, d_mobile_drone_2D)
+        # Elevation angle of the drone referenced to GROUND station plane. 
+        # Is also the roll angle to send to the gimbal
+        roll_to_set = np.arctan2(height_drone - height_gimbal, d_mobile_drone_2D)
+        roll_to_set = int(np.rad2deg(roll_to_set)*10)
+        print(f"[DEBUG]: Elevation angle of DRONE refered to GROUND plane: {roll_to_set}")
                 
-        # Frome the gimbal in the car, this is the direction pointing towards the drone
+        # Angle between CAR and DRONE, with the CAR position as the (0,0) coordinate of the reference system where the angle is computed
+        # The angle is refered to the EAST direction
         alpha = np.arctan2(lat_drone_planar - lat_gimbal_planar, lon_drone_planar - lon_gimbal_planar)
+        print(f"[DEBUG]: ALPHA angle: {alpha}")
         
-        # This is the yaw angle of the gimbal
-        yaw = np.pi/2 - alpha
+        yaw_now_gimbal = np.pi/2 - yaw_now_gimbal
+        if yaw_now_gimbal > np.pi:
+            yaw_now_gimbal = yaw_now_gimbal - np.pi*2
+        if yaw_now_gimbal < - np.pi:
+            yaw_now_gimbal = yaw_now_gimbal + np.pi*2
+               
+        # This is the angle the gimbal has to move
+        yaw_to_set = (np.pi/2 - yaw_now_gimbal) - alpha
+        yaw_to_set = int(np.rad2deg(yaw_to_set)*10)
+        
+        print(f"[DEBUG]: Yaw to set in gimbal: {yaw_to_set}")
         
         # Yaw is in the interval [180, -180] but in units of 0.1 deg, so multiply by 10
-        if yaw > np.pi:
-            yaw = yaw - np.pi*2
-        if yaw < np.pi:
-            yaw = yaw + np.pi*2
+        if yaw_to_set > 1800:
+            yaw_to_set = yaw_to_set - 3600
+        if yaw_to_set < -1800:
+            yaw_to_set = yaw_to_set + 3600       
         
-        yaw = int(np.rad2deg(yaw)*10)
-        roll = int(np.rad2deg(roll)*10)
-        
-        return yaw, roll
+        return yaw_to_set, roll_to_set
         
     def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
             """_summary_
@@ -1012,17 +1039,30 @@ class HelperA2GMeasurements(object):
             return lat_planar, lon_planar
     
     def parse_rx_data(self, data):
+        if data == 'GET_GPS':
+            if self.IsGPS:
+                to_send = json.dumps(self.mySeptentrioGPS.NMEA_buffer[-1])
+                print(to_send)
+                if self.DBG_LVL_1:
+                    print('Received the GET GPS and read the NMEA buffer')
+                if self.ID == 'GROUND':
+                    self.a2g_conn.sendall(to_send.encode())
+                if self.ID == 'DRONE':
+                    self.socket.sendall(to_send.encode())
+            else:
+                print('ASKED for GPS position but flag IsGPS is False')
+            return
+        
         self.SOCKET_BUFFER.append(data)
     
     def socket_receive(self, stop_event):
         while not stop_event.is_set():
             try:
+                # Send everything in a json serialized packet
                 if self.ID == 'GROUND':
                     data = json.loads(self.a2g_conn.recv(1024).decode())
-                    #data = self.a2g_conn.recv(1024).decode()
                 elif self.ID == 'DRONE':
                     data = json.loads(self.socket.recv(1024).decode())
-                    #data = self.socket.recv(1024).decode()
                 if data:
                     if self.DBG_LVL_0:
                         print(data)
@@ -1068,10 +1108,24 @@ class HelperA2GMeasurements(object):
         thread_rx_helper = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_helper,))
         thread_rx_helper.start()
         
-    def HelperA2GStopCom(self):        
+    def HelperA2GStopCom(self, DISC_WHAT='ALL'):   
         if self.ID == 'DRONE':
             self.socket.close()
         elif self.ID == 'GROUND':
             self.a2g_conn.close()
             
         self.event_stop_thread_helper.set()
+        
+        if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
+            self.myGimbal.stop_thread_gimbal()
+            print('Disconnecting gimbal...')
+            time.sleep(0.05)
+            self.myGimbal.actual_bus.shutdown()
+            
+        if self.IsGPS and (DISC_WHAT=='ALL' or DISC_WHAT == 'GPS'):  
+            self.mySeptentrioGPS.stop_gps_data_retrieval(msg_type='NMEA')
+            print('Stoping GPS stream...')
+            self.mySeptentrioGPS.stop_thread_gps()
+            
+            
+
