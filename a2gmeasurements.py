@@ -489,21 +489,7 @@ class GimbalRS2(object):
 
         """
         
-        self.event_stop_thread_gimbal.set()
-
-    def send_N_azimuth_angles(self, az_now, Naz, el_now=None, Nel=None):
-        
-        for i in range(Naz):
-            ang = int((i+1)*3600/Naz)
-            ang = az_now + ang
-            if ang > 1800:
-                ang = ang - 3600
-            if ang < -1800:
-                ang = ang + 3600
-            #print('ANGLE TO BE SENT: ', ang, type(ang))    
-            self.setPosControl(yaw=ang, roll=0, pitch=0)
-            
-            input('Press ENTER when ready to move Gimbal RS2 to next angle')
+        self.event_stop_thread_gimbal.set()        
             
 class GpsSignaling(object):
     def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False):
@@ -921,19 +907,21 @@ class myAnritsuSpectrumAnalyzer(object):
 
 class HelperA2GMeasurements(object):
     def __init__(self, ID, SERVER_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=False, IsGPS=False):
-        """
-        
+        """        
         GROUND station is the server and AIR station is the client.
 
         Args:
             ID (_type_): _description_
             SERVER_ADDRESS (str): the IP address of the server (the ground station)
+            DBG_LVL_0 (bool): provides DEBUG support at the lowest level (i.e printing incoming messages)
+            DBG_LVL_1 (bool): provides DEBUG support at the medium level (i.e printing exceptions)
+            IsGimbal (bool): An RS2 Gimbal is going to be connected.
+            IsGPS (bool): A Septentrio GPS is going to be connected.
         """
         
         self.ID = ID
         self.SERVER_ADDRESS = SERVER_ADDRESS  
         self.SOCKET_BUFFER = []
-        self.SAVE_BUFFER = []
         self.DBG_LVL_0 = DBG_LVL_0
         self.DBG_LVL_1 = DBG_LVL_1
         self.IsGimbal = IsGimbal
@@ -953,18 +941,20 @@ class HelperA2GMeasurements(object):
             time.sleep(0.5)
         
     def mobile_gimbal_follows_drone(self, yaw_now_gimbal, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
-        """_summary_
+        """
+        Finds the yaw and roll angles to be set at the GROUND gimbal so it points towards the DRONE station.
 
         Args:
-            lat_gimbal (scalar): _description_
-            lon_gimbal (scalar): _description_
-            height_gimbal (scalar): _description_
-            lat_drone (scalar): _description_
-            lon_drone (scalar): _description_
-            height_drone (scalar): _description_
+            yaw_now_gimbal (float): GROUND gimbal orientation with respect to the North. It is an angle in DEGREES.
+            lat_gimbal (float): Latitude of GROUND station. In DDMMS format: i.e: 62.471541 N
+            lon_gimbal (float): Longitude of GROUND station. In DDMMS format: i.e: 21.471541 E
+            height_gimbal (float): Height of the GPS Antenna in GROUND station. In meters.
+            lat_drone (float): Latitude of DRONE station. In DDMMS format: i.e: 62.471541 N
+            lon_drone (float): Longitude of DRONE station. In DDMMS format: i.e: 21.471541 E
+            height_drone (float): Height of the GPS Antenna in DRONE station. In meters.
 
         Returns:
-            _type_: _description_
+            yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
         """''
         
         lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
@@ -989,7 +979,7 @@ class HelperA2GMeasurements(object):
         alpha = np.arctan2(lat_drone_planar - lat_gimbal_planar, lon_drone_planar - lon_gimbal_planar)
         print(f"[DEBUG]: ALPHA angle: {alpha}")
         
-        yaw_now_gimbal = np.pi/2 - yaw_now_gimbal
+        yaw_now_gimbal = np.pi/2 - np.deg2rad(yaw_now_gimbal)
         if yaw_now_gimbal > np.pi:
             yaw_now_gimbal = yaw_now_gimbal - np.pi*2
         if yaw_now_gimbal < - np.pi:
@@ -1010,8 +1000,9 @@ class HelperA2GMeasurements(object):
         return yaw_to_set, roll_to_set
         
     def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
-            """_summary_
-
+            """
+            Converts DDDMMS coordinates into planar coordinates
+            
             Args:
                 input_lon (scalar): _description_
                 input_lat (scalar): _description_
@@ -1020,7 +1011,7 @@ class HelperA2GMeasurements(object):
                 epsg_out (int, optional): _description_. Defaults to 3901. Finland EPSG Uniform Coordinate System
 
             Returns:
-                _type_: _description_
+                lat_planar, lon_planar (float): planar coordinates
             """
             
             # setup your projections, assuming you're using WGS84 geographic
@@ -1039,10 +1030,15 @@ class HelperA2GMeasurements(object):
             return lat_planar, lon_planar
     
     def parse_rx_data(self, data):
+        """
+        Handles the received socket data. 
+
+        Args:
+            data (bytes): received data from socket
+        """
         if data == 'GET_GPS':
             if self.IsGPS:
                 to_send = json.dumps(self.mySeptentrioGPS.NMEA_buffer[-1])
-                print(to_send)
                 if self.DBG_LVL_1:
                     print('Received the GET GPS and read the NMEA buffer')
                 if self.ID == 'GROUND':
@@ -1056,6 +1052,12 @@ class HelperA2GMeasurements(object):
         self.SOCKET_BUFFER.append(data)
     
     def socket_receive(self, stop_event):
+        """
+        Callback for when receiveing an incoming socket message.
+
+        Args:
+            stop_event (Event thread): event thread used to stop the callback
+        """
         while not stop_event.is_set():
             try:
                 # Send everything in a json serialized packet
@@ -1073,12 +1075,57 @@ class HelperA2GMeasurements(object):
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
             
-    def HelperStartA2GCom(self, PORT=12000):
+    def send_N_azimuth_angles(self, az_now, Naz, el_now=None, Nel=None, meas_number='1'):
+        """
+        Divides the azimuth in Naz sections and for each correspondent angle sets the yaw of the gimbal,
+        and waits for the user input before moving gimbal to next angle. The angle count starts from az_now
         
+        Args:
+            az_now (int): angle where to start the count. It lies between -1800 and 1800
+            Naz (int): number of sectors in azimuth circle
+            el_now (_type_, optional): _description_. Defaults to None.
+            Nel (_type_, optional): _description_. Defaults to None.
+            meas_number (str, optional): number of measurement according to Flight Plan. Defaults to '1'.
+        """
+        if self.IsGimbal:
+            for i in range(Naz):
+                ang = int((i+1)*3600/Naz)
+                ang = az_now + ang
+                if ang > 1800:
+                    ang = ang - 3600
+                if ang < -1800:
+                    ang = ang + 3600
+    
+                self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=0)
+                
+                input('Press ENTER when ready to move Gimbal RS2 to next angle')
+                
+                to_save = self.mySeptentrioGPS.NMEA_buffer[-1]
+                to_save['GROUND_GIMBAL_YAW'] = self.myGimbal.yaw
+                to_save['GROUND_GIMBAL_ROLL'] = self.myGimbal.roll
+                
+                to_save = json.dumps(to_save)
+                filename = 'MEASUREMENT_' + meas_number + '_AZIMUTH_POS_' + str(i)
+                f = open(filename + '.json', 'w')
+                f.write(to_save)
+                f.close()
+                
+                print(f'File {filename} saved')
+        else:
+            print('To call this function, IsGimbal has to be set')
+    
+    def HelperStartA2GCom(self, PORT=12000):
+        """
+        Starts the socket binding, listening and accepting for server side, or connecting for client side. 
+        Starts the thread handling the socket messages.
+        
+        Args:
+            PORT (int, optional): _description_. Defaults to 12000.
+        """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket = s
-        self.socket.settimeout(10) # Block up to 5 sec
+        self.socket.settimeout(20) # Block up to 5 sec
         
         # CLIENT
         if self.ID == 'DRONE':
