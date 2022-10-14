@@ -1,3 +1,5 @@
+import xmltodict
+from datetime import datetime
 import time
 import struct
 from ctypes import *
@@ -609,6 +611,18 @@ class GpsSignaling(object):
             for item in extracted_data:
                 tmp = item.split(': ')
                 gps_data[tmp[0]] = tmp[1]
+            
+            if int(gps_data['Latitude'][0]) != 0:
+                gps_data['Latitude'] = float(gps_data['Latitude'][0:2]) + float(gps_data['Latitude'][2:])/60
+            else:
+                gps_data['Latitude'] = float(gps_data['Latitude'][0:3]) + float(gps_data['Latitude'][3:])/60
+            
+            if int(gps_data['Longitude'][0]) != 0:
+                gps_data['Longitude'] = float(gps_data['Longitude'][0:2]) + float(gps_data['Longitude'][2:])/60
+            else:
+                gps_data['Longitude'] = float(gps_data['Longitude'][0:3]) + float(gps_data['Longitude'][3:])/60
+            
+            gps_data['Antenna Alt above sea level (mean)'] = float(gps_data['Antenna Alt above sea level (mean)'])
         except:
             # Do not save any other comand line
             if self.DBG_LVL_0:
@@ -825,6 +839,7 @@ class myAnritsuSpectrumAnalyzer(object):
         self.model = 'MS2760A'
         self.is_debug = is_debug # Print debug messages
         self.is_config = is_config # True if you want to configure the Spectrum Analyzer
+        self.XML_file = {'Timestamp': 0, 'Data': [], 'NSamp': []}
         
     def spectrum_analyzer_connect(self, HOST='127.0.0.1', PORT=9001):
         """
@@ -899,6 +914,48 @@ class myAnritsuSpectrumAnalyzer(object):
         
         return {'MAG': float(pwr), 'MAG_UNITS': 'dBm', 'FREQ': float(freq), 'FREQ_UNITS': 'Hz'}
 
+    def parse_xml_file(self, filename):
+        """
+        Wrapper for function 'iterate_xml_file'. This function is the one the user needs to use.
+        
+        Args:
+            filename (string): absolute path
+        """
+        
+        with open(filename, 'r') as fd:
+            doc = xmltodict.parse(fd.read(), process_namespaces=True)
+            self.iterate_xml_file(doc)
+    
+    def iterate_xml_file(self, iterable):
+
+        if isinstance(iterable, dict):
+            for key, value in iterable.items():
+                if key == 'TimeStamp':
+                    if value['@year']:
+                            meas_date = datetime(year=int(value['@year']), 
+                                                month=int(value['@month']),
+                                                day=int(value['@day']),
+                                                hour=int(value['@hour']),
+                                                minute=int(value['@minute']),
+                                                second=int(value['@second']))
+                            self.XML_file['Timestamp'] = datetime.timestamp(meas_date)
+                if not (isinstance(value, dict) or isinstance(value, list)):
+                    # We know when the key '@id' is an integer then we are in a data point
+                    if key == '@id':
+                        try:
+                            tmp = int(value)
+                            if iterable['@value'] != 'nan':
+                                self.XML_file['NSamp'].append(int(value))
+                                self.XML_file['Data'].append(float(iterable['@value']))
+                        except:
+                            1
+                else:
+                    self.iterate_xml_file(value)
+
+        elif isinstance(iterable, list):
+            for i in iterable:
+                self.iterate_xml_file(i)
+
     def spectrum_analyzer_close(self):
         """
         Wrapper to close the spectrum analyzer socket
@@ -950,11 +1007,15 @@ class HelperA2GMeasurements(object):
             self.inst.write('L0 ' + str(L0)+ ' DM\n')
             time.sleep(0.5)
         
-    def mobile_gimbal_follows_drone(self, yaw_now_gimbal, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
+    def ground_gimbal_follows_drone(self, yaw_now_gimbal, lat_ground=None, 
+                                    lon_ground=None, height_ground=None, 
+                                    lat_drone=None, lon_drone=None, height_drone=None):
         """
-        Ground gimbal points to the drone. 
-        The front part of the RS2 Gimbal should be pointing to the North. (or equivalently, the touchscreen
-        should be pointing to the south)
+        Ground gimbal points to the drone. The front part of the RS2 Gimbal should be pointing to the North. (or equivalently, the touchscreen
+        should be pointing to the south).
+        
+        The user must input either the 3 ground coordinates or the 3 drone coordinates, but both of them can't be None. 
+        Moreover, the user must input exactly the 3 coordinates, otherwise the computation won't work.
 
         Finds the yaw and roll angles to be set at the GROUND gimbal so it points towards the DRONE station.
 
@@ -970,12 +1031,25 @@ class HelperA2GMeasurements(object):
         Returns:
             yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
         """
+        if self.IsGPS and self.ID == 'GROUND' and lat_ground is None  and lon_ground is None and height_ground is None:
+            lat_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
+            lon_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
+            height_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']
         
+        if self.IsGPS and self.ID == 'DRONE' and lat_drone is None  and lon_drone is None and height_drone is None:
+            lat_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
+            lon_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
+            height_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']
+        
+        if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
+            print("ERROR: Either ground or drone coordinates must be provided\n")
+            return 0, 0
+                
         lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
-        lat_gimbal_planar, lon_gimbal_planar = self.convert_DDMMS_to_planar(lon_gimbal, lat_gimbal, offset=None, epsg_in=4326, epsg_out=3901)
+        lat_gimbal_planar, lon_gimbal_planar = self.convert_DDMMS_to_planar(lon_ground, lat_ground, offset=None, epsg_in=4326, epsg_out=3901)
         
         position_drone = np.array([lon_drone_planar, lat_drone_planar, height_drone])
-        position_gimbal = np.array([lon_gimbal_planar, lat_gimbal_planar, height_gimbal])
+        position_gimbal = np.array([lon_gimbal_planar, lat_gimbal_planar, height_ground])
         print(f"[DEBUG]: POS_DRONE: {position_drone}, POS_GROUND: {position_gimbal}")
         
         #d_mobile_drone_3D = np.linalg.norm(position_drone - position_gimbal)
@@ -984,9 +1058,9 @@ class HelperA2GMeasurements(object):
                 
         # Elevation angle of the drone referenced to GROUND station plane. 
         # Is also the roll angle to send to the gimbal
-        roll_to_set = np.arctan2(height_drone - height_gimbal, d_mobile_drone_2D)
-        roll_to_set = int(np.rad2deg(roll_to_set)*10)
-        print(f"[DEBUG]: Elevation angle of DRONE refered to GROUND plane: {roll_to_set}")
+        pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)
+        pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
+        print(f"[DEBUG]: Elevation angle of DRONE refered to GROUND plane: {pitch_to_set}")
                 
         # Angle between CAR and DRONE, with the CAR position as the (0,0) coordinate of the reference system where the angle is computed
         # The angle is refered to the EAST direction
@@ -1011,7 +1085,7 @@ class HelperA2GMeasurements(object):
         if yaw_to_set < -1800:
             yaw_to_set = yaw_to_set + 3600       
         
-        return yaw_to_set, roll_to_set
+        return yaw_to_set, pitch_to_set
         
     def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
             """
@@ -1089,7 +1163,7 @@ class HelperA2GMeasurements(object):
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
             
-    def send_N_azimuth_angles(self, az_now, roll_now, Naz, el_now=None, Nel=None, meas_number='1', meas_time=10):
+    def send_N_azimuth_angles(self, az_now, pitch_now, Naz, el_now=None, Nel=None, meas_number='1', meas_time=10):
         """
         Divides the azimuth in Naz sections and for each correspondent angle sets the yaw of the gimbal,
         and waits for the user input before moving gimbal to next angle. The angle count starts from az_now
@@ -1115,7 +1189,7 @@ class HelperA2GMeasurements(object):
                 
                 reset_ang_buffer.append(ang)
                 
-                self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=roll_now)
+                self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=pitch_now)
                 
                 # Approximate gimbal speed of 56 deg/s:
                 # Max angular movement is 1800 which is done in 3.5 at the actual speed 
@@ -1147,7 +1221,7 @@ class HelperA2GMeasurements(object):
         reset_buffer = reset_ang_buffer[-2::-1]
         reset_buffer.append(reset_ang_buffer[-1])
         return reset_buffer
-    
+        
     def HelperStartA2GCom(self, PORT=12000):
         """
         Starts the socket binding, listening and accepting for server side, or connecting for client side. 
@@ -1219,5 +1293,3 @@ class HelperA2GMeasurements(object):
         
         if self.IsSignalGenerator:
             self.inst.write('RF0\n')    
-            
-
