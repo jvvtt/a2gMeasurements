@@ -4,7 +4,7 @@ from socket import socket
 import time
 from a2gmeasurements import HelperA2GMeasurements, GimbalRS2, GpsSignaling
 
-input('Start Experiment?')
+meas_number = input('To start experiment, enter the number of the Measurement according to Flight Plan')
 
 host = 'localhost'
 myHelper = HelperA2GMeasurements('GROUND', host, DBG_LVL_0=False, DBG_LVL_1=True, IsGPS=True, IsGimbal=True)
@@ -73,6 +73,15 @@ reset_yaw_gimbal = myHelper.send_N_azimuth_angles(int(yaw_now*10), int(roll_now*
 for i in reset_yaw_gimbal:
     myHelper.myGimbal.setPosControl(i, int(roll_now*10), 0)
     time.sleep(1)
+
+
+# Gimbal assumed to be not moving
+yaw_now = myHelper.myGimbal.yaw
+print('Compare yaw printed value previously, with yaw_now var: ', yaw_now, '\n')
+
+# 10. Move GROUND gimbal in 30 deg steps
+N_ang_steps = 360/30
+myHelper.send_N_azimuth_angles(int(yaw_now*10), int(N_ang_steps), meas_number=meas_number)
 
 input('Stop test?')
 myHelper.HelperA2GStopCom()
