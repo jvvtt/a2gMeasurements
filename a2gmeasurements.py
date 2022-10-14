@@ -1150,32 +1150,6 @@ class HelperA2GMeasurements(object):
     
     def HelperStartA2GCom(self, PORT=12000):
         """
-        Starts the socket communication. The ground station is the server and the drone is the client.
-
-        Args:
-            PORT (int, optional): TCP/IP port. Defaults to 12000.
-        """
-    
-                self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=0)
-                
-                input('Press ENTER when ready to move Gimbal RS2 to next angle')
-                
-                to_save = self.mySeptentrioGPS.NMEA_buffer[-1]
-                to_save['GROUND_GIMBAL_YAW'] = self.myGimbal.yaw
-                to_save['GROUND_GIMBAL_ROLL'] = self.myGimbal.roll
-                
-                to_save = json.dumps(to_save)
-                filename = 'MEASUREMENT_' + meas_number + '_AZIMUTH_POS_' + str(i)
-                f = open(filename + '.json', 'w')
-                f.write(to_save)
-                f.close()
-                
-                print(f'File {filename} saved')
-        else:
-            print('To call this function, IsGimbal has to be set')
-    
-    def HelperStartA2GCom(self, PORT=12000):
-        """
         Starts the socket binding, listening and accepting for server side, or connecting for client side. 
         Starts the thread handling the socket messages.
         
