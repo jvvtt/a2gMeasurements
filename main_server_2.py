@@ -18,6 +18,7 @@ myHelper.a2g_conn.sendall(json.dumps('GET_GPS').encode())
 
 # 2. Request Gimbal orientation
 myHelper.myGimbal.request_current_position()
+time.sleep(0.0015)
 
 # Gimbal assumed to be not moving
 yaw_now = myHelper.myGimbal.yaw
@@ -56,14 +57,22 @@ myHelper.a2g_conn.sendall(json.dumps('START_SA').encode())
 
 # 9. Request Gimbal orientation
 myHelper.myGimbal.request_current_position()
+time.sleep(0.0015)
 
 # Gimbal assumed to be not moving
 yaw_now = myHelper.myGimbal.yaw
+roll_now = myHelper.myGimbal.roll
 print('Compare yaw printed value previously, with yaw_now var: ', yaw_now, '\n')
+print('Compare yaw printed value previously, with roll_now var: ', roll_now, '\n')
 
 # 10. Move GROUND gimbal in 30 deg steps
 N_ang_steps = 360/30
-myHelper.send_N_azimuth_angles(int(yaw_now*10), int(N_ang_steps), meas_number=meas_number)
+reset_yaw_gimbal = myHelper.send_N_azimuth_angles(int(yaw_now*10), int(roll_now*10), int(N_ang_steps), meas_number=meas_number)
+
+# 11. Make the gimbal move in the opposite direction to unfold cables
+for i in reset_yaw_gimbal:
+    myHelper.myGimbal.setPosControl(i, int(roll_now*10), 0)
+    time.sleep(1)
 
 input('Stop test?')
 myHelper.HelperA2GStopCom()

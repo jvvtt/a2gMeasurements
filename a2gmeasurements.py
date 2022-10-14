@@ -13,6 +13,7 @@ import sys
 from serial.tools.list_ports import comports
 import pyproj as proj
 import json
+import pyvisa
 
 """
 Author: Julian D. Villegas G.
@@ -24,7 +25,7 @@ Gimbal control adapted and extended from https://github.com/ceinem/dji_rs2_ros_c
 """
 
 class GimbalRS2(object):
-    def __init__(self):
+    def __init__(self, speed=1800/3.47):
         self.header = 0xAA
         self.enc = 0x00
         self.res1 = 0x00
@@ -45,6 +46,7 @@ class GimbalRS2(object):
         self.pitch = 0.0
         self.yaw = 0.0
 
+        self.speed =  speed# deg/s
         self.MAIN_LOOP_STOP = True
         self.keyboard_set_flag = False
         self.keyboard_buff = []
@@ -906,7 +908,7 @@ class myAnritsuSpectrumAnalyzer(object):
         self.anritsu_con_socket.close()
 
 class HelperA2GMeasurements(object):
-    def __init__(self, ID, SERVER_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=False, IsGPS=False):
+    def __init__(self, ID, SERVER_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=False, IsGPS=False, IsSignalGenerator=False, F0=None, L0=None):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -926,6 +928,7 @@ class HelperA2GMeasurements(object):
         self.DBG_LVL_1 = DBG_LVL_1
         self.IsGimbal = IsGimbal
         self.IsGPS = IsGPS
+        self.IsSignalGenerator = IsSignalGenerator
         
         if IsGimbal:
             self.myGimbal = GimbalRS2()
@@ -938,6 +941,13 @@ class HelperA2GMeasurements(object):
             self.mySeptentrioGPS.start_thread_gps()
             self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
             print('Setting GPS...\n')
+            time.sleep(0.5)
+        if IsSignalGenerator:
+            rm = pyvisa.ResourceManager()
+            inst = rm.open_resource('GPIB0::19::INSTR')
+            self.inst = inst
+            self.inst.write('F0 ' + str(F0) + ' GH\n')
+            self.inst.write('L0 ' + str(L0)+ ' DM\n')
             time.sleep(0.5)
         
     def mobile_gimbal_follows_drone(self, yaw_now_gimbal, lat_gimbal, lon_gimbal, height_gimbal, lat_drone, lon_drone, height_drone):
@@ -1075,7 +1085,7 @@ class HelperA2GMeasurements(object):
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
             
-    def send_N_azimuth_angles(self, az_now, Naz, el_now=None, Nel=None, meas_number='1'):
+    def send_N_azimuth_angles(self, az_now, roll_now, Naz, el_now=None, Nel=None, meas_number='1', meas_time=10):
         """
         Divides the azimuth in Naz sections and for each correspondent angle sets the yaw of the gimbal,
         and waits for the user input before moving gimbal to next angle. The angle count starts from az_now
@@ -1087,6 +1097,8 @@ class HelperA2GMeasurements(object):
             Nel (_type_, optional): _description_. Defaults to None.
             meas_number (str, optional): number of measurement according to Flight Plan. Defaults to '1'.
         """
+        reset_ang_buffer = []
+        to_save_file = []
         if self.IsGimbal:
             for i in range(Naz):
                 ang = int((i+1)*3600/Naz)
@@ -1095,24 +1107,41 @@ class HelperA2GMeasurements(object):
                     ang = ang - 3600
                 if ang < -1800:
                     ang = ang + 3600
-    
-                self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=0)
                 
-                input('Press ENTER when ready to move Gimbal RS2 to next angle')
+                reset_ang_buffer.append(ang)
+                
+                self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=roll_now)
+                
+                # Approximate gimbal speed of 56 deg/s:
+                # Max angular movement is 1800 which is done in 3.5 at the actual speed 
+                time.sleep(1800/self.myGimbal.speed + 1) 
+
+                self.inst.write('RF1\n')
+                print('Measuring for ' + str(meas_time) + '  secs\n')
+                time.sleep(meas_time)
+                self.inst.write('RF0\n')
                 
                 to_save = self.mySeptentrioGPS.NMEA_buffer[-1]
+                self.myGimbal.request_current_position()
+                time.sleep(0.0015)
+                
                 to_save['GROUND_GIMBAL_YAW'] = self.myGimbal.yaw
                 to_save['GROUND_GIMBAL_ROLL'] = self.myGimbal.roll
-                
-                to_save = json.dumps(to_save)
-                filename = 'MEASUREMENT_' + meas_number + '_AZIMUTH_POS_' + str(i)
-                f = open(filename + '.json', 'w')
-                f.write(to_save)
-                f.close()
-                
-                print(f'File {filename} saved')
+                to_save_file.append(to_save)
         else:
             print('To call this function, IsGimbal has to be set')
+        
+        to_save_now = json.dumps(to_save_file)
+        filename = 'MEASUREMENT_' + meas_number
+        f = open(filename + '.json', 'w')
+        f.write(to_save_now)
+        f.close()
+        
+        print(f'File {filename} saved')
+        
+        reset_buffer = reset_ang_buffer[-2::-1]
+        reset_buffer.append(reset_ang_buffer[-1])
+        return reset_buffer
     
     def HelperStartA2GCom(self, PORT=12000):
         """
@@ -1156,12 +1185,15 @@ class HelperA2GMeasurements(object):
         thread_rx_helper.start()
         
     def HelperA2GStopCom(self, DISC_WHAT='ALL'):   
-        if self.ID == 'DRONE':
-            self.socket.close()
-        elif self.ID == 'GROUND':
-            self.a2g_conn.close()
-            
-        self.event_stop_thread_helper.set()
+        try:    
+            if self.ID == 'DRONE':
+                self.socket.close()
+            elif self.ID == 'GROUND':
+                self.a2g_conn.close()
+                
+            self.event_stop_thread_helper.set()
+        except:
+            print('NO SOCKET created')         
         
         if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
             self.myGimbal.stop_thread_gimbal()
@@ -1173,6 +1205,8 @@ class HelperA2GMeasurements(object):
             self.mySeptentrioGPS.stop_gps_data_retrieval(msg_type='NMEA')
             print('Stoping GPS stream...')
             self.mySeptentrioGPS.stop_thread_gps()
-            
+        
+        if self.IsSignalGenerator:
+            self.inst.write('RF0\n')    
             
 
