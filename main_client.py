@@ -1,40 +1,51 @@
 import socket
-from a2gmeasurements import HelperA2GMeasurements, GpsSignaling, GimbalRS2
-import json
-import sys
 import time
+import numpy as np
+import threading
+from timeit import default_timer as timer
 
-host = 'localhost'
-myHelper = HelperA2GMeasurements('DRONE', host, DBG_LVL_0=False, DBG_LVL_1=True)
-myHelper.HelperStartA2GCom()
 
-mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
-mySeptentrioGPS.serial_connect()
-mySeptentrioGPS.start_thread_gps()
-mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
-print('Setting GPS...')
-time.sleep(0.5)
+def dummy_fcn(sz):
+    return np.sum(np.matmul(np.random.rand(sz,sz), np.random.rand(sz,sz)), axis=(0,1))
 
-Naz = 4
-continue_condition = True
-while(continue_condition):    
-    try:
-        if myHelper.SOCKET_BUFFER:
-            if myHelper.SOCKET_BUFFER[-1] == 'GET_GPS':
-                if mySeptentrioGPS.NMEA_buffer != []:    
-                    # Send last GPS coordinate
-                    data = json.dumps(mySeptentrioGPS.NMEA_buffer[-1])
-                    myHelper.socket.sendall(data.encode())
-                    
-        if myHelper.SOCKET_BUFFER:
-            if myHelper.SOCKET_BUFFER[-1] == 'END_EXPERIMENT':
-                continue_condition = False
-    except Exception as e:
-        print('Error in CLIENT:', e)
-        break
+def receive(stop_event, sock):
+    while not stop_event.is_set():
+        data = sock.recv(1024)
+        data = data.decode()
+        if data:
+            print(data)
+
+server_ip = 'localhost'
+port = 10000
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((server_ip, port))
+
+print('\nCLIENT connected to server')
+
+time.sleep(1)
+event_stop_thread = threading.Event()
+myThread = threading.Thread(target=receive, args=(event_stop_thread, sock))
+myThread.start()
+
+print('\nEntering main CLIENT thread')
+
+#sock.sendall(HTTP_msg.encode())
+
+try:    
+    while(True):
+    # Faster task than server side
+        sz = np.random.randint(5000, 6000)
+        start = timer()
+        tmp = dummy_fcn(sz)
+        del tmp
         
+        msg = 'Computing time of CLIENT task is: ' + str(timer() - start)
+                
+        sock.sendall(msg.encode())           
+        print('\nCLIENT messages sent')
     
-myHelper.HelperA2GStopCom()
-
-mySeptentrioGPS.stop_gps_data_retrieval(msg_type='NMEA')
-mySeptentrioGPS.stop_thread_gps()
+except KeyboardInterrupt:
+    event_stop_thread.set()
+    sock.close()
+        

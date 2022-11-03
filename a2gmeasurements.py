@@ -558,7 +558,7 @@ class GpsSignaling(object):
                                                         xonxoff=False,
                                                         do_not_open=True)
 
-                serial_instance.timeout = 1
+                serial_instance.timeout = 5
                             
                 serial_instance.exclusive = True
                 serial_instance.open()
@@ -573,12 +573,13 @@ class GpsSignaling(object):
             print('CONNECTED TO VIRTUAL SERIAL PORT IN SEPTENTRIO\r\n')
         
         self.serial_instance = serial_instance
-    
+        time.sleep(0.1)
+
     def process_gps_nmea_data(self, data):
         """
         Process the received data of the gps coming from the virtual serial port.
         
-        The labels of the items of the returned dictionary are the following ones:
+        The labels of the items of the returned dictionary are the following ones for the GGA sentence:
         
         'Timestamp'
         'Latitude'
@@ -603,8 +604,8 @@ class GpsSignaling(object):
         
         try:
             if self.DBG_LVL_0:
-                print('STARTS NMEA PARSING\r\n')
-            #nmeaobj = pynmea2.parse(data.decode('utf-8'))
+                print('\nNMEA PARSING')
+            
             nmeaobj = pynmea2.parse(data.decode())
             extracted_data = ['%s: %s' % (nmeaobj.fields[i][0], nmeaobj.data[i]) for i in range(len(nmeaobj.fields))]
             gps_data = {}
@@ -612,30 +613,41 @@ class GpsSignaling(object):
                 tmp = item.split(': ')
                 gps_data[tmp[0]] = tmp[1]
             
-            if int(gps_data['Latitude'][0]) != 0:
-                gps_data['Latitude'] = float(gps_data['Latitude'][0:2]) + float(gps_data['Latitude'][2:])/60
-            else:
-                gps_data['Latitude'] = float(gps_data['Latitude'][0:3]) + float(gps_data['Latitude'][3:])/60
-            
-            if int(gps_data['Longitude'][0]) != 0:
-                gps_data['Longitude'] = float(gps_data['Longitude'][0:2]) + float(gps_data['Longitude'][2:])/60
-            else:
-                gps_data['Longitude'] = float(gps_data['Longitude'][0:3]) + float(gps_data['Longitude'][3:])/60
-            
-            gps_data['Antenna Alt above sea level (mean)'] = float(gps_data['Antenna Alt above sea level (mean)'])
-        except:
+            # GGA type of NMEA sentence
+            if 'Latitude' in gps_data:
+                if int(gps_data['Latitude'][0]) != 0:
+                    gps_data['Latitude'] = float(gps_data['Latitude'][0:2]) + float(gps_data['Latitude'][2:])/60
+                else:
+                    gps_data['Latitude'] = float(gps_data['Latitude'][0:3]) + float(gps_data['Latitude'][3:])/60
+                
+                if int(gps_data['Longitude'][0]) != 0:
+                    gps_data['Longitude'] = float(gps_data['Longitude'][0:2]) + float(gps_data['Longitude'][2:])/60
+                else:
+                    gps_data['Longitude'] = float(gps_data['Longitude'][0:3]) + float(gps_data['Longitude'][3:])/60
+                
+                gps_data['Antenna Alt above sea level (mean)'] = float(gps_data['Antenna Alt above sea level (mean)'])
+                
+            if 'Heading' in gps_data:
+                gps_data['Heading'] = float(gps_data['Heading'])
+                
+                if gps_data['Heading'] > 180:
+                    gps_data['Heading'] = gps_data['Heading'] - 360
+                
+        except Exception as e:
             # Do not save any other comand line
+            if self.DBG_LVL_1:
+                print('\nEXCEPTION PROCESSING NMEA')
             if self.DBG_LVL_0:
-                print('EXCEPTION PROCESSING NMEA\r\n')
+                print('\nThis is the exception: ', e)
             return
         
         # Save data if there is information (there is no any blank space in the dictionary of gps data)
         if not any([True for key, items in gps_data.items() if items == '']) or self.DBG_LVL_2:
             if self.DBG_LVL_0:
-                print('SAVES NMEA DATA INTO BUFFER\r\n')
+                print('\nSAVES NMEA DATA INTO BUFFER')
             self.NMEA_buffer.append(gps_data)
         
-    def process_pvtcart_sbf_data(self, data):
+    def process_pvtcart_sbf_data(self, raw_data):
         """
         Process the PVTCart data type
         
@@ -643,17 +655,46 @@ class GpsSignaling(object):
             data (list): _description_
         """
         
-        data = struct.unpack('<1c3H1I1H2B3d5fdf4B2H1I2B4H1B1B', data)
+        format_before_padd = '<1c3H1I1H2B3d5f1d1f4B2H1I2B4H1B' 
+        format_after_padd = format_before_padd + str(sys.getsizeof(raw_data)-struct.calcsize(format_before_padd)) + 'B'
+        #print('\nFormat: ', format_after_padd, ' Size of format: ', struct.calcsize(format_after_padd))
         
-        pvt_msg_format = {'SYNC2': data[0], 'CRC': data[1], 'ID': data[2], 'LEN': data[3], 'TOW': data[4],
-                          'WNc': data[5], 'MODE': data[6], 'ERR': data[7], 'X': data[8], 'Y': data[9], 'Z': data[10],
-                          'Undulation': data[11], 'Vx': data[12], 'Vy': data[13], 'Vz': data[14], 'COG': data[15],
-                          'RxClkBias': data[16], 'RxClkDrift': data[17], 'TimeSystem': data[18], 'Datum': data[19],
-                          'NrSV': data[20], 'WACorrInfo': data[21], 'ReferenceID': data[22], 'MeanCorrAge': data[23],
-                          'SignalInfo': data[24], 'AlertFlag': data[25], 'NrBases': data[26], 'PPPInfo': data[27],
-                          'Latency': data[28], 'HAccuracy': data[29], 'VAccuracy': data[30], 'Misc': data[31],
-                          'Padding': data[32]}        
-
+        TOW = struct.unpack('<1I', raw_data[7:11])[0]
+        WNc = struct.unpack('<1H', raw_data[11:13])[0]        
+        MODE =  struct.unpack('<1B', raw_data[13:14])[0]
+        ERR =  struct.unpack('<1B', raw_data[14:15])[0]
+        X =  struct.unpack('<1d', raw_data[15:23])[0]
+        Y =  struct.unpack('<1d', raw_data[23:31])[0]
+        Z = struct.unpack('<1d', raw_data[31:39])[0]
+        Undulation =  struct.unpack('<1f', raw_data[39:43])[0]
+        Vx =  struct.unpack('<1f', raw_data[43:47])[0]
+        Vy = struct.unpack('<1f', raw_data[47:51])[0]
+        Vz =  struct.unpack('<1f', raw_data[51:55])[0]
+        COG =  struct.unpack('<1f', raw_data[55:59])[0]
+        RxClkBias = struct.unpack('<1d', raw_data[59:67])[0]
+        RxClkDrift =  struct.unpack('<1f', raw_data[67:71])[0]
+        TimeSystem = struct.unpack('<1B', raw_data[71:72])[0]
+        Datum =  struct.unpack('<1B', raw_data[72:73])[0]
+        NrSV = struct.unpack('<1B', raw_data[73:74])[0]
+        WACorrInfo =  struct.unpack('<1B', raw_data[74:75])[0]
+        ReferenceID =  struct.unpack('<1H', raw_data[75:77])[0]
+        MeanCorrAge = struct.unpack('<1H', raw_data[77:79])[0]
+        SignalInfo =  struct.unpack('<1I', raw_data[79:83])[0] 
+        AlertFlag = struct.unpack('<1B', raw_data[83:84])[0]
+        NrBases =  struct.unpack('<1B', raw_data[84:85])[0]
+        PPPInfo =  struct.unpack('<1H', raw_data[85:87])[0]
+        Latency =  struct.unpack('<1H', raw_data[87:89])[0]        
+        HAccuracy =  struct.unpack('<1H', raw_data[89:91])[0]         
+        VAccuracy =  struct.unpack('<1H', raw_data[91:93])[0]  
+        
+        
+        pvt_msg_format = {'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 'X': X, 'Y': Y, 'Z': Z,
+                          'Undulation': Undulation, 'Vx': Vx, 'Vy': Vy, 'Vz': Vz, 'COG': COG,
+                          'RxClkBias': RxClkBias, 'RxClkDrift': RxClkDrift, 'TimeSystem': TimeSystem, 'Datum': Datum,
+                          'NrSV': NrSV, 'WACorrInfo': WACorrInfo, 'ReferenceID': ReferenceID, 'MeanCorrAge': MeanCorrAge,
+                          'SignalInfo': SignalInfo, 'AlertFlag': AlertFlag, 'NrBases': NrBases, 'PPPInfo': PPPInfo,
+                          'Latency': Latency, 'HAccuracy': HAccuracy, 'VAccuracy': VAccuracy}        
+        
         self.SBF_frame_buffer.append(pvt_msg_format)
         
     def parse_septentrio_msg(self, rx_msg):
@@ -667,20 +708,28 @@ class GpsSignaling(object):
             Exception: _description_
         """                
         try:
-            if self.DBG_LVL_0:
-                print('STARTS RECEPTION OF MSG\r\n')
             if self.DBG_LVL_1:
-                print('MSG: ', rx_msg)
+                print('\nPARSING RX DATA')
+            if self.DBG_LVL_0:                
+                print('\nRX DATA: ', rx_msg.decode('utf-8', 'ignore'), 'TYPE RX DATA: ', type(rx_msg))
             
             # The SBF output follows the $ sync1 byte, with a second sync byte that is the symbol @ or in utf-8 the decimal 64
-            if rx_msg[0] == 64: 
+            # Bytes indexing  works as follows:
+            # One integer gives a decimal
+            # A slice (i.e. 0:1) gives a bytes object ---> rx_msg[0] != rx_msg[0:1]
+            if rx_msg[0] == 64:                
                 if self.DBG_LVL_0:
-                    print('DETECTS SBF\r\n')
+                    print('\nDETECTS SBF')
+                    
+                # Header detection
+                #SYNC = struct.unpack('<1c', rx_msg[0]) 
+                CRC = struct.unpack('<1H', rx_msg[1:3])                
                 ID_SBF_msg = struct.unpack('<1H', rx_msg[3:5])
+                LEN_SBF_msg = struct.unpack('1H', rx_msg[5:7])
                 
                 # PVTCart SBF sentence identified by ID 4006
                 if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
-                    self.process_pvtcart_sbf_data(rx_msg[:-1])
+                    self.process_pvtcart_sbf_data(rx_msg)
                 
                 
                 # Implement other  SBF sentences.
@@ -690,13 +739,13 @@ class GpsSignaling(object):
             # NMEA Output starts with the letter G, that in utf-8 is the decimal 71
             elif rx_msg[0] == 71:
                 if self.DBG_LVL_0:
-                    print('DETECTS NMEA\r\n')
+                    print('\nDETECTS NMEA')
                 self.process_gps_nmea_data(rx_msg[:-1])
-        except:
-            if self.DBG_LVL_0:
-                print('EXCEPTION IN parse_septentrio_msg\r\n')
+        except Exception as e:
             if self.DBG_LVL_1:
-                print('MSG:', rx_msg, ' SIZE: ', sys.getsizeof(rx_msg), '\r\n')
+                print('\nEXCEPTION IN parse_septentrio_msg')
+            if self.DBG_LVL_0:
+                print('\nThis is the exception: ', e)
     
     def serial_receive(self, serial_instance_actual, stop_event):
         """
@@ -731,6 +780,7 @@ class GpsSignaling(object):
             t_receive = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_gps))
 
         t_receive.start()
+        time.sleep(0.5)
         
     def stop_thread_gps(self, interface='USB'):
         """
@@ -762,6 +812,8 @@ class GpsSignaling(object):
         elif interface == 'IP':
             self.socket.sendall(cmd_eof.encode('utf-8'))
             
+        time.sleep(0.5)
+            
     def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', nmea_type='GGA'):
         """
         Wrapper to sendCommandGps for a specific command to send.
@@ -776,16 +828,20 @@ class GpsSignaling(object):
         
         if interface == 'USB':
             if msg_type == 'SBF':
-                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', PVTCartesian, ' + interval
+                cmd1 = 'setDataInOut, ' + interface + str(self.interface_number) + ',, ' + '+SBF'
+                cmd2 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', PVTCartesian, ' + interval
             elif msg_type == 'NMEA':
-                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', ' + nmea_type + ', ' + interval
+                cmd1 = 'setDataInOut, ' + interface + str(self.interface_number) + ',, ' + '+NMEA'
+                cmd2 = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', ' + nmea_type + ', ' + interval
         
-        self.sendCommandGps(cmd)
+        self.sendCommandGps(cmd1)
+        self.sendCommandGps(cmd2)
         
         if self.DBG_LVL_1:
-            print(cmd)
+            print('\n'+ cmd1)
+            print('\n'+ cmd2)
      
-    def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='NMEA'):
+    def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='NMEA'):   
         """
         Stop the streaming of data using septentrio commands. 
         
@@ -801,11 +857,14 @@ class GpsSignaling(object):
         
         if interface == 'USB':
             if msg_type == 'SBF':
-                cmd = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none '
+                cmd1 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none '
+                cmd2 = 'sdio, ' + interface + str(self.interface_number) + ',, -SBF'
             elif msg_type == 'NMEA':
-                cmd = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none ' 
-     
-        self.sendCommandGps(cmd)
+                cmd1 = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none ' 
+                cmd2 = 'sdio, ' + interface + str(self.interface_number) + ',, -NMEA'
+        
+        self.sendCommandGps(cmd1)
+        self.sendCommandGps(cmd2)
         
     def ask_for_port(self):
         """
@@ -927,7 +986,13 @@ class myAnritsuSpectrumAnalyzer(object):
             self.iterate_xml_file(doc)
     
     def iterate_xml_file(self, iterable):
+        """
+        Extracts timestamp, sample number and sample value of the Anritsu MS276XA Spectrum Analyzer, from
+        the .rsm file generated by the device. This file is similar in structure to a XML file.
 
+        Args:
+            iterable (_type_): _description_
+        """
         if isinstance(iterable, dict):
             for key, value in iterable.items():
                 if key == 'TimeStamp':
@@ -990,14 +1055,14 @@ class HelperA2GMeasurements(object):
         if IsGimbal:
             self.myGimbal = GimbalRS2()
             self.myGimbal.start_thread_gimbal()
-            print('Setting Gimbal RS2...\n')
+            print('Gimbal RS2 thread opened\n')
             time.sleep(0.5)
         if IsGPS:
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
             self.mySeptentrioGPS.serial_connect()
             self.mySeptentrioGPS.start_thread_gps()
             self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
-            print('Setting GPS...\n')
+            print('Septentrio GPS thread opened\n')
             time.sleep(0.5)
         if IsSignalGenerator:
             rm = pyvisa.ResourceManager()
@@ -1040,6 +1105,7 @@ class HelperA2GMeasurements(object):
             lat_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
             lon_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
             height_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']
+            
         
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
             print("ERROR: Either ground or drone coordinates must be provided\n")
@@ -1070,7 +1136,7 @@ class HelperA2GMeasurements(object):
         yaw_now_gimbal = np.pi/2 - np.deg2rad(yaw_now_gimbal)
         if yaw_now_gimbal > np.pi:
             yaw_now_gimbal = yaw_now_gimbal - np.pi*2
-        if yaw_now_gimbal < - np.pi:
+        if yaw_now_gimbal < -np.pi:
             yaw_now_gimbal = yaw_now_gimbal + np.pi*2
                
         # This is the angle the gimbal has to move
@@ -1087,7 +1153,7 @@ class HelperA2GMeasurements(object):
         
         return yaw_to_set, pitch_to_set
         
-    def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3901):
+    def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3067):
             """
             Converts from DDMMS coordinates to planar coordinates by using a specified projection.
 
@@ -1096,7 +1162,11 @@ class HelperA2GMeasurements(object):
                 input_lat (scalar): _description_
                 offset (dictionary, optional): The coordinates of the (0, 0) coordinate in the planar system with meter units. Defaults to None.
                 epsg_in (int, optional): _description_. Defaults to 4326.
-                epsg_out (int, optional): _description_. Defaults to 3901. Finland EPSG Uniform Coordinate System
+                epsg_out (int, optional): _description_. Defaults to 3067. 
+                
+                Known EPSG codes:
+                3067 ---> EUREF-FIN geodetic datum (ETRS-TM35FIN)
+                4936 ---> ETRS89 Europe
 
             Returns:
                 lat_planar, lon_planar (float): planar coordinates
@@ -1104,7 +1174,7 @@ class HelperA2GMeasurements(object):
             
             # setup your projections, assuming you're using WGS84 geographic
             crs_wgs = proj.Proj(init='epsg:' + str(epsg_in))
-            crs_bng = proj.Proj(init='epsg:' + str(epsg_out))  # use the Belgium epsg code
+            crs_bng = proj.Proj(init='epsg:' + str(epsg_out))  # use the Finnish epsg code
 
             # then cast your geographic coordinate pair to the projected system
             lon_planar, lat_planar = proj.transform(crs_wgs, crs_bng, input_lon, input_lat)
@@ -1268,7 +1338,7 @@ class HelperA2GMeasurements(object):
         Stops communications with all the devices or the specified ones in the variable 'DISC_WHAT
 
         Args:
-            DISC_WHAT (str, optional): specifies what to disconnect. Defaults to 'ALL'. Options are: 'Gimbal', 'GPS', 'ALL'
+            DISC_WHAT (str, optional): specifies what to disconnect. Defaults to 'ALL'. Options are: 'SG', 'GIMBAL', 'GPS', 'ALL'
         """
         try:    
             if self.ID == 'DRONE':
@@ -1291,5 +1361,5 @@ class HelperA2GMeasurements(object):
             print('Stoping GPS stream...')
             self.mySeptentrioGPS.stop_thread_gps()
         
-        if self.IsSignalGenerator:
+        if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
             self.inst.write('RF0\n')    
