@@ -1,5 +1,5 @@
 import xmltodict
-from datetime import datetime
+import datetime
 import time
 import struct
 from ctypes import *
@@ -16,6 +16,7 @@ from serial.tools.list_ports import comports
 import pyproj as proj
 import json
 import pyvisa
+import pandas as pd
 
 """
 Author: Julian D. Villegas G.
@@ -500,7 +501,22 @@ class GpsSignaling(object):
         # Initializations
         # Dummy initialization
         self.SBF_frame_buffer = []
-        self.NMEA_buffer = []
+        self.NMEA_buffer = pd.DataFrame({'Timestamp': '', 
+                 'Latitude': '', 
+                 'Latitude Direction': '', 
+                 'Longitude': '', 
+                 'Longitude Direction': '', 
+                 'GPS Quality Indicator': '', 
+                 'Number of Satellites in use': '', 
+                 'Horizontal Dilution of Precision': '', 
+                 'Antenna Alt above sea level (mean)': '', 
+                 'Units of altitude (meters)': '', 
+                 'Geoidal Separation': '', 
+                 'Units of Geoidal Separation (meters)': '', 
+                 'Age of Differential GPS Data (secs)': '', 
+                 'Differential Reference Station ID': '',
+                 'Heading': ''}, index=[0])
+
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
         self.DBG_LVL_0 = DBG_LVL_0
@@ -614,7 +630,7 @@ class GpsSignaling(object):
                 gps_data[tmp[0]] = tmp[1]
             
             # GGA type of NMEA sentence
-            if 'Latitude' in gps_data:
+            if 'Antenna Alt above sea level (mean)' in gps_data:
                 if int(gps_data['Latitude'][0]) != 0:
                     gps_data['Latitude'] = float(gps_data['Latitude'][0:2]) + float(gps_data['Latitude'][2:])/60
                 else:
@@ -627,12 +643,29 @@ class GpsSignaling(object):
                 
                 gps_data['Antenna Alt above sea level (mean)'] = float(gps_data['Antenna Alt above sea level (mean)'])
                 
+                
+                # Save the UNIX timestamp. As the timestamp provides hour/min/sec only, add the date
+                today_date = datetime.date.today()
+                today_date = [int(i) for i in today_date.strftime("%Y-%m-%d").split('-')]                
+
+                complete_date = datetime.datetime(year=today_date[0], 
+                                                month=today_date[1], 
+                                                day=today_date[2], 
+                                                hour=int(gps_data['Timestamp'][0:2]), 
+                                                minute=int(gps_data['Timestamp'][2:4]), 
+                                                second=int(gps_data['Timestamp'][4:6]))
+
+                gps_data['Timestamp'] = time.mktime(complete_date.timetuple())                            
+            
+            # HDT NMEA sentence
             if 'Heading' in gps_data:
                 gps_data['Heading'] = float(gps_data['Heading'])
                 
                 if gps_data['Heading'] > 180:
                     gps_data['Heading'] = gps_data['Heading'] - 360
                 
+                gps_data['Timestamp'] = time.time()                
+            
         except Exception as e:
             # Do not save any other comand line
             if self.DBG_LVL_1:
@@ -642,11 +675,13 @@ class GpsSignaling(object):
             return
         
         # Save data if there is information (there is no any blank space in the dictionary of gps data)
-        if not any([True for key, items in gps_data.items() if items == '']) or self.DBG_LVL_2:
+        #if not any([True for key, items in gps_data.items() if items == '']) or self.DBG_LVL_2:
+        if self.DBG_LVL_2:
             if self.DBG_LVL_0:
                 print('\nSAVES NMEA DATA INTO BUFFER')
-            self.NMEA_buffer.append(gps_data)
-        
+                
+            self.NMEA_buffer.loc[len(self.NMEA_buffer)] = gps_data   
+           # self.NMEA_buffer.append(gps_data)    
     def process_pvtcart_sbf_data(self, raw_data):
         """
         Process the PVTCart data type
@@ -696,7 +731,28 @@ class GpsSignaling(object):
                           'Latency': Latency, 'HAccuracy': HAccuracy, 'VAccuracy': VAccuracy}        
         
         self.SBF_frame_buffer.append(pvt_msg_format)
+    
+    def process_atteuler_sbf_data(self, raw_data):
         
+        TOW = struct.unpack('<1I', raw_data[7:11])[0]
+        WNc = struct.unpack('<1H', raw_data[11:13])[0]        
+        NrSV = struct.unpack('<1B', raw_data[13:14])[0]
+        ERR =  struct.unpack('<1B', raw_data[14:15])[0]
+        MODE =  struct.unpack('<1H', raw_data[15:17])[0]
+        Heading =  struct.unpack('<1f', raw_data[17:21])[0]
+        Pitch =  struct.unpack('<1f', raw_data[21:25])[0]
+        Roll = struct.unpack('<1f', raw_data[25:29])[0]
+        PitchDot =  struct.unpack('<1f', raw_data[29:33])[0]
+        RollDot =  struct.unpack('<1f', raw_data[33:37])[0]
+        HeadingDot = struct.unpack('<1f', raw_data[37:41])[0]
+        
+        
+        atteul_msg_format = {'TOW': TOW, 'WNc': WNc, 'NrSV': NrSV, 'ERR': ERR, 'MODE': MODE, 
+                             'Heading': Heading, 'Pitch': Pitch, 'Roll': Roll, 
+                             'PitchDot': PitchDot, 'RollDot': RollDot, 'HeadingDot': HeadingDot}        
+        
+        self.SBF_frame_buffer.append(atteul_msg_format)
+    
     def parse_septentrio_msg(self, rx_msg):
         """
         Parse the received message and process it depending if it is a SBF or NMEA message
@@ -731,10 +787,28 @@ class GpsSignaling(object):
                 if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
                     self.process_pvtcart_sbf_data(rx_msg)
                 
+                # PosCovCartesian SBF sentence identified by ID 5905
+                if ID_SBF_msg[0] & 8191 == 5905: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
+                    print('\nReceived PosCovCartesian SBF sentence')
                 
-                # Implement other  SBF sentences.
-                # ...
+                if ID_SBF_msg[0] & 8191 == 5907: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
+                    print('\nReceived VelCovCartesian SBF sentence')
                 
+                if ID_SBF_msg[0] & 8191 == 4043: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
+                    print('\nReceived BaseVectorCart SBF sentence')
+                
+                if ID_SBF_msg[0] & 8191 == 5942: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
+                    print('\nReceived AuxAntPositions SBF sentence')
+                
+                if ID_SBF_msg[0] & 8191 == 5938: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
+                    print('\nReceived AttEuler SBF sentence')
+                    self.process_atteuler_sbf_data(rx_msg)
+                
+                if ID_SBF_msg[0] & 8191 == 5939: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
+                    print('\nReceived AttCovEuler SBF sentence')
+                               
+                if ID_SBF_msg[0] & 8191 == 5943: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
+                    print('\nReceived EndOfAtt SBF sentence')
             
             # NMEA Output starts with the letter G, that in utf-8 is the decimal 71
             elif rx_msg[0] == 71:
@@ -814,7 +888,7 @@ class GpsSignaling(object):
             
         time.sleep(0.5)
             
-    def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', nmea_type='GGA'):
+    def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', nmea_type='GGA', sbf_type='PVTCartesian'):
         """
         Wrapper to sendCommandGps for a specific command to send.
 
@@ -829,7 +903,7 @@ class GpsSignaling(object):
         if interface == 'USB':
             if msg_type == 'SBF':
                 cmd1 = 'setDataInOut, ' + interface + str(self.interface_number) + ',, ' + '+SBF'
-                cmd2 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', PVTCartesian, ' + interval
+                cmd2 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', ' +  sbf_type + ', ' + interval
             elif msg_type == 'NMEA':
                 cmd1 = 'setDataInOut, ' + interface + str(self.interface_number) + ',, ' + '+NMEA'
                 cmd2 = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', ' + nmea_type + ', ' + interval
@@ -997,13 +1071,13 @@ class myAnritsuSpectrumAnalyzer(object):
             for key, value in iterable.items():
                 if key == 'TimeStamp':
                     if value['@year']:
-                            meas_date = datetime(year=int(value['@year']), 
+                            meas_date = datetime.datetime(year=int(value['@year']), 
                                                 month=int(value['@month']),
                                                 day=int(value['@day']),
                                                 hour=int(value['@hour']),
                                                 minute=int(value['@minute']),
                                                 second=int(value['@second']))
-                            self.XML_file['Timestamp'] = datetime.timestamp(meas_date)
+                            self.XML_file['Timestamp'] = datetime.datetime.timestamp(meas_date)
                 if not (isinstance(value, dict) or isinstance(value, list)):
                     # We know when the key '@id' is an integer then we are in a data point
                     if key == '@id':
@@ -1072,9 +1146,9 @@ class HelperA2GMeasurements(object):
             self.inst.write('L0 ' + str(L0)+ ' DM\n')
             time.sleep(0.5)
         
-    def ground_gimbal_follows_drone(self, yaw_now_gimbal, lat_ground=None, 
-                                    lon_ground=None, height_ground=None, 
-                                    lat_drone=None, lon_drone=None, height_drone=None):
+    def ground_gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
+                                    lat_drone=None, lon_drone=None, height_drone=None, 
+                                    coord_type='latlon'):
         """
         Ground gimbal points to the drone. The front part of the RS2 Gimbal should be pointing to the North. (or equivalently, the touchscreen
         should be pointing to the south).
@@ -1082,7 +1156,7 @@ class HelperA2GMeasurements(object):
         The user must input either the 3 ground coordinates or the 3 drone coordinates, but both of them can't be None. 
         Moreover, the user must input exactly the 3 coordinates, otherwise the computation won't work.
 
-        Finds the yaw and roll angles to be set at the GROUND gimbal so it points towards the DRONE station.
+        Finds the yaw and pitch angles to be set at the GROUND gimbal so it points towards the DRONE station.
 
         Args:
             yaw_now_gimbal (float): GROUND gimbal orientation with respect to the North. It is an angle in DEGREES.
@@ -1100,6 +1174,7 @@ class HelperA2GMeasurements(object):
             lat_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
             lon_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
             height_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']
+            heading = self.mySeptentrioGPS.NMEA_buffer[-1]
         
         if self.IsGPS and self.ID == 'DRONE' and lat_drone is None  and lon_drone is None and height_drone is None:
             lat_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
@@ -1108,50 +1183,43 @@ class HelperA2GMeasurements(object):
             
         
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
-            print("ERROR: Either ground or drone coordinates must be provided\n")
+            print("\nERROR: Either ground or drone coordinates must be provided")
             return 0, 0
-                
-        lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
-        lat_gimbal_planar, lon_gimbal_planar = self.convert_DDMMS_to_planar(lon_ground, lat_ground, offset=None, epsg_in=4326, epsg_out=3901)
+
+        if coord_type == 'latlon':
+            lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
+            lat_ground_planar, lon_ground_planar = self.convert_DDMMS_to_planar(lon_ground, lat_ground, offset=None, epsg_in=4326, epsg_out=3901)
+
+        # Testing purposes
+        elif coord_type == 'planar':
+            lat_drone_planar = lat_drone
+            lon_drone_planar = lon_drone
+            lat_ground_planar = lat_ground
+            lon_ground_planar = lon_ground
         
         position_drone = np.array([lon_drone_planar, lat_drone_planar, height_drone])
-        position_gimbal = np.array([lon_gimbal_planar, lat_gimbal_planar, height_ground])
-        print(f"[DEBUG]: POS_DRONE: {position_drone}, POS_GROUND: {position_gimbal}")
-        
-        #d_mobile_drone_3D = np.linalg.norm(position_drone - position_gimbal)
-        d_mobile_drone_2D = np.linalg.norm(position_drone[:-1] - position_gimbal[:-1])
-        print(f"[DEBUG]: Azimuth distance from ground to drone station: {d_mobile_drone_2D}")
-                
-        # Elevation angle of the drone referenced to GROUND station plane. 
-        # Is also the roll angle to send to the gimbal
+        position_ground = np.array([lon_ground_planar, lat_ground_planar, height_ground])
+                    
+        d_mobile_drone_2D = np.linalg.norm(position_drone[:-1] - position_ground[:-1])
+                        
         pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)
         pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
-        print(f"[DEBUG]: Elevation angle of DRONE refered to GROUND plane: {pitch_to_set}")
+                            
+        alpha = np.arctan2(lat_drone_planar - lat_ground_planar, lon_drone_planar - lon_ground_planar)
                 
-        # Angle between CAR and DRONE, with the CAR position as the (0,0) coordinate of the reference system where the angle is computed
-        # The angle is refered to the EAST direction
-        alpha = np.arctan2(lat_drone_planar - lat_gimbal_planar, lon_drone_planar - lon_gimbal_planar)
-        print(f"[DEBUG]: ALPHA angle: {alpha}")
+        if heading > np.pi:
+            heading = heading - np.pi*2
+                    
+        yaw_to_set = (alpha - np.pi/2) + heading
+
+        if yaw_to_set > np.pi:
+            yaw_to_set = yaw_to_set - np.pi*2
+        elif yaw_to_set < -np.pi:
+            yaw_to_set = yaw_to_set + np.pi*2
+            
+        yaw_to_set = int(np.rad2deg(-yaw_to_set)*10)
         
-        yaw_now_gimbal = np.pi/2 - np.deg2rad(yaw_now_gimbal)
-        if yaw_now_gimbal > np.pi:
-            yaw_now_gimbal = yaw_now_gimbal - np.pi*2
-        if yaw_now_gimbal < -np.pi:
-            yaw_now_gimbal = yaw_now_gimbal + np.pi*2
-               
-        # This is the angle the gimbal has to move
-        yaw_to_set = (np.pi/2 - yaw_now_gimbal) - alpha
-        yaw_to_set = int(np.rad2deg(yaw_to_set)*10)
-        
-        print(f"[DEBUG]: Yaw to set in gimbal: {yaw_to_set}")
-        
-        # Yaw is in the interval [180, -180] but in units of 0.1 deg, so multiply by 10
-        if yaw_to_set > 1800:
-            yaw_to_set = yaw_to_set - 3600
-        if yaw_to_set < -1800:
-            yaw_to_set = yaw_to_set + 3600       
-        
-        return yaw_to_set, pitch_to_set
+        return yaw_to_set, pitch_to_set, alpha
         
     def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3067):
             """
