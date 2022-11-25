@@ -17,6 +17,7 @@ import pyproj as proj
 import json
 import pyvisa
 import pandas as pd
+from sys import platform
 
 """
 Author: Julian D. Villegas G.
@@ -501,21 +502,7 @@ class GpsSignaling(object):
         # Initializations
         # Dummy initialization
         self.SBF_frame_buffer = []
-        self.NMEA_buffer = pd.DataFrame({'Timestamp': '', 
-                 'Latitude': '', 
-                 'Latitude Direction': '', 
-                 'Longitude': '', 
-                 'Longitude Direction': '', 
-                 'GPS Quality Indicator': '', 
-                 'Number of Satellites in use': '', 
-                 'Horizontal Dilution of Precision': '', 
-                 'Antenna Alt above sea level (mean)': '', 
-                 'Units of altitude (meters)': '', 
-                 'Geoidal Separation': '', 
-                 'Units of Geoidal Separation (meters)': '', 
-                 'Age of Differential GPS Data (secs)': '', 
-                 'Differential Reference Station ID': '',
-                 'Heading': ''}, index=[0])
+        self.NMEA_buffer = []
 
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
@@ -549,20 +536,40 @@ class GpsSignaling(object):
             data = self.socket.recv(64)
             self.process_gps_nmea_data(data)
             
-    def serial_connect(self):
+    def serial_connect(self, serial_port=None):
         """
-        Open a serial connection with one of the 2 virtual ports provided by Septentrio mosaic-go.
+        Open a serial connection. The Septentrio mosaic-go provides 2 virtual serial ports.
+        
+        In Windows the name of the virtual serial ports are typically: 
+        -COM15 (Virtual serial port 1)
+        -COM14 (Virtual serial port 2)
+
+        In Linux the name of the virtual serial ports (controlled by the standard Linux CDC-ACM driver) are:
+        -/dev/ttyACM0 (Virtual serial port 1)
+        -/dev/ttyACM1 (Virtual serial port 2)
+
+        For the virtual serial ports the interface name in Septentrio receiver is 'USB' as they
+        communication is made through the USB connection with the host computer. 
+        
+        Additionally there is an actual serial port in the mosaic-go device. Under Linux,
+        the name of this port is '/dev/serial0' (or '/dev/serial0') which is the symbolic link
+        to either 'dev/ttyS#' or '/dev/ttyAMA#'.
         
         Args:
-            port (str, optional): virtual serial port. Defaults to 'COM11'.
+            serial_port (str, optional): serial port or virtual serial port name. 
         """
         
         # Look for the first Virtual Com in Septentrio receiver. It is assumed that it is available, 
         # meaning that it has been closed by user if was used before.        
         for (this_port, desc, _) in sorted(comports()):
-            if 'Septentrio Virtual USB COM Port 1' in desc:
-                self.serial_port = this_port
-                self.interface_number = 1
+            # Linux CDC-ACM driver
+            if 'Septentrio USB Device - CDC Abstract Control Model (ACM)' in desc:
+                    self.serial_port = '/dev/ttyACM0'
+                    self.interface_number = 1
+            # Windows driver
+            elif 'Septentrio Virtual USB COM Port 1' in desc:
+                    self.serial_port = this_port
+                    self.interface_number = 1
         
         serial_instance = None
         while serial_instance is None:
@@ -597,20 +604,11 @@ class GpsSignaling(object):
         
         The labels of the items of the returned dictionary are the following ones for the GGA sentence:
         
-        'Timestamp'
-        'Latitude'
-        'Longitude'
-        'Latitude Direction'
-        'Longitude'
-        'Longitude Direction'
-        'GPS Quality Indicator'
-        'Number of Satellites in use'
-        'Horizontal Dilution of Precision'
-        'Antenna Alt above sea level (mean)'
-        'Units of altitude (meters)'
-        'Geoidal Separation'
-        'Units of Geoidal Separation (meters)'
-        'Age of Differential GPS Data (secs)'
+        'Timestamp', 'Latitude', 'Longitude', 'Latitude Direction', 'Longitude'
+        'Longitude Direction', 'GPS Quality Indicator', 'Number of Satellites in use'
+        'Horizontal Dilution of Precision', 'Antenna Alt above sea level (mean)'
+        'Units of altitude (meters)', 'Geoidal Separation'
+        'Units of Geoidal Separation (meters)', 'Age of Differential GPS Data (secs)'
         'Differential Reference Station ID'
         
 
@@ -674,14 +672,11 @@ class GpsSignaling(object):
                 print('\nThis is the exception: ', e)
             return
         
-        # Save data if there is information (there is no any blank space in the dictionary of gps data)
-        #if not any([True for key, items in gps_data.items() if items == '']) or self.DBG_LVL_2:
-        if self.DBG_LVL_2:
+        if self.DBG_LVL_2 or len(self.NMEA_buffer):
             if self.DBG_LVL_0:
-                print('\nSAVES NMEA DATA INTO BUFFER')
-                
-            self.NMEA_buffer.loc[len(self.NMEA_buffer)] = gps_data   
-           # self.NMEA_buffer.append(gps_data)    
+                print('\nSAVES NMEA DATA INTO BUFFER')    
+            self.NMEA_buffer.append(gps_data)    
+
     def process_pvtcart_sbf_data(self, raw_data):
         """
         Process the PVTCart data type
@@ -730,7 +725,9 @@ class GpsSignaling(object):
                           'SignalInfo': SignalInfo, 'AlertFlag': AlertFlag, 'NrBases': NrBases, 'PPPInfo': PPPInfo,
                           'Latency': Latency, 'HAccuracy': HAccuracy, 'VAccuracy': VAccuracy}        
         
-        self.SBF_frame_buffer.append(pvt_msg_format)
+        pvt_data_we_care = {'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 'X': X, 'Y': Y, 'Z': Z, 'Datum': Datum}
+
+        self.SBF_frame_buffer.append(pvt_data_we_care)
     
     def process_atteuler_sbf_data(self, raw_data):
         
@@ -767,7 +764,7 @@ class GpsSignaling(object):
             if self.DBG_LVL_1:
                 print('\nPARSING RX DATA')
             if self.DBG_LVL_0:                
-                print('\nRX DATA: ', rx_msg.decode('utf-8', 'ignore'), 'TYPE RX DATA: ', type(rx_msg))
+                print('\nRX DATA: ', rx_msg.decode('utf-8', 'ignore'))
             
             # The SBF output follows the $ sync1 byte, with a second sync byte that is the symbol @ or in utf-8 the decimal 64
             # Bytes indexing  works as follows:
@@ -894,7 +891,7 @@ class GpsSignaling(object):
 
         Args:
             stream_number(int, optional): stream number. Defaults to 1.
-            interface (str, optional): Interface: can be 'USB1', 'USB2' or 'IP'+ number_of_ip_terminal_emulator. Defaults to 'USB1'. 
+            interface (str, optional): Interface: can be 'USB#', 'COM#' or 'IP#'. Defaults to 'USB1'. 
             interval (str, optional): can be any of: 'msec10', 'msec20', 'msec40', 'msec50', 'msec100', 'msec200', 'msec500',
                                                      'sec1', 'sec2', 'sec5', 'sec10', 'sec15', 'sec30', 'sec60', 
                                                      'min2', 'min5', 'min10', 'min15', 'min30', 'min60'
@@ -915,7 +912,7 @@ class GpsSignaling(object):
             print('\n'+ cmd1)
             print('\n'+ cmd2)
      
-    def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='NMEA'):   
+    def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='+NMEA+SBF'):   
         """
         Stop the streaming of data using septentrio commands. 
         
@@ -933,12 +930,25 @@ class GpsSignaling(object):
             if msg_type == 'SBF':
                 cmd1 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none '
                 cmd2 = 'sdio, ' + interface + str(self.interface_number) + ',, -SBF'
+                
+                self.sendCommandGps(cmd1)
+                self.sendCommandGps(cmd2)
             elif msg_type == 'NMEA':
                 cmd1 = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none ' 
                 cmd2 = 'sdio, ' + interface + str(self.interface_number) + ',, -NMEA'
-        
-        self.sendCommandGps(cmd1)
-        self.sendCommandGps(cmd2)
+
+                self.sendCommandGps(cmd1)
+                self.sendCommandGps(cmd2)
+            elif msg_type == '+NMEA+SBF' or msg_type == '+SBF+NMEA':
+                cmd1 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none '
+                cmd2 = 'sdio, ' + interface + str(self.interface_number) + ',, -SBF'
+                cmd3 = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none ' 
+                cmd4 = 'sdio, ' + interface + str(self.interface_number) + ',, -NMEA'
+
+                self.sendCommandGps(cmd1)
+                self.sendCommandGps(cmd2)       
+                self.sendCommandGps(cmd3)
+                self.sendCommandGps(cmd4)
         
     def ask_for_port(self):
         """
@@ -1255,27 +1265,122 @@ class HelperA2GMeasurements(object):
 
             return lat_planar, lon_planar
     
-    def parse_rx_data(self, data):
+    def build_a2g_frame(self, type_frame='cmd', data=None, cmd=None):
+        """
+        Builds the frame for the a2g communication messages.
+
+        Args:
+            type_frame (str, optional): 'cmd' or 'ans'. Defaults to 'cmd'.
+            data (str, optional): data to be set with the 'cmd' (i.e. for the comand 'SETGIMBAL', data contains the gimbal position to be set).
+                                  Or data to be send in 'ans' frame. 
+            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL', 'SNDDATA'. Defaults to None.
+        """
+        synch_1 = '%'
+        synch_2 = '*'
+
+        if type_frame == 'cmd':
+            header_field = cmd
+        elif type_frame =='ans':
+            header_field = 'ANS'
+
+        if len(header_field) > 4:
+            header_length = str(2 + 2 + header_field + 1)
+        else:
+            header_length = '0' + str(2 + 2 + header_field + 1)
+
+        term_header_charac = ';'
+
+        if data:
+            frame = synch_1 + synch_2 + header_length + header_field + term_header_charac + data
+        else:
+            frame = synch_1 + synch_2 + header_length + header_field + term_header_charac
+        
+        return frame
+
+    def do_getgps_action(self):
+        """
+        Function to execute when the received instruction in the a2g comm link is 'GETGPS'
+
+        """
+
+        if self.IsGPS:
+            
+            data_to_send = json.dumps(self.mySeptentrioGPS.NMEA_buffer[-1])
+            frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send)
+
+            if self.DBG_LVL_1:
+                print('\nReceived the GET GPS and read the NMEA buffer')
+            if self.ID == 'GROUND':
+                self.a2g_conn.sendall(frame_to_send.encode())
+            if self.ID == 'DRONE':
+                self.socket.sendall(frame_to_send.encode())
+        else:
+            print('\nASKED for GPS position but flag IsGPS is False')
+    
+    def do_setgimbal_action(self, msg_data):
+        """
+        Function to execute when the received instruction in the a2g comm link is 'SETGIMBAL'.
+
+        Args:
+            msg_data (str): string array with the yaw and pitch angle to be moved. 
+                            
+            THE EXPECTED STRUCTURE OF THE STRING ARRAY IS:
+                            
+                            'YAW/#/PITCH/#'
+
+            where # represents the number between -1800,1800
+        """
+
+        if self.IsGimbal:
+            msg_data = msg_data.split('/')
+
+            self.myGimbal.setPosControl(yaw=int(float(msg_data[1])), roll=0, pitch=int(float(msg_data[3])))
+        else:
+            print('\nAction to SET Gimbal not posible cause no gimbal is on')
+
+    def do_snddata_action(self, msg_data):
+        """
+        Function to execute when the received instruction in the a2g comm link is 'SNDDATA'.
+        This function parses the message data received in the comm link.
+
+        """
+
+    def parse_rx_msg(self, rx_msg):
         """
         Handles the received socket data. 
 
         Args:
-            data (bytes): received data from socket
+            rx_msg (str): received data from socket
         """
-        if data == 'GET_GPS':
-            if self.IsGPS:
-                to_send = json.dumps(self.mySeptentrioGPS.NMEA_buffer[-1])
-                if self.DBG_LVL_1:
-                    print('Received the GET GPS and read the NMEA buffer')
-                if self.ID == 'GROUND':
-                    self.a2g_conn.sendall(to_send.encode())
-                if self.ID == 'DRONE':
-                    self.socket.sendall(to_send.encode())
-            else:
-                print('ASKED for GPS position but flag IsGPS is False')
+
+        # Check:
+        if rx_msg[0] != '%':
+            print('\nWrong frame message')
             return
-        
-        self.SOCKET_BUFFER.append(data)
+        if rx_msg[1] != '*':
+            print('\nWrong frame message')
+            return
+
+        len_frame_header = int(rx_msg[2:4])
+        msg_data_len = len(rx_msg) - len_frame_header
+
+        if msg_data_len > 0:
+            msg_data = rx_msg.split(':')
+            header_field = msg_data[0][4:]
+            msg_data = msg_data[1]
+        else:
+            header_field = rx_msg[4:-1]
+
+        if header_field == 'ANS':
+            1
+        elif header_field == 'GETGPS':
+            self.do_getgps_action()
+        elif header_field == 'SETGIMBAL':
+            self.do_setgimbal_action(msg_data)
+        elif header_field == 'SNDDATA':
+            self.do_snddata_action(msg_data)
+
+        #self.SOCKET_BUFFER.append(rx_msg)
     
     def socket_receive(self, stop_event):
         """
@@ -1294,9 +1399,10 @@ class HelperA2GMeasurements(object):
                 if data:
                     if self.DBG_LVL_0:
                         print(data)
-                    self.parse_rx_data(data)
+                    self.parse_rx_msg(data)
                 else:
                     break
+            # i.e.  Didn't receive anything
             except Exception as e:
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
@@ -1343,7 +1449,7 @@ class HelperA2GMeasurements(object):
                 time.sleep(0.0015)
                 
                 to_save['GROUND_GIMBAL_YAW'] = self.myGimbal.yaw
-                to_save['GROUND_GIMBAL_ROLL'] = self.myGimbal.roll
+                to_save['GROUND_GIMBAL_PITCH'] = self.myGimbal.pitch
                 to_save_file.append(to_save)
         else:
             print('To call this function, IsGimbal has to be set')
@@ -1369,9 +1475,8 @@ class HelperA2GMeasurements(object):
             PORT (int, optional): _description_. Defaults to 12000.
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket = s
-        self.socket.settimeout(20) # Block up to 5 sec
+        self.socket.settimeout(20) 
         
         # CLIENT
         if self.ID == 'DRONE':
@@ -1383,7 +1488,7 @@ class HelperA2GMeasurements(object):
         elif self.ID == 'GROUND':            
 
             # Bind the socket to the port
-            self.socket.bind((self.SERVER_ADDRESS, PORT))
+            self.socket.bind(('', PORT))
 
             # Listen for incoming connections
             self.socket.listen()
@@ -1401,7 +1506,7 @@ class HelperA2GMeasurements(object):
         thread_rx_helper = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_helper,))
         thread_rx_helper.start()
         
-    def HelperA2GStopCom(self, DISC_WHAT='ALL'):
+    def HelperA2GStopCom(self, DISC_WHAT='ALL', GPS_STOP='+NMEA+SBF'):
         """
         Stops communications with all the devices or the specified ones in the variable 'DISC_WHAT
 
@@ -1416,17 +1521,17 @@ class HelperA2GMeasurements(object):
                 
             self.event_stop_thread_helper.set()
         except:
-            print('NO SOCKET created')         
+            print('\nERROR closing connection: probably NO SOCKET created')         
         
         if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
             self.myGimbal.stop_thread_gimbal()
-            print('Disconnecting gimbal...')
+            print('\nDisconnecting gimbal')
             time.sleep(0.05)
             self.myGimbal.actual_bus.shutdown()
             
         if self.IsGPS and (DISC_WHAT=='ALL' or DISC_WHAT == 'GPS'):  
-            self.mySeptentrioGPS.stop_gps_data_retrieval(msg_type='NMEA')
-            print('Stoping GPS stream...')
+            self.mySeptentrioGPS.stop_gps_data_retrieval(msg_type=GPS_STOP)
+            print('\nStoping GPS stream')
             self.mySeptentrioGPS.stop_thread_gps()
         
         if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
