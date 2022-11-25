@@ -2,13 +2,13 @@ from a2gmeasurements import GpsSignaling
 import time
 
 # Multiple streams
-mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
+mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True, DBG_LVL_1=True, DBG_LVL_0=True)
 
 mySeptentrioGPS.serial_connect()
 mySeptentrioGPS.serial_instance.reset_input_buffer()
 time.sleep(0.1)
 #mySeptentrioGPS.sendCommandGps('erst, hard, PVTData')
-mySeptentrioGPS.sendCommandGps('sdio, USB1,, -NMEA')
+#mySeptentrioGPS.sendCommandGps('sdio, USB1,, -NMEA')
 mySeptentrioGPS.sendCommandGps(cmd='sga, MultiAntenna') # by default this is the command
 mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec2', sbf_type='+PVTCartesian+AttEuler')
 mySeptentrioGPS.start_gps_data_retrieval(stream_number=2,  msg_type='NMEA', interval='sec2', nmea_type='+GGA+HDT')
