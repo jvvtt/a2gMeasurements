@@ -3,7 +3,51 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Arc
 from matplotlib.transforms import IdentityTransform, TransformedBbox, Bbox
 import matplotlib
+from pyproj import CRS, Transformer
 
+def geocentric2geodetic(X, Y, Z, EPSG_GEODETIC=4979, EPSG_GEOCENTRIC=4978):
+    """
+    Given Geocentric coordinates referred to a datum (given by EPSG_GEOCENTRIC), convert them
+    to Geodetic (lat, lon, height) in the datum given by EPSG_GEODETIC.    
+
+    Args:
+        X (float): geocentric X coordinate. 
+        Y (float): geocentric Y coordinate.
+        Z (float): geocentric Z coordinate.
+        EPSG_GEODETIC (int, optional): _description_. Defaults to 4979, that corresponds to WSG84 (geodetic)
+        EPSG_GEOCENTRIC (int, optional): _description_. Defaults to 4978, that corresponds to WSG84 (geocentric).
+    """
+
+    geodet_crs = CRS.from_epsg(4979) # Geodetic (lat,lon,h) system
+    geocent_crs = CRS.from_epsg(4978) # Geocentric (X,Y,Z) system
+
+    geocent_to_geodet = Transformer.from_crs(geocent_crs, geodet_crs)
+
+    lat, lon, height = geocent_to_geodet.transform(X, Y, Z)
+
+    return lat, lon, height
+
+def geodetic2geocentric(lat, lon, height, EPSG_GEODETIC=4979, EPSG_GEOCENTRIC=4978):
+    """
+    Given Geodetic coordinates referred to a datum (given by EPSG_GEODETIC), convert them
+    to Geocentric (lat, lon, height) in the datum given by EPSG_GEOCENTRIC.    
+
+    Args:
+        lat (float): latitude (N)
+        lon (float): longitude (E).
+        height (float): height in meters.
+        EPSG_GEODETIC (int, optional): _description_. Defaults to 4979, that corresponds to WSG84 (geodetic)
+        EPSG_GEOCENTRIC (int, optional): _description_. Defaults to 4978, that corresponds to WSG84 (geocentric).
+    """
+
+    geodet_crs = CRS.from_epsg(4979) # Geodetic (lat,lon,h) system
+    geocent_crs = CRS.from_epsg(4978) # Geocentric (X,Y,Z) system
+
+    geodet_to_geocent = Transformer.from_crs(geodet_crs, geocent_crs)
+
+    X, Y, Z = geodet_to_geocent.transform(lat, lon, height)
+
+    return X, Y, Z
 
 class AngleAnnotation(Arc):
     """

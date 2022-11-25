@@ -15,7 +15,7 @@ def receive(stop_event, sock):
         if data:
             print(data)
 
-server_ip = 'localhost'
+server_ip = '192.168.0.2' # Server IP address
 port = 10000
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
