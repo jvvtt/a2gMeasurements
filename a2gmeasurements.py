@@ -1,3 +1,5 @@
+from itertools import groupby
+from operator import itemgetter
 import xmltodict
 import datetime
 import time
@@ -18,6 +20,7 @@ import json
 import pyvisa
 import pandas as pd
 from sys import platform
+from crc import Calculator, Configuration, Crc16
 
 """
 Author: Julian D. Villegas G.
@@ -507,6 +510,11 @@ class GpsSignaling(object):
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
         self.DBG_LVL_0 = DBG_LVL_0
+
+        # Expected SBF sentences to be requested. Add or remove according to planned
+        # SBF sentences to be requested.
+        self.register_sbf_sentences_by_id = [4006, 5938] # PVTCart, AttEul
+        self.n_sbf_sentences = len(self.register_sbf_sentences_by_id)
         
     def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1', ip_port_number='IP11'):
         """
@@ -682,7 +690,7 @@ class GpsSignaling(object):
         Process the PVTCart data type
         
         Args:
-            data (list): _description_
+            raw_data (bytes): received raw data
         """
         
         format_before_padd = '<1c3H1I1H2B3d5f1d1f4B2H1I2B4H1B' 
@@ -725,12 +733,21 @@ class GpsSignaling(object):
                           'SignalInfo': SignalInfo, 'AlertFlag': AlertFlag, 'NrBases': NrBases, 'PPPInfo': PPPInfo,
                           'Latency': Latency, 'HAccuracy': HAccuracy, 'VAccuracy': VAccuracy}        
         
-        pvt_data_we_care = {'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 'X': X, 'Y': Y, 'Z': Z, 'Datum': Datum}
+        pvt_data_we_care = {'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 
+                            'X': X, 'Y': Y, 'Z': Z, 'Datum': Datum}
 
         self.SBF_frame_buffer.append(pvt_data_we_care)
     
     def process_atteuler_sbf_data(self, raw_data):
-        
+        """
+        Parse the AttEuler SBF sentence.
+
+        Args:
+            raw_data (bytes): received raw data
+            synch_w_pvt (boolean): this flag tells if the PVTCart and AttEuler are requested
+                                   at the same time, so that they can be merged in the same
+                                   database or array entry.
+        """
         TOW = struct.unpack('<1I', raw_data[7:11])[0]
         WNc = struct.unpack('<1H', raw_data[11:13])[0]        
         NrSV = struct.unpack('<1B', raw_data[13:14])[0]
@@ -748,7 +765,10 @@ class GpsSignaling(object):
                              'Heading': Heading, 'Pitch': Pitch, 'Roll': Roll, 
                              'PitchDot': PitchDot, 'RollDot': RollDot, 'HeadingDot': HeadingDot}        
         
-        self.SBF_frame_buffer.append(atteul_msg_format)
+        atteul_msg_useful = {'TOW': TOW, 'WNc': WNc,'ERR': ERR, 'MODE': MODE, 
+                             'Heading': Heading, 'Pitch': Pitch, 'Roll': Roll}
+
+        self.SBF_frame_buffer.append(atteul_msg_useful)
     
     def parse_septentrio_msg(self, rx_msg):
         """
@@ -778,8 +798,23 @@ class GpsSignaling(object):
                 #SYNC = struct.unpack('<1c', rx_msg[0]) 
                 CRC = struct.unpack('<1H', rx_msg[1:3])                
                 ID_SBF_msg = struct.unpack('<1H', rx_msg[3:5])
-                LEN_SBF_msg = struct.unpack('1H', rx_msg[5:7])
+                LEN_SBF_msg = struct.unpack('<1H', rx_msg[5:7])
+
+                # According to the manual, the LEN should always be a multiple of 4, otherwise 
+                # there is an error
+                if not np.mod(LEN_SBF_msg,4):
+                    if self.DBG_LVL_1:
+                        print('\nDiscarded frame as LEN_SBF_msg is not multiple of 4')
+                    return
                 
+                crc16_checker = Calculator(Crc16.CCITT)
+                crc16 = crc16_checker.checksum(rx_msg[7:7+LEN_SBF_msg-8])
+
+                if CRC != crc16:
+                    if self.DBG_LVL_1:
+                        print('\nDiscarded frame cause it did not pass the CRC check')
+                    return
+
                 # PVTCart SBF sentence identified by ID 4006
                 if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
                     self.process_pvtcart_sbf_data(rx_msg)
@@ -806,7 +841,31 @@ class GpsSignaling(object):
                                
                 if ID_SBF_msg[0] & 8191 == 5943: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
                     print('\nReceived EndOfAtt SBF sentence')
-            
+
+                # Sort SBF buffer entries by time (this is double checking, as they are expected to arrive in time order)
+                self.SBF_frame_buffer.sort(key=lambda k : k['TOW'])
+
+                # Merge buffer entries corresponding to the same TOW
+                tmp_buff = []
+                for key, value in groupby(self.SBF_frame_buffer[-2*self.n_sbf_sentences:], key = itemgetter('TOW')):
+                    tmp_buff.append({'TOW': key})
+                    for dict_i in value:
+                        for key_dict_i, value_dict_i in dict_i.items():
+                            if key_dict_i == 'ERR':
+                                if 'Heading' in dict_i:
+                                    tmp_buff[-1]['ERR_ATTEUL'] = value_dict_i
+                                elif 'X' in dict_i:
+                                    tmp_buff[-1]['ERR_PVT'] = value_dict_i
+                            elif key_dict_i == 'MODE':
+                                if 'Heading' in dict_i:
+                                    tmp_buff[-1]['ERR_ATTEUL'] = value_dict_i
+                                elif 'X' in dict_i:
+                                    tmp_buff[-1]['ERR_PVT'] = value_dict_i
+                            else:
+                                tmp_buff[-1][key_dict_i] = value_dict_i
+                
+                self.SBF_frame_buffer[-2*self.n_sbf_sentences:] = tmp_buff
+
             # NMEA Output starts with the letter G, that in utf-8 is the decimal 71
             elif rx_msg[0] == 71:
                 if self.DBG_LVL_0:
@@ -844,7 +903,7 @@ class GpsSignaling(object):
         
         self.event_stop_thread_gps = threading.Event()
         
-        if interface == 'USB':
+        if interface == 'USB' or interface == 'COM':
             t_receive = threading.Thread(target=self.serial_receive, args=(self.serial_instance, self.event_stop_thread_gps))
             
         elif interface == 'IP':
@@ -862,7 +921,7 @@ class GpsSignaling(object):
         self.event_stop_thread_gps.set()
         time.sleep(0.1)
         
-        if interface =='USB':
+        if interface =='USB' or interface == 'COM':
             self.serial_instance.close()
             
         elif interface =='IP':
@@ -897,7 +956,7 @@ class GpsSignaling(object):
                                                      'min2', 'min5', 'min10', 'min15', 'min30', 'min60'
         """
         
-        if interface == 'USB':
+        if interface == 'USB' or interface == 'COM':
             if msg_type == 'SBF':
                 cmd1 = 'setDataInOut, ' + interface + str(self.interface_number) + ',, ' + '+SBF'
                 cmd2 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', ' +  sbf_type + ', ' + interval
@@ -926,7 +985,7 @@ class GpsSignaling(object):
             msg_type (str, optional): _description_. Defaults to 'NMEA'.
         """
         
-        if interface == 'USB':
+        if interface == 'USB' or interface == 'COM':
             if msg_type == 'SBF':
                 cmd1 = 'setSBFOutput, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', none '
                 cmd2 = 'sdio, ' + interface + str(self.interface_number) + ',, -SBF'
