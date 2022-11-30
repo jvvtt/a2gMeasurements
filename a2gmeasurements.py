@@ -506,6 +506,7 @@ class GpsSignaling(object):
         # Dummy initialization
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
+        self.stream_info = []
 
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
@@ -650,6 +651,7 @@ class GpsSignaling(object):
                 gps_data['Antenna Alt above sea level (mean)'] = float(gps_data['Antenna Alt above sea level (mean)'])
                 
                 
+                '''
                 # Save the UNIX timestamp. As the timestamp provides hour/min/sec only, add the date
                 today_date = datetime.date.today()
                 today_date = [int(i) for i in today_date.strftime("%Y-%m-%d").split('-')]                
@@ -661,7 +663,9 @@ class GpsSignaling(object):
                                                 minute=int(gps_data['Timestamp'][2:4]), 
                                                 second=int(gps_data['Timestamp'][4:6]))
 
-                gps_data['Timestamp'] = time.mktime(complete_date.timetuple())                            
+                gps_data['Timestamp'] = time.mktime(complete_date.timetuple())
+                
+                '''
             
             # HDT NMEA sentence
             if 'Heading' in gps_data:
@@ -670,7 +674,22 @@ class GpsSignaling(object):
                 if gps_data['Heading'] > 180:
                     gps_data['Heading'] = gps_data['Heading'] - 360
                 
-                gps_data['Timestamp'] = time.time()                
+                # Make the timestamp the same format as the GGA sentence
+                for stream in self.stream_info:
+                    if stream['msg_type'] == 'NMEA':
+                        
+                        if 'msec' in stream['interval']:
+                            1
+                        elif 'sec' in stream['interval']:
+                            gps_data['Timestamp'] = ''
+                            for i in datetime.datetime.utcnow().timetuple()[3:6]:
+                                tmp = str(i)
+                                if len(tmp) == 1:
+                                    tmp = '0' + tmp
+                                gps_data['Timestamp'] = gps_data['Timestamp'] + tmp
+                            gps_data['Timestamp'] = float(int(gps_data['Timestamp']))
+                        else:
+                            1                
             
         except Exception as e:
             # Do not save any other comand line
@@ -753,12 +772,12 @@ class GpsSignaling(object):
         NrSV = struct.unpack('<1B', raw_data[13:14])[0]
         ERR =  struct.unpack('<1B', raw_data[14:15])[0]
         MODE =  struct.unpack('<1H', raw_data[15:17])[0]
-        Heading =  struct.unpack('<1f', raw_data[17:21])[0]
-        Pitch =  struct.unpack('<1f', raw_data[21:25])[0]
-        Roll = struct.unpack('<1f', raw_data[25:29])[0]
-        PitchDot =  struct.unpack('<1f', raw_data[29:33])[0]
-        RollDot =  struct.unpack('<1f', raw_data[33:37])[0]
-        HeadingDot = struct.unpack('<1f', raw_data[37:41])[0]
+        Heading =  struct.unpack('<1f', raw_data[19:23])[0]
+        Pitch =  struct.unpack('<1f', raw_data[23:27])[0]
+        Roll = struct.unpack('<1f', raw_data[27:31])[0]
+        PitchDot =  struct.unpack('<1f', raw_data[31:35])[0]
+        RollDot =  struct.unpack('<1f', raw_data[35:39])[0]
+        HeadingDot = struct.unpack('<1f', raw_data[39:43])[0]
         
         
         atteul_msg_format = {'TOW': TOW, 'WNc': WNc, 'NrSV': NrSV, 'ERR': ERR, 'MODE': MODE, 
@@ -767,7 +786,7 @@ class GpsSignaling(object):
         
         atteul_msg_useful = {'TOW': TOW, 'WNc': WNc,'ERR': ERR, 'MODE': MODE, 
                              'Heading': Heading, 'Pitch': Pitch, 'Roll': Roll}
-
+        
         self.SBF_frame_buffer.append(atteul_msg_useful)
     
     def parse_septentrio_msg(self, rx_msg):
@@ -795,26 +814,32 @@ class GpsSignaling(object):
                     print('\nDETECTS SBF')
                     
                 # Header detection
-                #SYNC = struct.unpack('<1c', rx_msg[0]) 
+                #SYNC = struct.unpack('<1c', rx_msg[0:1]) 
                 CRC = struct.unpack('<1H', rx_msg[1:3])                
                 ID_SBF_msg = struct.unpack('<1H', rx_msg[3:5])
                 LEN_SBF_msg = struct.unpack('<1H', rx_msg[5:7])
 
                 # According to the manual, the LEN should always be a multiple of 4, otherwise 
                 # there is an error
-                if not np.mod(LEN_SBF_msg,4):
+                if np.mod(int(LEN_SBF_msg[0]),4) != 0 :
                     if self.DBG_LVL_1:
-                        print('\nDiscarded frame as LEN_SBF_msg is not multiple of 4')
+                        print('\nDiscarded frame as LEN_SBF_msg is not multiple of 4, LEN_SBF_msg: ', LEN_SBF_msg[0])
                     return
                 
+                '''
+                # CRC checker
                 crc16_checker = Calculator(Crc16.CCITT)
-                crc16 = crc16_checker.checksum(rx_msg[7:7+LEN_SBF_msg-8])
-
-                if CRC != crc16:
+                idx_bytes_crc_to_read = 7+int(LEN_SBF_msg[0])-8
+                crc_data = rx_msg[7:idx_bytes_crc_to_read]
+                print(type(crc_data))
+                crc16 = crc16_checker.checksum(crc_data)
+                print(rx_msg[1:3], type(crc16))
+                if CRC[0] != crc16:
                     if self.DBG_LVL_1:
                         print('\nDiscarded frame cause it did not pass the CRC check')
                     return
-
+                '''
+                
                 # PVTCart SBF sentence identified by ID 4006
                 if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
                     self.process_pvtcart_sbf_data(rx_msg)
@@ -858,9 +883,9 @@ class GpsSignaling(object):
                                     tmp_buff[-1]['ERR_PVT'] = value_dict_i
                             elif key_dict_i == 'MODE':
                                 if 'Heading' in dict_i:
-                                    tmp_buff[-1]['ERR_ATTEUL'] = value_dict_i
+                                    tmp_buff[-1]['MODE_ATTEUL'] = value_dict_i
                                 elif 'X' in dict_i:
-                                    tmp_buff[-1]['ERR_PVT'] = value_dict_i
+                                    tmp_buff[-1]['MODE_PVT'] = value_dict_i
                             else:
                                 tmp_buff[-1][key_dict_i] = value_dict_i
                 
@@ -944,7 +969,8 @@ class GpsSignaling(object):
             
         time.sleep(0.5)
             
-    def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', nmea_type='GGA', sbf_type='PVTCartesian'):
+    def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', 
+                                 nmea_type='+GGA+HDT', sbf_type='+PVTCartesian+AttEuler'):
         """
         Wrapper to sendCommandGps for a specific command to send.
 
@@ -963,6 +989,8 @@ class GpsSignaling(object):
             elif msg_type == 'NMEA':
                 cmd1 = 'setDataInOut, ' + interface + str(self.interface_number) + ',, ' + '+NMEA'
                 cmd2 = 'sno, Stream ' + str(stream_number) + ', ' + interface + str(self.interface_number) + ', ' + nmea_type + ', ' + interval
+        
+        self.stream_info.append({'interface': interface, 'stream_number': stream_number, 'interval': interval, 'msg_type': msg_type})
         
         self.sendCommandGps(cmd1)
         self.sendCommandGps(cmd2)
@@ -1324,6 +1352,12 @@ class HelperA2GMeasurements(object):
 
             return lat_planar, lon_planar
     
+    def syncronous_send_gps_msgs_thread(self):
+        1
+        
+        # Start thread
+        # thread function to invoke
+    
     def build_a2g_frame(self, type_frame='cmd', data=None, cmd=None):
         """
         Builds the frame for the a2g communication messages.
@@ -1365,6 +1399,8 @@ class HelperA2GMeasurements(object):
         if self.IsGPS:
             
             data_to_send = json.dumps(self.mySeptentrioGPS.NMEA_buffer[-1])
+            #data_to_send = json.dumps(self.mySeptentrioGPS.SBF_frame_buffer[-1])
+            
             frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send)
 
             if self.DBG_LVL_1:
@@ -1438,8 +1474,6 @@ class HelperA2GMeasurements(object):
             self.do_setgimbal_action(msg_data)
         elif header_field == 'SNDDATA':
             self.do_snddata_action(msg_data)
-
-        #self.SOCKET_BUFFER.append(rx_msg)
     
     def socket_receive(self, stop_event):
         """
