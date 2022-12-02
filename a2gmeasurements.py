@@ -1,3 +1,4 @@
+import logging
 from itertools import groupby
 from operator import itemgetter
 import xmltodict
@@ -649,7 +650,7 @@ class GpsSignaling(object):
                     gps_data['Longitude'] = float(gps_data['Longitude'][0:3]) + float(gps_data['Longitude'][3:])/60
                 
                 gps_data['Antenna Alt above sea level (mean)'] = float(gps_data['Antenna Alt above sea level (mean)'])
-                
+                gps_data['Timestamp'] = float(gps_data['Timestamp'])
                 
                 '''
                 # Save the UNIX timestamp. As the timestamp provides hour/min/sec only, add the date
@@ -669,7 +670,10 @@ class GpsSignaling(object):
             
             # HDT NMEA sentence
             if 'Heading' in gps_data:
-                gps_data['Heading'] = float(gps_data['Heading'])
+                if gps_data['Heading'] == '':
+                    gps_data['Heading'] = -2000
+                else:
+                    gps_data['Heading'] = float(gps_data['Heading'])
                 
                 # No need to restrict heading to [-pi, pi] since it will be done 
                 # inside 'ground_gimbal_follows_drone' function 
@@ -692,18 +696,17 @@ class GpsSignaling(object):
                                 gps_data['Timestamp'] = gps_data['Timestamp'] + tmp
                             gps_data['Timestamp'] = float(int(gps_data['Timestamp']))
             
+            if self.DBG_LVL_2 or len(self.NMEA_buffer):
+                if self.DBG_LVL_0:
+                    print('\nSAVES NMEA DATA INTO BUFFER')    
+                self.NMEA_buffer.append(gps_data)  
+             
         except Exception as e:
             # Do not save any other comand line
             if self.DBG_LVL_1:
                 print('\nEXCEPTION PROCESSING NMEA')
             if self.DBG_LVL_0:
-                print('\nThis is the exception: ', e)
-            return
-        
-        if self.DBG_LVL_2 or len(self.NMEA_buffer):
-            if self.DBG_LVL_0:
-                print('\nSAVES NMEA DATA INTO BUFFER')    
-            self.NMEA_buffer.append(gps_data)    
+                print('\nThis is the exception: ', e) 
 
     def process_pvtcart_sbf_data(self, raw_data):
         """
@@ -872,20 +875,21 @@ class GpsSignaling(object):
                 self.SBF_frame_buffer.sort(key=lambda k : k['TOW'])
 
                 # Merge buffer entries corresponding to the same TOW
-                self.util_merge_buffer_entries_by_timetag(type_msg='SBF')
+                #self.util_merge_buffer_entries_by_timetag(type_msg='SBF')
 
             # NMEA Output starts with the letter G, that in utf-8 is the decimal 71
             elif rx_msg[0] == 71:
                 if self.DBG_LVL_0:
                     print('\nDETECTS NMEA')
                 self.process_gps_nmea_data(rx_msg[:-1])
-                self.util_merge_buffer_entries_by_timetag(type_msg='NMEA')
+                #self.util_merge_buffer_entries_by_timetag(type_msg='NMEA')
                 
         except Exception as e:
             if self.DBG_LVL_1:
                 print('\nEXCEPTION IN parse_septentrio_msg')
             if self.DBG_LVL_0:
-                print('\nThis is the exception: ', e)
+                print('\nThis is the exception: ', e, )
+                logging.exception("\nError occurred: ")
     
     def util_merge_buffer_entries_by_timetag(self, type_msg='SBF'):
         """
@@ -894,7 +898,7 @@ class GpsSignaling(object):
         Args:
             type_msg (str, optional): _description_. Defaults to 'SBF'.
         """
-        
+
         if type_msg == 'SBF':
             tmp_buff = []
             for key, value in groupby(self.SBF_frame_buffer[-2*self.n_sbf_sentences:], key = itemgetter('TOW')):
@@ -916,16 +920,34 @@ class GpsSignaling(object):
                     
             self.SBF_frame_buffer[-2*self.n_sbf_sentences:] = tmp_buff    
 
-        # NMEA
-        elif type_msg['NMEA']:
-            tmp_buff = []
-            for key, value in groupby(self.NMEA_buffer[-2*2:], key = itemgetter('Timestamp')):
-                tmp_buff.append({'Timestamp': key})
-                for dict_i in value:
-                    for key_dict_i, value_dict_i in dict_i.items():
-                        tmp_buff[-1][key_dict_i] = value_dict_i
-                    
-            self.NMEA_buffer[-2*2:] = tmp_buff        
+        # NMEA doesn't send GGA and HDT at the same time. They are tipycally spaced by a second.
+        # So we consider to groupy by a time bin of 1 second
+        elif type_msg == 'NMEA':
+            self.NMEA_buffer[-2*2:].sort(key=lambda k : k['Timestamp'])
+            
+            # Group the buffer entries by timestamps close in time by a max of 'time_bin -1' seconds
+            groups = []
+            time_bin = 2
+            
+            if len(self.NMEA_buffer) >= 4 :
+                start_time = datetime.datetime.strptime(str(int(self.NMEA_buffer[-2*2]['Timestamp'])), '%H%M%S')
+            else:
+                start_time = datetime.datetime.strptime(str(int(self.NMEA_buffer[-len(self.NMEA_buffer)]['Timestamp'])), '%H%M%S')
+            
+            for list_i in self.NMEA_buffer[-2*2:]:
+                t_c = datetime.datetime.strptime(str(int(list_i['Timestamp'])), '%H%M%S')
+                groups.append(int((t_c - start_time).total_seconds() // time_bin) + 1)
+            print(groups)
+            tmp_buf = []
+            for i in np.unique(groups):
+                tmp_buf.append({})
+                for cnt, dict_i in enumerate(self.NMEA_buffer[-2*2:]):
+                    if groups[cnt] == i:
+                        for key, value in dict_i.items():
+                            tmp_buf[-1][key] = value
+
+            self.NMEA_buffer[-2*2:] = tmp_buf       
+        
 
     def serial_receive(self, serial_instance_actual, stop_event):
         """
@@ -1251,14 +1273,14 @@ class HelperA2GMeasurements(object):
         if IsGimbal:
             self.myGimbal = GimbalRS2()
             self.myGimbal.start_thread_gimbal()
-            print('Gimbal RS2 thread opened\n')
+            print('\nGimbal RS2 thread opened')
             time.sleep(0.5)
         if IsGPS:
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
             self.mySeptentrioGPS.serial_connect()
             self.mySeptentrioGPS.start_thread_gps()
             self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
-            print('Septentrio GPS thread opened\n')
+            print('\nSeptentrio GPS thread opened')
             time.sleep(0.5)
         if IsSignalGenerator:
             rm = pyvisa.ResourceManager()
@@ -1377,57 +1399,90 @@ class HelperA2GMeasurements(object):
 
             return lat_planar, lon_planar
     
-    def syncronous_send_gps_msgs_thread(self):
-        1
-        
-        # Start thread
-        # thread function to invoke
-    
-    def build_a2g_frame(self, type_frame='cmd', data=None, cmd=None):
+    def build_a2g_frame(self, type_frame='cmd', data=None, cmd=None, cmd_source_for_ans=None):
         """
         Builds the frame for the a2g communication messages.
+        
+        The frame consists of the following fields:
+        
+        SYNCH1 | SYNCH2 | LENGHT_OF_HEADER | TYPE_FRAME | TERMINATOR_HEADER | DATA(OPTIONAL)
+        ------  -------   ----------------  -----------   -----------------   -------------
+         '%'      '-'         2-entries       string            ';'              string
+                            string array       array                              array
+
+        LENGHT_OF_HEADER comprises all the fields but not the DATA field.
 
         Args:
             type_frame (str, optional): 'cmd' or 'ans'. Defaults to 'cmd'.
             data (str, optional): data to be set with the 'cmd' (i.e. for the comand 'SETGIMBAL', data contains the gimbal position to be set).
-                                  Or data to be send in 'ans' frame. 
-            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL', 'SNDDATA'. Defaults to None.
+                                  Or data to be sent in 'ans' frame. 
+            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL'. Defaults to None.
+            cmd_source_for_ans (str, optional): always provide which command you are replying to, in the answer frame.
+            
+        Returns:
+            frame (str): this might be a string array containing a json-converted dictionary(i.e. ANS frames) or other type of object (SNDDATA).    
+        
+        
         """
         synch_1 = '%'
         synch_2 = '*'
-
-        if type_frame == 'cmd':
-            header_field = cmd
-        elif type_frame =='ans':
-            header_field = 'ANS'
-
-        if len(header_field) > 4:
-            header_length = str(2 + 2 + header_field + 1)
-        else:
-            header_length = '0' + str(2 + 2 + header_field + 1)
-
         term_header_charac = ';'
 
-        if data:
-            frame = synch_1 + synch_2 + header_length + header_field + term_header_charac + data
-        else:
-            frame = synch_1 + synch_2 + header_length + header_field + term_header_charac
+        if type_frame == 'cmd':
+            header_type_field = cmd
+            
+            if len(header_type_field) > 4:
+                header_length_field = str(2 + 2 + header_type_field + 1)
+            else:
+                header_length_field = '0' + str(2 + 2 + header_type_field + 1)
+
+            if data:
+                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps(data)
+            else:
+                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac
         
-        return frame
+        elif type_frame =='ans':
+            header_type_field = 'ANS'
+            
+            if len(header_type_field) > 4:
+                header_length_field = str(2 + 2 + header_type_field + 1)
+            else:
+                header_length_field = '0' + str(2 + 2 + header_type_field + 1)
+
+            if data:
+                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps({'CMD_SOURCE': cmd_source_for_ans, 'DATA': data})
+            else:
+                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac
+        
+        return json.dumps(frame)
 
     def do_getgps_action(self):
         """
-        Function to execute when the received instruction in the a2g comm link is 'GETGPS'
+        Function to execute when the received instruction in the a2g comm link is 'GETGPS'.
 
         """
 
-        if self.IsGPS:
+        if self.IsGPS:            
             
-            data_to_send = json.dumps(self.mySeptentrioGPS.NMEA_buffer[-1])
-            #data_to_send = json.dumps(self.mySeptentrioGPS.SBF_frame_buffer[-1])
+            # This saves the last heading and lat, lon coordinates by overwritting them
+            heading = []
+            coordinates = []
+            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.n_sbf_sentences:]:
+                if 'Heading' in dict_i:
+                    heading = dict_i
+                elif 'Latitude' in dict_i and 'Longitude' in dict_i:
+                    coordinates = dict_i
             
-            frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send)
-
+            if heading != [] and coordinates != []:    
+                # If heading and coordinates are not separated by more than 1 second use those as the drone might have not move substantially
+                if np.abs(heading['Timestamp'] - coordinates['Timestamp']) < 2:            
+                    data_to_send = {**heading, **coordinates}
+            else:
+                print('\nEither heading or coordinates information not available')
+                return                    
+            
+            frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
+            
             if self.DBG_LVL_1:
                 print('\nReceived the GET GPS and read the NMEA buffer')
             if self.ID == 'GROUND':
@@ -1435,36 +1490,36 @@ class HelperA2GMeasurements(object):
             if self.ID == 'DRONE':
                 self.socket.sendall(frame_to_send.encode())
         else:
-            print('\nASKED for GPS position but flag IsGPS is False')
+            print('\nASKED for GPS position but no GPS connected: IsGPS is False')
     
     def do_setgimbal_action(self, msg_data):
         """
         Function to execute when the received instruction in the a2g comm link is 'SETGIMBAL'.
 
         Args:
-            msg_data (str): string array with the yaw and pitch angle to be moved. 
-                            
-            THE EXPECTED STRUCTURE OF THE STRING ARRAY IS:
-                            
-                            'YAW/#/PITCH/#'
-
-            where # represents the number between -1800,1800
+            msg_data (): string array with the yaw and pitch angle to be moved.                             
         """
 
         if self.IsGimbal:
-            msg_data = msg_data.split('/')
+            # Unwrap the dictionary containing the yaw and pitch values to be set.
+            msg_data = json.loads(msg_data)
 
-            self.myGimbal.setPosControl(yaw=int(float(msg_data[1])), roll=0, pitch=int(float(msg_data[3])))
+            # Error checking
+            if 'YAW' not in msg_data or 'PITCH' not in msg_data:
+                print('\nError: no YAW or PITCH provided')
+                return
+            else:
+                if float(msg_data['YAW']) > 1800 or float(msg_data['PITCH']) > 1800 or float(msg_data['YAW']) < -1800 or float(msg_data['PITCH']) < -1800:
+                    print('\nError: Yaw or pitch angles are outside of range')
+                    return
+                else:
+                    self.myGimbal.setPosControl(yaw=int(msg_data['YAW']), roll=0, pitch=int(msg_data['PITCH']))
         else:
-            print('\nAction to SET Gimbal not posible cause no gimbal is on')
+            print('\nAction to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
-    def do_snddata_action(self, msg_data):
-        """
-        Function to execute when the received instruction in the a2g comm link is 'SNDDATA'.
-        This function parses the message data received in the comm link.
-
-        """
-
+    def process_answer(self, msg_data):
+        1
+        
     def parse_rx_msg(self, rx_msg):
         """
         Handles the received socket data. 
@@ -1485,20 +1540,18 @@ class HelperA2GMeasurements(object):
         msg_data_len = len(rx_msg) - len_frame_header
 
         if msg_data_len > 0:
-            msg_data = rx_msg.split(':')
+            msg_data = rx_msg.split(';')
             header_field = msg_data[0][4:]
             msg_data = msg_data[1]
         else:
             header_field = rx_msg[4:-1]
 
         if header_field == 'ANS':
-            1
+            self.process_answer(msg_data)
         elif header_field == 'GETGPS':
             self.do_getgps_action()
         elif header_field == 'SETGIMBAL':
             self.do_setgimbal_action(msg_data)
-        elif header_field == 'SNDDATA':
-            self.do_snddata_action(msg_data)
     
     def socket_receive(self, stop_event):
         """
@@ -1518,13 +1571,36 @@ class HelperA2GMeasurements(object):
                     if self.DBG_LVL_0:
                         print(data)
                     self.parse_rx_msg(data)
-                else:
-                    break
             # i.e.  Didn't receive anything
             except Exception as e:
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
-            
+         
+    def socket_send_cmd(self, type_cmd=None, data=None):
+        """
+        Wrapper to send a command through the socket between ground and drone connection (or viceversa).
+        
+        If 'type_cmd' is 'SETGIMBAL', the 'data' argument SHOULD BE a dictionary as follows:
+        
+        {'YAW': yaw_value, 'PITCH', pitch_value}
+        
+        where yaw_value and pitch_value are integers (between -1800, 1800).
+
+        Args:
+            type_cmd (_type_, optional): _description_. Defaults to None.
+            data (object, optional): _description_. Defaults to None.
+        """
+        if type_cmd is 'GETGPS':
+            frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd)
+        
+        elif type_cmd is 'SETGIMBAL':
+            frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd, data=data)
+        
+        if self.ID == 'DRONE':
+            self.socket.sendall(frame.encode())
+        elif self.ID == 'GROUND':
+            self.a2g_conn.sendall(frame.encode())
+    
     def send_N_azimuth_angles(self, az_now, pitch_now, Naz, el_now=None, Nel=None, meas_number='1', meas_time=10):
         """
         Divides the azimuth in Naz sections and for each correspondent angle sets the yaw of the gimbal,
@@ -1594,7 +1670,9 @@ class HelperA2GMeasurements(object):
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket = s
-        self.socket.settimeout(20) 
+        
+        # This will block, so keep it low
+        self.socket.settimeout(5) 
         
         # CLIENT
         if self.ID == 'DRONE':
@@ -1631,13 +1709,13 @@ class HelperA2GMeasurements(object):
         Args:
             DISC_WHAT (str, optional): specifies what to disconnect. Defaults to 'ALL'. Options are: 'SG', 'GIMBAL', 'GPS', 'ALL'
         """
-        try:    
+        try:   
+            self.event_stop_thread_helper.set()
+             
             if self.ID == 'DRONE':
                 self.socket.close()
             elif self.ID == 'GROUND':
                 self.a2g_conn.close()
-                
-            self.event_stop_thread_helper.set()
         except:
             print('\nERROR closing connection: probably NO SOCKET created')         
         
@@ -1653,4 +1731,4 @@ class HelperA2GMeasurements(object):
             self.mySeptentrioGPS.stop_thread_gps()
         
         if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
-            self.inst.write('RF0\n')    
+            self.inst.write('RF0\n')   
