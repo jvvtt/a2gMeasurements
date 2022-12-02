@@ -671,16 +671,19 @@ class GpsSignaling(object):
             if 'Heading' in gps_data:
                 gps_data['Heading'] = float(gps_data['Heading'])
                 
-                if gps_data['Heading'] > 180:
-                    gps_data['Heading'] = gps_data['Heading'] - 360
+                # No need to restrict heading to [-pi, pi] since it will be done 
+                # inside 'ground_gimbal_follows_drone' function 
+                #if gps_data['Heading'] > 180:
+                #    gps_data['Heading'] = gps_data['Heading'] - 360
                 
                 # Make the timestamp the same format as the GGA sentence
                 for stream in self.stream_info:
                     if stream['msg_type'] == 'NMEA':
-                        
+                        # Need to update faster
                         if 'msec' in stream['interval']:
                             1
-                        elif 'sec' in stream['interval']:
+                        #elif 'sec' in stream['interval']:                            
+                        else:
                             gps_data['Timestamp'] = ''
                             for i in datetime.datetime.utcnow().timetuple()[3:6]:
                                 tmp = str(i)
@@ -688,8 +691,6 @@ class GpsSignaling(object):
                                     tmp = '0' + tmp
                                 gps_data['Timestamp'] = gps_data['Timestamp'] + tmp
                             gps_data['Timestamp'] = float(int(gps_data['Timestamp']))
-                        else:
-                            1                
             
         except Exception as e:
             # Do not save any other comand line
@@ -871,37 +872,61 @@ class GpsSignaling(object):
                 self.SBF_frame_buffer.sort(key=lambda k : k['TOW'])
 
                 # Merge buffer entries corresponding to the same TOW
-                tmp_buff = []
-                for key, value in groupby(self.SBF_frame_buffer[-2*self.n_sbf_sentences:], key = itemgetter('TOW')):
-                    tmp_buff.append({'TOW': key})
-                    for dict_i in value:
-                        for key_dict_i, value_dict_i in dict_i.items():
-                            if key_dict_i == 'ERR':
-                                if 'Heading' in dict_i:
-                                    tmp_buff[-1]['ERR_ATTEUL'] = value_dict_i
-                                elif 'X' in dict_i:
-                                    tmp_buff[-1]['ERR_PVT'] = value_dict_i
-                            elif key_dict_i == 'MODE':
-                                if 'Heading' in dict_i:
-                                    tmp_buff[-1]['MODE_ATTEUL'] = value_dict_i
-                                elif 'X' in dict_i:
-                                    tmp_buff[-1]['MODE_PVT'] = value_dict_i
-                            else:
-                                tmp_buff[-1][key_dict_i] = value_dict_i
-                
-                self.SBF_frame_buffer[-2*self.n_sbf_sentences:] = tmp_buff
+                self.util_merge_buffer_entries_by_timetag(type_msg='SBF')
 
             # NMEA Output starts with the letter G, that in utf-8 is the decimal 71
             elif rx_msg[0] == 71:
                 if self.DBG_LVL_0:
                     print('\nDETECTS NMEA')
                 self.process_gps_nmea_data(rx_msg[:-1])
+                self.util_merge_buffer_entries_by_timetag(type_msg='NMEA')
+                
         except Exception as e:
             if self.DBG_LVL_1:
                 print('\nEXCEPTION IN parse_septentrio_msg')
             if self.DBG_LVL_0:
                 print('\nThis is the exception: ', e)
     
+    def util_merge_buffer_entries_by_timetag(self, type_msg='SBF'):
+        """
+        Utility function to merge buffer entries that have the same timetag.
+
+        Args:
+            type_msg (str, optional): _description_. Defaults to 'SBF'.
+        """
+        
+        if type_msg == 'SBF':
+            tmp_buff = []
+            for key, value in groupby(self.SBF_frame_buffer[-2*self.n_sbf_sentences:], key = itemgetter('TOW')):
+                tmp_buff.append({'TOW': key})
+                for dict_i in value:
+                    for key_dict_i, value_dict_i in dict_i.items():
+                        if key_dict_i == 'ERR':
+                            if 'Heading' in dict_i:
+                                tmp_buff[-1]['ERR_ATTEUL'] = value_dict_i
+                            elif 'X' in dict_i:
+                                tmp_buff[-1]['ERR_PVT'] = value_dict_i
+                        elif key_dict_i == 'MODE':
+                            if 'Heading' in dict_i:
+                                tmp_buff[-1]['MODE_ATTEUL'] = value_dict_i
+                            elif 'X' in dict_i:
+                                tmp_buff[-1]['MODE_PVT'] = value_dict_i
+                        else:
+                            tmp_buff[-1][key_dict_i] = value_dict_i
+                    
+            self.SBF_frame_buffer[-2*self.n_sbf_sentences:] = tmp_buff    
+
+        # NMEA
+        elif type_msg['NMEA']:
+            tmp_buff = []
+            for key, value in groupby(self.NMEA_buffer[-2*2:], key = itemgetter('Timestamp')):
+                tmp_buff.append({'Timestamp': key})
+                for dict_i in value:
+                    for key_dict_i, value_dict_i in dict_i.items():
+                        tmp_buff[-1][key_dict_i] = value_dict_i
+                    
+            self.NMEA_buffer[-2*2:] = tmp_buff        
+
     def serial_receive(self, serial_instance_actual, stop_event):
         """
         The callback function invoked by the serial thread.
@@ -1256,7 +1281,6 @@ class HelperA2GMeasurements(object):
         Finds the yaw and pitch angles to be set at the GROUND gimbal so it points towards the DRONE station.
 
         Args:
-            yaw_now_gimbal (float): GROUND gimbal orientation with respect to the North. It is an angle in DEGREES.
             lat_gimbal (float): Latitude of GROUND station. In DDMMS format: i.e: 62.471541 N
             lon_gimbal (float): Longitude of GROUND station. In DDMMS format: i.e: 21.471541 E
             height_gimbal (float): Height of the GPS Antenna in GROUND station. In meters.
@@ -1303,7 +1327,8 @@ class HelperA2GMeasurements(object):
         pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
                             
         alpha = np.arctan2(lat_drone_planar - lat_ground_planar, lon_drone_planar - lon_ground_planar)
-                
+
+        # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
         if heading > np.pi:
             heading = heading - np.pi*2
                     
