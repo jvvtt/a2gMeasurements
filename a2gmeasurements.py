@@ -22,6 +22,7 @@ import pyvisa
 import pandas as pd
 from sys import platform
 from crc import Calculator, Configuration, Crc16
+from a2gUtils import geocentric2geodetic, geodetic2geocentric
 
 """
 Author: Julian D. Villegas G.
@@ -948,7 +949,6 @@ class GpsSignaling(object):
 
             self.NMEA_buffer[-2*2:] = tmp_buf       
         
-
     def serial_receive(self, serial_instance_actual, stop_event):
         """
         The callback function invoked by the serial thread.
@@ -1083,34 +1083,7 @@ class GpsSignaling(object):
                 self.sendCommandGps(cmd2)       
                 self.sendCommandGps(cmd3)
                 self.sendCommandGps(cmd4)
-        
-    def ask_for_port(self):
-        """
-        Utility function that asks the user to choose the COM port (windows) from the list of available ports.
-        Extracted and adapted from miniterm python code.
-
-        Returns:
-            str: the name of the com port chosen
-        """
-        sys.stderr.write('\n--- Available ports:\n')
-        ports = []
-        for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
-            sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
-            ports.append(port)
-        while True:
-            sys.stderr.write('--- Enter port index or full name: ')
-            port = input('')
-            try:
-                index = int(port) - 1
-                if not 0 <= index < len(ports):
-                    sys.stderr.write('--- Invalid index!\n')
-                    continue
-            except ValueError:
-                pass
-            else:
-                port = ports[index]
-            return port
-    
+           
 class myAnritsuSpectrumAnalyzer(object):
     def __init__(self, is_debug=True, is_config=True):
         self.model = 'MS2760A'
@@ -1313,17 +1286,62 @@ class HelperA2GMeasurements(object):
         Returns:
             yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
         """
+
+        # Ground station
         if self.IsGPS and self.ID == 'GROUND' and lat_ground is None  and lon_ground is None and height_ground is None:
+            '''
             lat_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
             lon_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
             height_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']
             heading = self.mySeptentrioGPS.NMEA_buffer[-1]
-        
+            '''
+
+            # Get the last heading and coordinates
+            # If there is more than one heading_ground,lat_ground,lon_ground or height_ground, th eloop overwrites the variable since is an easy implementation and the buffer is small (<=20 entries)
+            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-self.mySeptentrioGPS.n_sbf_sentences:]:
+                if 'Heading' in dict_i:
+                    if dict_i['ERR'] == 0:
+                        heading = dict_i['Heading']
+                    else:
+                        print('\nERROR: No heading information available at THIS terminal')
+                        return -10000, -10000, -10000 
+                elif 'X' and 'Y' and 'Z' in dict_i:
+                    if dict_i['ERR'] == 0:
+                        # Coordinates encapsulated in SBF sentences are geocentric (X, Y, Z)
+                        lat_ground = dict_i['Y']
+                        lon_ground = dict_i['X']
+                        datum_coordinates = dict_i['Datum']
+
+                        # Geocentric WGS84
+                        if datum_coordinates == 0:
+                        # Z coordinate is geocentric and does not correspond to the actual height in meters: we need to transform to geodetic and take only the Z variable
+                            _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, dict_i[-1]['Z'])
+                        # Geocentric ETRS89
+                        elif datum_coordinates == 30:
+                            _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, dict_i['Z'], EPSG_GEOCENTRIC=4346)
+                        else:
+                            print('\nERROR: Not known geocentric datum')
+                            return -10000, -10000, -10000
+                        
+                    else:
+                        print('\nERROR: No geocentric coordinates are available at THIS terminal')
+                        return -10000, -10000, -10000
+                else:
+                    print('\nERROR: No Heading or Geocentric coordinates entries at the gps buffer in THIS terminal')
+                    return -10000, -10000, -10000
+            
+            # If retrieved coordinates and heading info, we know they are geocentric (SBF buffer)
+            coord_type = 'planar'
+
+        # Drone station:
+        '''
+        We can compute the yaw, pitch angle of drone's gimbal, but HEADING information is not available from
+        septentrio GPS for the drone, due to secondary antenna placement
+        '''
         if self.IsGPS and self.ID == 'DRONE' and lat_drone is None  and lon_drone is None and height_drone is None:
             lat_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
             lon_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
-            height_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']
-            
+            height_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']   
         
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
             print("\nERROR: Either ground or drone coordinates must be provided")
@@ -1463,28 +1481,25 @@ class HelperA2GMeasurements(object):
         """
 
         if self.IsGPS:            
-            
-            # This saves the last heading and lat, lon coordinates by overwritting them
-            heading = []
+            # Only need to send to the OTHER station our last coordinates, NOT heading.
+            # Heading info required by the OTHER station is Heading info from the OTHER station
             coordinates = []
+
+            # The loop overwrites data_to_send, so that the last coordinate is saved
+            # We have to loop over last buffer entries, cause we don't know if last entry is heading or coordinates
+            # Moreover, heading and coordinate msgs don't arrive alternating between them
             for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.n_sbf_sentences:]:
-                if 'Heading' in dict_i:
-                    heading = dict_i
-                elif 'Latitude' in dict_i and 'Longitude' in dict_i:
-                    coordinates = dict_i
-            
-            if heading != [] and coordinates != []:    
-                # If heading and coordinates are not separated by more than 1 second use those as the drone might have not move substantially
-                if np.abs(heading['Timestamp'] - coordinates['Timestamp']) < 2:            
-                    data_to_send = {**heading, **coordinates}
-            else:
-                print('\nEither heading or coordinates information not available')
-                return                    
-            
+                if dict_i['ERR'] == 0:
+                    if 'X' in dict_i and 'Y' in dict_i and 'Z' in dict_i:
+                        data_to_send = dict_i
+                else:
+                    print('\nEither heading or coordinates information not available')
+                    return    
+
             frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
             
             if self.DBG_LVL_1:
-                print('\nReceived the GET GPS and read the NMEA buffer')
+                print('\nReceived the GETGPS and read the SBF buffer')
             if self.ID == 'GROUND':
                 self.a2g_conn.sendall(frame_to_send.encode())
             if self.ID == 'DRONE':
@@ -1518,7 +1533,37 @@ class HelperA2GMeasurements(object):
             print('\nAction to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
     def process_answer(self, msg_data):
-        1
+        
+        msg_data = json.loads(msg_data)
+        cmd_source = msg_data['CMD_SOURCE']
+        
+        data = msg_data['DATA']
+        # THIS IS UNNECESARY and it gives an error
+        #data = json.loads(msg_data['DATA'])
+
+        if cmd_source == 'GETGPS':
+            if self.ID =='DRONE':
+                # Invoke c++ function controlling drone's gimbal
+                1
+            elif self.ID == 'GROUND':
+
+                lat_drone = data['Y']
+                lon_drone = data['X']
+                datum_coordinates = data['Datum']
+
+                # Z is in geocentric coordinates and does not correspond to the actual height
+
+                # Geocentric WGS84
+                if datum_coordinates == 0:
+                    _, _, height_drone = geocentric2geodetic(lat_drone, lon_drone, data['Z'])
+                # Geocentric ETRS89
+                elif datum_coordinates == 30:
+                    _, _, heightdrone = geocentric2geodetic(lat_drone, lon_drone, data['Z'], EPSG_GEOCENTRIC=4346)
+                else:
+                    print('\nERROR: Not known geocentric datum')
+
+                yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
+                                    lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
         
     def parse_rx_msg(self, rx_msg):
         """

@@ -29,8 +29,8 @@ def geocentric2geodetic(X, Y, Z, EPSG_GEODETIC=4979, EPSG_GEOCENTRIC=4978):
 
 def geodetic2geocentric(lat, lon, height, EPSG_GEODETIC=4979, EPSG_GEOCENTRIC=4978):
     """
-    Given Geodetic coordinates referred to a datum (given by EPSG_GEODETIC), convert them
-    to Geocentric (lat, lon, height) in the datum given by EPSG_GEOCENTRIC.    
+    Given Geodetic coordinates (lat, lon, h), convert them 
+    to Geocentric  in the datum given by EPSG_GEOCENTRIC.    
 
     Args:
         lat (float): latitude (N)
