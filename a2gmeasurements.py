@@ -1251,8 +1251,10 @@ class HelperA2GMeasurements(object):
         if IsGPS:
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
             self.mySeptentrioGPS.serial_connect()
+            self.mySeptentrioGPS.serial_instance.reset_input_buffer()
+            self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+            #self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
             self.mySeptentrioGPS.start_thread_gps()
-            self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
             print('\nSeptentrio GPS thread opened')
             time.sleep(0.5)
         if IsSignalGenerator:
@@ -1479,7 +1481,9 @@ class HelperA2GMeasurements(object):
         Function to execute when the received instruction in the a2g comm link is 'GETGPS'.
 
         """
-
+        if self.DBG_LVL_1:
+            print(f"THIS ({self.ID}) receives a GETGPS command")
+    
         if self.IsGPS:            
             # Only need to send to the OTHER station our last coordinates, NOT heading.
             # Heading info required by the OTHER station is Heading info from the OTHER station
@@ -1534,6 +1538,9 @@ class HelperA2GMeasurements(object):
 
     def process_answer(self, msg_data):
         
+        if self.DBG_LVL_1:
+                print(f'\nTHIS ({self.ID}) receives protocol ANS')
+                
         msg_data = json.loads(msg_data)
         cmd_source = msg_data['CMD_SOURCE']
         
@@ -1542,6 +1549,8 @@ class HelperA2GMeasurements(object):
         #data = json.loads(msg_data['DATA'])
 
         if cmd_source == 'GETGPS':
+            if self.DBG_LVL_1:
+                print(f'\nTHIS ({self.ID}) receives ANS to GETGPS cmd')
             if self.ID =='DRONE':
                 # Invoke c++ function controlling drone's gimbal
                 1
@@ -1564,7 +1573,9 @@ class HelperA2GMeasurements(object):
 
                 yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
                                     lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
-        
+                
+                print(f"YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
+                
     def parse_rx_msg(self, rx_msg):
         """
         Handles the received socket data. 
@@ -1591,6 +1602,8 @@ class HelperA2GMeasurements(object):
         else:
             header_field = rx_msg[4:-1]
 
+        if self.DBG_LVL_1:
+            print(f'\nTHIS ({self.ID}) parses incoming message')
         if header_field == 'ANS':
             self.process_answer(msg_data)
         elif header_field == 'GETGPS':
@@ -1635,10 +1648,10 @@ class HelperA2GMeasurements(object):
             type_cmd (_type_, optional): _description_. Defaults to None.
             data (object, optional): _description_. Defaults to None.
         """
-        if type_cmd is 'GETGPS':
+        if type_cmd == 'GETGPS':
             frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd)
         
-        elif type_cmd is 'SETGIMBAL':
+        elif type_cmd == 'SETGIMBAL':
             frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd, data=data)
         
         if self.ID == 'DRONE':
@@ -1771,7 +1784,7 @@ class HelperA2GMeasurements(object):
             self.myGimbal.actual_bus.shutdown()
             
         if self.IsGPS and (DISC_WHAT=='ALL' or DISC_WHAT == 'GPS'):  
-            self.mySeptentrioGPS.stop_gps_data_retrieval(msg_type=GPS_STOP)
+            self.mySeptentrioGPS.stop_gps_data_retrieval()
             print('\nStoping GPS stream')
             self.mySeptentrioGPS.stop_thread_gps()
         
