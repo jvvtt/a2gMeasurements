@@ -1252,7 +1252,12 @@ class HelperA2GMeasurements(object):
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
             self.mySeptentrioGPS.serial_connect()
             self.mySeptentrioGPS.serial_instance.reset_input_buffer()
-            self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+            
+            if self.ID == 'DRONE':
+                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian')
+            elif self.ID == 'GROUND':
+                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+            
             #self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
             self.mySeptentrioGPS.start_thread_gps()
             print('\nSeptentrio GPS thread opened')
@@ -1487,12 +1492,13 @@ class HelperA2GMeasurements(object):
         if self.IsGPS:            
             # Only need to send to the OTHER station our last coordinates, NOT heading.
             # Heading info required by the OTHER station is Heading info from the OTHER station
+            
             coordinates = []
 
             # The loop overwrites data_to_send, so that the last coordinate is saved
             # We have to loop over last buffer entries, cause we don't know if last entry is heading or coordinates
             # Moreover, heading and coordinate msgs don't arrive alternating between them
-            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.n_sbf_sentences:]:
+            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.mySeptentrioGPS.n_sbf_sentences:]:
                 if dict_i['ERR'] == 0:
                     if 'X' in dict_i and 'Y' in dict_i and 'Z' in dict_i:
                         data_to_send = dict_i
@@ -1718,7 +1724,7 @@ class HelperA2GMeasurements(object):
         reset_buffer.append(reset_ang_buffer[-1])
         return reset_buffer
         
-    def HelperStartA2GCom(self, PORT=12000):
+    def HelperStartA2GCom(self, PORT=10000):
         """
         Starts the socket binding, listening and accepting for server side, or connecting for client side. 
         Starts the thread handling the socket messages.
