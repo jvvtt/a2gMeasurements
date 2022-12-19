@@ -38,13 +38,14 @@ print('\nEntering main SERVER thread')
 try:    
     # Heavy task with some randomness
     while(True):
-        sz = np.random.randint(8000, 9000)
+        sz = np.random.randint(5000, 6000)
         start = timer()
         tmp = dummy_fcn(sz)
         del tmp
         
         msg = 'Computing time of SERVER task is: ' + str(timer() - start)
-                
+        
+        print('\n[LOCALDEBUG]: ', msg)
         clientConn.sendall(msg.encode())           
         print('\nSERVER messages sent')
 
