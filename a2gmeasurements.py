@@ -863,7 +863,7 @@ class GpsSignaling(object):
                     print('\nReceived AuxAntPositions SBF sentence')
                 
                 if ID_SBF_msg[0] & 8191 == 5938: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    print('\nReceived AttEuler SBF sentence')
+                    #print('\nReceived AttEuler SBF sentence')
                     self.process_atteuler_sbf_data(rx_msg)
                 
                 if ID_SBF_msg[0] & 8191 == 5939: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
@@ -1452,9 +1452,9 @@ class HelperA2GMeasurements(object):
             header_type_field = cmd
             
             if len(header_type_field) > 4:
-                header_length_field = str(2 + 2 + header_type_field + 1)
+                header_length_field = str(2 + 2 + len(header_type_field) + 1)
             else:
-                header_length_field = '0' + str(2 + 2 + header_type_field + 1)
+                header_length_field = '0' + str(2 + 2 + len(header_type_field) + 1)
 
             if data:
                 frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps(data)
@@ -1718,7 +1718,7 @@ class HelperA2GMeasurements(object):
         reset_buffer.append(reset_ang_buffer[-1])
         return reset_buffer
         
-    def HelperStartA2GCom(self, PORT=12000):
+    def HelperStartA2GCom(self, PORT=10000):
         """
         Starts the socket binding, listening and accepting for server side, or connecting for client side. 
         Starts the thread handling the socket messages.
@@ -1730,7 +1730,7 @@ class HelperA2GMeasurements(object):
         self.socket = s
         
         # This will block, so keep it low
-        self.socket.settimeout(5) 
+        self.socket.settimeout(10) 
         
         # CLIENT
         if self.ID == 'DRONE':
