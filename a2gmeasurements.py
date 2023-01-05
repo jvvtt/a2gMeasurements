@@ -1457,9 +1457,9 @@ class HelperA2GMeasurements(object):
             header_type_field = cmd
             
             if len(header_type_field) > 4:
-                header_length_field = str(2 + 2 + header_type_field + 1)
+                header_length_field = str(2 + 2 + len(header_type_field) + 1)
             else:
-                header_length_field = '0' + str(2 + 2 + header_type_field + 1)
+                header_length_field = '0' + str(2 + 2 + len(header_type_field) + 1)
 
             if data:
                 frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps(data)
@@ -1469,16 +1469,18 @@ class HelperA2GMeasurements(object):
         elif type_frame =='ans':
             header_type_field = 'ANS'
             
+            print('Construido1')    
             if len(header_type_field) > 4:
-                header_length_field = str(2 + 2 + header_type_field + 1)
+                header_length_field = str(2 + 2 + len(header_type_field) + 1)
             else:
-                header_length_field = '0' + str(2 + 2 + header_type_field + 1)
+                header_length_field = '0' + str(2 + 2 + len(header_type_field) + 1)
 
             if data:
                 frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps({'CMD_SOURCE': cmd_source_for_ans, 'DATA': data})
             else:
                 frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac
-        
+
+            print('Construido2')
         return json.dumps(frame)
 
     def do_getgps_action(self):
@@ -1501,11 +1503,12 @@ class HelperA2GMeasurements(object):
             for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.mySeptentrioGPS.n_sbf_sentences:]:
                 if dict_i['ERR'] == 0:
                     if 'X' in dict_i and 'Y' in dict_i and 'Z' in dict_i:
+                        if self.DBG_LVL_1:
+                            print('\nAssigned GETGPS response')
                         data_to_send = dict_i
                 else:
                     print('\nEither heading or coordinates information not available')
-                    return    
-
+            
             frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
             
             if self.DBG_LVL_1:
@@ -1514,6 +1517,9 @@ class HelperA2GMeasurements(object):
                 self.a2g_conn.sendall(frame_to_send.encode())
             if self.ID == 'DRONE':
                 self.socket.sendall(frame_to_send.encode())
+            
+            if self.DBG_LVL_1:
+                print('\nSent SBF buffer')
         else:
             print('\nASKED for GPS position but no GPS connected: IsGPS is False')
     
