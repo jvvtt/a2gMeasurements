@@ -46,7 +46,7 @@ try:
         
         print('\nCNT: ', cnt)
         print(f"\nTHIS ({drone_a2g_helper.ID}) emulated buff length: {len(drone_a2g_helper.mySeptentrioGPS.SBF_frame_buffer)}")
-        #print(drone_a2g_helper.mySeptentrioGPS.SBF_frame_buffer[-1])
+        print(drone_a2g_helper.mySeptentrioGPS.SBF_frame_buffer[-5:])
         
         cnt = cnt + 1    
         time.sleep(1)
