@@ -851,26 +851,34 @@ class GpsSignaling(object):
                 
                 # PosCovCartesian SBF sentence identified by ID 5905
                 if ID_SBF_msg[0] & 8191 == 5905: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    print('\nReceived PosCovCartesian SBF sentence')
+                    if self.DBG_LVL_1:
+                        print('\nReceived PosCovCartesian SBF sentence')
                 
                 if ID_SBF_msg[0] & 8191 == 5907: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    print('\nReceived VelCovCartesian SBF sentence')
+                    if self.DBG_LVL_1:
+                        print('\nReceived VelCovCartesian SBF sentence')
                 
                 if ID_SBF_msg[0] & 8191 == 4043: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    print('\nReceived BaseVectorCart SBF sentence')
+                    if self.DBG_LVL_1:
+                        print('\nReceived BaseVectorCart SBF sentence')
                 
                 if ID_SBF_msg[0] & 8191 == 5942: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    print('\nReceived AuxAntPositions SBF sentence')
+                    if self.DBG_LVL_1:
+                        print('\nReceived AuxAntPositions SBF sentence')
                 
                 if ID_SBF_msg[0] & 8191 == 5938: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    #print('\nReceived AttEuler SBF sentence')
+                    if self.DBG_LVL_1:
+                        1
+                        #print('\nReceived AttEuler SBF sentence')
                     self.process_atteuler_sbf_data(rx_msg)
                 
                 if ID_SBF_msg[0] & 8191 == 5939: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    print('\nReceived AttCovEuler SBF sentence')
+                    if self.DBG_LVL_1:
+                        print('\nReceived AttCovEuler SBF sentence')
                                
                 if ID_SBF_msg[0] & 8191 == 5943: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
-                    print('\nReceived EndOfAtt SBF sentence')
+                    if self.DBG_LVL_1:
+                        print('\nReceived EndOfAtt SBF sentence')
 
                 # Sort SBF buffer entries by time (this is double checking, as they are expected to arrive in time order)
                 self.SBF_frame_buffer.sort(key=lambda k : k['TOW'])
@@ -1252,7 +1260,12 @@ class HelperA2GMeasurements(object):
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
             self.mySeptentrioGPS.serial_connect()
             self.mySeptentrioGPS.serial_instance.reset_input_buffer()
-            self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+            
+            if self.ID == 'DRONE':
+                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian')
+            elif self.ID == 'GROUND':
+                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+            
             #self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
             self.mySeptentrioGPS.start_thread_gps()
             print('\nSeptentrio GPS thread opened')
@@ -1465,9 +1478,9 @@ class HelperA2GMeasurements(object):
             header_type_field = 'ANS'
             
             if len(header_type_field) > 4:
-                header_length_field = str(2 + 2 + header_type_field + 1)
+                header_length_field = str(2 + 2 + len(header_type_field) + 1)
             else:
-                header_length_field = '0' + str(2 + 2 + header_type_field + 1)
+                header_length_field = '0' + str(2 + 2 + len(header_type_field) + 1)
 
             if data:
                 frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps({'CMD_SOURCE': cmd_source_for_ans, 'DATA': data})
@@ -1487,17 +1500,18 @@ class HelperA2GMeasurements(object):
         if self.IsGPS:            
             # Only need to send to the OTHER station our last coordinates, NOT heading.
             # Heading info required by the OTHER station is Heading info from the OTHER station
+            
             coordinates = []
 
             # The loop overwrites data_to_send, so that the last coordinate is saved
             # We have to loop over last buffer entries, cause we don't know if last entry is heading or coordinates
-            # Moreover, heading and coordinate msgs don't arrive alternating between them
-            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.n_sbf_sentences:]:
+            # Moreover, heading and coordinate msgs don't arrive alternating between them: two or more consecutive msgs from coordinates or heading can happen
+            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.mySeptentrioGPS.n_sbf_sentences:]:
                 if dict_i['ERR'] == 0:
                     if 'X' in dict_i and 'Y' in dict_i and 'Z' in dict_i:
                         data_to_send = dict_i
                 else:
-                    print('\nEither heading or coordinates information not available')
+                    print('\nCoordinates information not available')
                     return    
 
             frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
