@@ -749,15 +749,15 @@ class GpsSignaling(object):
         HAccuracy =  struct.unpack('<1H', raw_data[89:91])[0]         
         VAccuracy =  struct.unpack('<1H', raw_data[91:93])[0]  
         
-        
+        '''
         pvt_msg_format = {'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 'X': X, 'Y': Y, 'Z': Z,
                           'Undulation': Undulation, 'Vx': Vx, 'Vy': Vy, 'Vz': Vz, 'COG': COG,
                           'RxClkBias': RxClkBias, 'RxClkDrift': RxClkDrift, 'TimeSystem': TimeSystem, 'Datum': Datum,
                           'NrSV': NrSV, 'WACorrInfo': WACorrInfo, 'ReferenceID': ReferenceID, 'MeanCorrAge': MeanCorrAge,
                           'SignalInfo': SignalInfo, 'AlertFlag': AlertFlag, 'NrBases': NrBases, 'PPPInfo': PPPInfo,
                           'Latency': Latency, 'HAccuracy': HAccuracy, 'VAccuracy': VAccuracy}        
-        
-        pvt_data_we_care = {'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 
+        '''
+        pvt_data_we_care = {'ID': 'Coordinates', 'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 
                             'X': X, 'Y': Y, 'Z': Z, 'Datum': Datum}
 
         self.SBF_frame_buffer.append(pvt_data_we_care)
@@ -784,12 +784,12 @@ class GpsSignaling(object):
         RollDot =  struct.unpack('<1f', raw_data[35:39])[0]
         HeadingDot = struct.unpack('<1f', raw_data[39:43])[0]
         
-        
+        '''
         atteul_msg_format = {'TOW': TOW, 'WNc': WNc, 'NrSV': NrSV, 'ERR': ERR, 'MODE': MODE, 
                              'Heading': Heading, 'Pitch': Pitch, 'Roll': Roll, 
                              'PitchDot': PitchDot, 'RollDot': RollDot, 'HeadingDot': HeadingDot}        
-        
-        atteul_msg_useful = {'TOW': TOW, 'WNc': WNc,'ERR': ERR, 'MODE': MODE, 
+        '''
+        atteul_msg_useful = {'ID': 'Heading', 'TOW': TOW, 'WNc': WNc,'ERR': ERR, 'MODE': MODE, 
                              'Heading': Heading, 'Pitch': Pitch, 'Roll': Roll}
         
         self.SBF_frame_buffer.append(atteul_msg_useful)
@@ -1229,7 +1229,11 @@ class myAnritsuSpectrumAnalyzer(object):
         self.anritsu_con_socket.close()
 
 class HelperA2GMeasurements(object):
-    def __init__(self, ID, SERVER_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=False, IsGPS=False, IsSignalGenerator=False, F0=None, L0=None):
+    def __init__(self, ID, SERVER_ADDRESS, 
+                 DBG_LVL_0=False, DBG_LVL_1=False, 
+                 IsGimbal=False, IsGPS=False, IsSignalGenerator=False, 
+                 F0=None, L0=None,
+                 SPEED=None):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -1250,6 +1254,9 @@ class HelperA2GMeasurements(object):
         self.IsGimbal = IsGimbal
         self.IsGPS = IsGPS
         self.IsSignalGenerator = IsSignalGenerator
+        self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ = -1e3
+        self.ERROR_CODE = -6e3 # Assign a negative and high value number to error code : shoudl be unique
+        self.SPEED_NODE = SPEED # m/s
         
         if IsGimbal:
             self.myGimbal = GimbalRS2()
@@ -1282,8 +1289,7 @@ class HelperA2GMeasurements(object):
                                     lat_drone=None, lon_drone=None, height_drone=None, 
                                     coord_type='latlon'):
         """
-        Ground gimbal points to the drone. The front part of the RS2 Gimbal should be pointing to the North. (or equivalently, the touchscreen
-        should be pointing to the south).
+        Ground gimbal points to the drone. 
         
         The user must input either the 3 ground coordinates or the 3 drone coordinates, but both of them can't be None. 
         Moreover, the user must input exactly the 3 coordinates, otherwise the computation won't work.
@@ -1303,64 +1309,92 @@ class HelperA2GMeasurements(object):
         """
 
         # Ground station
-        if self.IsGPS and self.ID == 'GROUND' and lat_ground is None  and lon_ground is None and height_ground is None:
+        if self.IsGPS and self.ID == 'GROUND' and lat_ground is None  and lon_ground is None and height_ground is None and heading is None:
+            cnt = 1
+            len_sbf_buffer = len(self.mySeptentrioGPS.SBF_frame_buffer)
+            
+            heading = []
+            lat_ground = []
+            lon_ground = []
+            
+            time_tag_coords = 0
+            time_tag_heading = 0
+            time_distance_allowed = 2 # in meters            
+            
             '''
-            lat_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
-            lon_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
-            height_ground = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']
-            heading = self.mySeptentrioGPS.NMEA_buffer[-1]
+            NOTE: AttEuler and PVTCart messages should be retrieved from the GPS within the same time-interval.
+            This is for the entries of the SBF_frame_buffer alternate between heading info and coordinates info. 
+            If the entries of the SBF_frame_buffer alternate between heading info and coordinates info
+            the AttEuler message in the SBF_frame_buffer is ASSUMED to correspond to the position of the GPS at the
+            coordinates given by the next consecutive PVTCart in SBF_frame_buffer.
             '''
-
-            # Get the last heading and coordinates
-            # If there is more than one heading_ground,lat_ground,lon_ground or height_ground, th eloop overwrites the variable since is an easy implementation and the buffer is small (<=20 entries)
-            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-self.mySeptentrioGPS.n_sbf_sentences:]:
-                if 'Heading' in dict_i:
-                    if dict_i['ERR'] == 0:
-                        heading = dict_i['Heading']
-                    else:
-                        print('\nERROR: No heading information available at THIS terminal')
-                        return -10000, -10000, -10000 
-                elif 'X' and 'Y' and 'Z' in dict_i:
-                    if dict_i['ERR'] == 0:
-                        # Coordinates encapsulated in SBF sentences are geocentric (X, Y, Z)
-                        lat_ground = dict_i['Y']
-                        lon_ground = dict_i['X']
-                        datum_coordinates = dict_i['Datum']
-
-                        # Geocentric WGS84
-                        if datum_coordinates == 0:
-                        # Z coordinate is geocentric and does not correspond to the actual height in meters: we need to transform to geodetic and take only the Z variable
-                            _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, dict_i[-1]['Z'])
-                        # Geocentric ETRS89
-                        elif datum_coordinates == 30:
-                            _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, dict_i['Z'], EPSG_GEOCENTRIC=4346)
-                        else:
-                            print('\nERROR: Not known geocentric datum')
-                            return -10000, -10000, -10000
+            
+            if len_sbf_buffer > 0:                
+                while((len(heading) == 0) or (len(lat_ground) == 0) or (len(lon_ground) == 0) or (len(height_ground) == 0)):     
+                    if cnt > len_sbf_buffer:
+                        print('\n[WARNING]: error in heading or no heading info available or error in coordinates or no coordinates available')
+                        return self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ, self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ, self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ
+                    
+                    dict_i = self.mySeptentrioGPS.SBF_frame_buffer[-cnt]
+                    
+                    if dict_i['ID'] == 'Heading':
+                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
+                        if dict_i['ERR'] == 0:
+                            if self.DBG_LVL_1:
+                                print('\n[DEBUG_1]: Retrieved  heading info')
+                            
+                            # If ERROR is 0, heading should be non-"zero" 
+                            heading = dict_i['Heading']
+                            time_tag_heading = dict_i['TOW']
+                                
+                    elif dict_i['ID'] == 'Coordinates':
+                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
+                        if dict_i['ERR'] == 0:
+                            if self.DBG_LVL_1:
+                                print('\n[DEBUG_1]: Retrieved  coordiantes info')
+                            
+                            # If ERROR is 0, X,Y, should be non-"zero" (in this case the values are negative i.e -2000, -2000, -2000, corresponding to the origin of the coordinate system in the actual datum)
+                            lat_ground = dict_i['Y']
+                            lon_ground = dict_i['X']
+                            height_ground = dict_i['Z']
+                            time_tag_coords = dict_i['TOW']
+                            datum_coordinates = dict_i['Datum']
+                                
+                    cnt = cnt + 1
                         
-                    else:
-                        print('\nERROR: No geocentric coordinates are available at THIS terminal')
-                        return -10000, -10000, -10000
-                else:
-                    print('\nERROR: No Heading or Geocentric coordinates entries at the gps buffer in THIS terminal')
-                    return -10000, -10000, -10000
+            else:
+                print('\n[WARNING]: nothing in SBF buffer')
+                return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE
+            
+            '''
+            Check if the time difference (ms) between the heading and the coordinates info is less
+            than the time it takes the node to move a predefined distance with the actual speed.
+            
+            
+            If the node is not moving (self.SPEED = 0) it means the heading info will be always the same
+            and the check is not required.
+            '''
+            if self.SPEED_NODE > 0:
+                if  abs(time_tag_coords - time_tag_heading) > (time_distance_allowed/self.SPEED_NODE)*1000:
+                    return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE
+                
+            # Z coordinate is geocentric and does not correspond to the actual height in meters: we need to transform to geodetic and take only the Z variable
+            # Geocentric WGS84
+            if datum_coordinates == 0:
+                _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, height_ground)
+            # Geocentric ETRS89
+            elif datum_coordinates == 30:
+                _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, height_ground, EPSG_GEOCENTRIC=4346)
+            else:
+                print('\n[ERROR]: Not known geocentric datum')
+                return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE            
             
             # If retrieved coordinates and heading info, we know they are geocentric (SBF buffer)
             coord_type = 'planar'
-
-        # Drone station:
-        '''
-        We can compute the yaw, pitch angle of drone's gimbal, but HEADING information is not available from
-        septentrio GPS for the drone, due to secondary antenna placement
-        '''
-        if self.IsGPS and self.ID == 'DRONE' and lat_drone is None  and lon_drone is None and height_drone is None:
-            lat_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Latitude']
-            lon_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Longitude']
-            height_drone = self.mySeptentrioGPS.NMEA_buffer[-1]['Antenna Alt above sea level (mean)']   
         
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
-            print("\nERROR: Either ground or drone coordinates must be provided")
-            return 0, 0
+            print("\n[ERROR]: Either ground or drone coordinates must be provided")
+            return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE
 
         if coord_type == 'latlon':
             lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
@@ -1435,15 +1469,6 @@ class HelperA2GMeasurements(object):
     def build_a2g_frame(self, type_frame='cmd', data=None, cmd=None, cmd_source_for_ans=None):
         """
         Builds the frame for the a2g communication messages.
-        
-        The frame consists of the following fields:
-        
-        SYNCH1 | SYNCH2 | LENGHT_OF_HEADER | TYPE_FRAME | TERMINATOR_HEADER | DATA(OPTIONAL)
-        ------  -------   ----------------  -----------   -----------------   -------------
-         '%'      '-'         2-entries       string            ';'              string
-                            string array       array                              array
-
-        LENGHT_OF_HEADER comprises all the fields but not the DATA field.
 
         Args:
             type_frame (str, optional): 'cmd' or 'ans'. Defaults to 'cmd'.
@@ -1455,40 +1480,22 @@ class HelperA2GMeasurements(object):
         Returns:
             frame (str): this might be a string array containing a json-converted dictionary(i.e. ANS frames) or other type of object (SNDDATA).    
         
-        
         """
-        synch_1 = '%'
-        synch_2 = '*'
-        term_header_charac = ';'
 
         if type_frame == 'cmd':
-            header_type_field = cmd
+            frame = {'TYPE': 'CMD'}
+            frame['CMD_SOURCE'] = cmd
             
-            if len(header_type_field) > 4:
-                header_length_field = str(2 + 2 + len(header_type_field) + 1)
-            else:
-                header_length_field = '0' + str(2 + 2 + len(header_type_field) + 1)
-
             if data:
-                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps(data)
-            else:
-                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac
+                frame['DATA'] = data            
         
         elif type_frame =='ans':
-            header_type_field = 'ANS'
+            frame = {'TYPE': 'ANS'}
             
-            print('Construido1')    
-            if len(header_type_field) > 4:
-                header_length_field = str(2 + 2 + len(header_type_field) + 1)
-            else:
-                header_length_field = '0' + str(2 + 2 + len(header_type_field) + 1)
-
             if data:
-                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac + json.dumps({'CMD_SOURCE': cmd_source_for_ans, 'DATA': data})
-            else:
-                frame = synch_1 + synch_2 + header_length_field + header_type_field + term_header_charac
+                frame['CMD_SOURCE'] = cmd_source_for_ans
+                frame['DATA'] =  data
 
-            print('Construido2')
         return json.dumps(frame)
 
     def do_getgps_action(self):
@@ -1503,33 +1510,51 @@ class HelperA2GMeasurements(object):
             # Only need to send to the OTHER station our last coordinates, NOT heading.
             # Heading info required by the OTHER station is Heading info from the OTHER station
             
-            coordinates = []
-
-            # The loop overwrites data_to_send, so that the last coordinate is saved
-            # We have to loop over last buffer entries, cause we don't know if last entry is heading or coordinates
-            # Moreover, heading and coordinate msgs don't arrive alternating between them: two or more consecutive msgs from coordinates or heading can happen
-            for dict_i in self.mySeptentrioGPS.SBF_frame_buffer[-2*self.mySeptentrioGPS.n_sbf_sentences:]:
-                if dict_i['ERR'] == 0:
-                    if 'X' in dict_i and 'Y' in dict_i and 'Z' in dict_i:
-                        if self.DBG_LVL_1:
-                            print('\nAssigned GETGPS response')
-                        data_to_send = dict_i
-                else:
-                    print('\nEither heading or coordinates information not available')
+            data_to_send = []            
+            len_sbf_buffer = len(self.mySeptentrioGPS.SBF_frame_buffer)
             
-            frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
-            
-            if self.DBG_LVL_1:
-                print('\nReceived the GETGPS and read the SBF buffer')
-            if self.ID == 'GROUND':
-                self.a2g_conn.sendall(frame_to_send.encode())
-            if self.ID == 'DRONE':
-                self.socket.sendall(frame_to_send.encode())
-            
-            if self.DBG_LVL_1:
-                print('\nSent SBF buffer')
+            # It has to send over the socket the geocentric/geodetic coordinates
+            # The only way there are no coordinates available is because:
+            # 1) Didn't start gps thread with PVTCart and AttEuler type of messages
+            # 2) Messages interval is too long and the program executed first than the first message arrived
+            # 3) The receiver is not connected to enough satellites or multipath propagation is very strong, so that ERROR == 1
+                    
+            cnt = 1
+            if  len_sbf_buffer > 0:
+                
+                while(len(data_to_send) == 0):
+                    if cnt > len_sbf_buffer:
+                        print('\n[WARNING]: Either heading or coordinates information not available')
+                        print('\n[WARNING]: Return 0 for each coordinate')
+                        data_to_send = {'X': self.ERROR_CODE, 'Y': self.ERROR_CODE, 'Z': self.ERROR_CODE}
+                        break
+                    
+                    dict_i = self.mySeptentrioGPS.SBF_frame_buffer[-cnt]
+                    if dict_i['ID'] == 'Coordinates':
+                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
+                        if dict_i['ERR'] == 0:
+                            if self.DBG_LVL_1:
+                                print('\n[DEBUG_1]: Assigned GETGPS response')
+                            data_to_send = dict_i
+                            
+                    cnt = cnt + 1                    
+                    
+                frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
+                
+                if self.DBG_LVL_1:
+                    print('\n[DEBUG_1]:Received the GETGPS and read the SBF buffer')
+                if self.ID == 'GROUND':
+                    self.a2g_conn.sendall(frame_to_send.encode())
+                if self.ID == 'DRONE':
+                    self.socket.sendall(frame_to_send.encode())
+                
+                if self.DBG_LVL_1:
+                    print('\n[DEBUG_1]: Sent SBF buffer')
+            else:
+                if self.DBG_LVL_1:
+                    print('\n[DEBUG_1]: No entries in SBF buffer')
         else:
-            print('\nASKED for GPS position but no GPS connected: IsGPS is False')
+            print('\n[WARNING]:ASKED for GPS position but no GPS connected: IsGPS is False')
     
     def do_setgimbal_action(self, msg_data):
         """
@@ -1541,32 +1566,28 @@ class HelperA2GMeasurements(object):
 
         if self.IsGimbal:
             # Unwrap the dictionary containing the yaw and pitch values to be set.
-            msg_data = json.loads(msg_data)
+            #msg_data = json.loads(msg_data)
 
             # Error checking
             if 'YAW' not in msg_data or 'PITCH' not in msg_data:
-                print('\nError: no YAW or PITCH provided')
+                print('\n[ERROR]: no YAW or PITCH provided')
                 return
             else:
                 if float(msg_data['YAW']) > 1800 or float(msg_data['PITCH']) > 1800 or float(msg_data['YAW']) < -1800 or float(msg_data['PITCH']) < -1800:
-                    print('\nError: Yaw or pitch angles are outside of range')
+                    print('\n[ERROR]: Yaw or pitch angles are outside of range')
                     return
                 else:
                     self.myGimbal.setPosControl(yaw=int(msg_data['YAW']), roll=0, pitch=int(msg_data['PITCH']))
         else:
-            print('\nAction to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
+            print('\n[WARNING]: Action to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
-    def process_answer(self, msg_data):
+    def process_answer(self, msg):
         
         if self.DBG_LVL_1:
                 print(f'\nTHIS ({self.ID}) receives protocol ANS')
                 
-        msg_data = json.loads(msg_data)
-        cmd_source = msg_data['CMD_SOURCE']
-        
-        data = msg_data['DATA']
-        # THIS IS UNNECESARY and it gives an error
-        #data = json.loads(msg_data['DATA'])
+        cmd_source = msg['CMD_SOURCE']        
+        data = msg['DATA']
 
         if cmd_source == 'GETGPS':
             if self.DBG_LVL_1:
@@ -1579,22 +1600,33 @@ class HelperA2GMeasurements(object):
                 lat_drone = data['Y']
                 lon_drone = data['X']
                 datum_coordinates = data['Datum']
+                
+                if lat_drone == self.ERROR_CODE or lon_drone == self.ERROR_CODE:
+                    print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
+                    return
 
-                # Z is in geocentric coordinates and does not correspond to the actual height
-
+                # Z is in geocentric coordinates and does not correspond to the actual height:
                 # Geocentric WGS84
                 if datum_coordinates == 0:
                     _, _, height_drone = geocentric2geodetic(lat_drone, lon_drone, data['Z'])
                 # Geocentric ETRS89
                 elif datum_coordinates == 30:
-                    _, _, heightdrone = geocentric2geodetic(lat_drone, lon_drone, data['Z'], EPSG_GEOCENTRIC=4346)
+                    _, _, height_drone = geocentric2geodetic(lat_drone, lon_drone, data['Z'], EPSG_GEOCENTRIC=4346)
                 else:
                     print('\nERROR: Not known geocentric datum')
+                    return
 
-                yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
-                                    lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
+                yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
                 
-                print(f"YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
+                # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the ground_gimbal_follows_drone method
+                while ((yaw_to_set == self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ) or ...
+                       (pitch_to_set == self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ)):
+                    yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
+                
+                if yaw_to_set == self.ERROR_CODE:
+                    print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
+                else:
+                    print(f"[WARNING]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
                 
     def parse_rx_msg(self, rx_msg):
         """
@@ -1604,32 +1636,16 @@ class HelperA2GMeasurements(object):
             rx_msg (str): received data from socket
         """
 
-        # Check:
-        if rx_msg[0] != '%':
-            print('\nWrong frame message')
-            return
-        if rx_msg[1] != '*':
-            print('\nWrong frame message')
-            return
-
-        len_frame_header = int(rx_msg[2:4])
-        msg_data_len = len(rx_msg) - len_frame_header
-
-        if msg_data_len > 0:
-            msg_data = rx_msg.split(';')
-            header_field = msg_data[0][4:]
-            msg_data = msg_data[1]
-        else:
-            header_field = rx_msg[4:-1]
-
         if self.DBG_LVL_1:
-            print(f'\nTHIS ({self.ID}) parses incoming message')
-        if header_field == 'ANS':
-            self.process_answer(msg_data)
-        elif header_field == 'GETGPS':
-            self.do_getgps_action()
-        elif header_field == 'SETGIMBAL':
-            self.do_setgimbal_action(msg_data)
+            print(f'\n[DEBUG_1]: THIS ({self.ID}) parses incoming message')
+            
+        if rx_msg['TYPE'] == 'ANS':
+            self.process_answer(rx_msg)
+        elif rx_msg['TYPE'] == 'CMD':
+            if rx_msg['CMD_SOURCE'] == 'GETGPS':
+                self.do_getgps_action()
+            elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
+                self.do_setgimbal_action(rx_msg['DATA'])
     
     def socket_receive(self, stop_event):
         """
