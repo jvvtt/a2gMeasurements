@@ -12,6 +12,8 @@ try:
     
         time.sleep(1)
 
-except KeyboardInterrupt:
-    ground_a2g_helper.mySeptentrioGPS.stop_gps_data_retrieval()
-    ground_a2g_helper.mySeptentrioGPS.stop_thread_gps()
+except Exception as e:
+    #ground_a2g_helper.mySeptentrioGPS.stop_gps_data_retrieval()
+    #ground_a2g_helper.mySeptentrioGPS.stop_thread_gps()
+    
+    ground_a2g_helper.HelperA2GStopCom(DISC_WHAT='GPS')

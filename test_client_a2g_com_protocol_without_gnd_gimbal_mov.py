@@ -53,5 +53,6 @@ try:
 
 except Exception as e:        
     print('\nThere is an exception: ', e)
-    drone_a2g_helper.mySeptentrioGPS.stop_gps_data_retrieval()
-    drone_a2g_helper.mySeptentrioGPS.stop_thread_gps()
+    #drone_a2g_helper.mySeptentrioGPS.stop_gps_data_retrieval()
+    #drone_a2g_helper.mySeptentrioGPS.stop_thread_gps()
+    drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='GPS')

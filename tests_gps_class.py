@@ -62,36 +62,13 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
         gpsObject.stop_gps_data_retrieval(stream_number=1, msg_type='SBF')
         gpsObject.stop_thread_gps()        
     
-def test_multiple_streams(gpsObject):
-    gpsObject.serial_connect()
-    gpsObject.serial_instance.reset_input_buffer()
-    time.sleep(0.1)
-
-    #mySeptentrioGPS.sendCommandGps('erst, hard, PVTData')
-
-    gpsObject.sendCommandGps(cmd='sga, MultiAntenna') # by default this is the command
-    gpsObject.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec2', sbf_type='+PVTCartesian+AttEuler')
-    gpsObject.start_gps_data_retrieval(stream_number=2,  msg_type='NMEA', interval='sec2', nmea_type='+GGA+HDT')
-
-    gpsObject.start_thread_gps()
-
-    input('\nFinish test? Press ENTER')
-
-    gpsObject.stop_gps_data_retrieval(stream_number=1, msg_type='SBF')
-    gpsObject.stop_gps_data_retrieval(stream_number=2, msg_type='NMEA')
-
-    gpsObject.stop_thread_gps()
-
-    print(len(gpsObject.SBF_frame_buffer), len(gpsObject.NMEA_buffer))
-    if len(gpsObject.SBF_frame_buffer) > 0:
-        print(gpsObject.SBF_frame_buffer[-10:])
-    if len(gpsObject.NMEA_buffer) > 0:
-        print(gpsObject.NMEA_buffer[-10:])    
-        
         
 # Turn on all debugging verbose
 mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True, DBG_LVL_0=True, DBG_LVL_1=True)
 
+input('For Tests 1,2,3: GPS must be OFF')
 test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='off')
+input('For Tests 4,5,6: GPS must be ON but indoor')
 test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_INDOOR')
+input('For Tests 7,8,9: GPS must be ON and outdoor')
 test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_ENOUGH_BUFF_SZ')

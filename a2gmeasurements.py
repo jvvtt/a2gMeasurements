@@ -1328,7 +1328,8 @@ class HelperA2GMeasurements(object):
                  DBG_LVL_0=False, DBG_LVL_1=False, 
                  IsGimbal=False, IsGPS=False, IsSignalGenerator=False, 
                  F0=None, L0=None,
-                 SPEED=None):
+                 SPEED=None,
+                 GPS_Stream_Interval='sec1'):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -1365,9 +1366,9 @@ class HelperA2GMeasurements(object):
             self.mySeptentrioGPS.serial_instance.reset_input_buffer()
             
             if self.ID == 'DRONE':
-                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian')
+                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian')
             elif self.ID == 'GROUND':
-                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
             
             #self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
             self.mySeptentrioGPS.start_thread_gps()
@@ -1875,7 +1876,7 @@ class HelperA2GMeasurements(object):
         thread_rx_helper = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_helper,))
         thread_rx_helper.start()
         
-    def HelperA2GStopCom(self, DISC_WHAT='ALL', GPS_STOP='+NMEA+SBF'):
+    def HelperA2GStopCom(self, DISC_WHAT='ALL', stream=1):
         """
         Stops communications with all the devices or the specified ones in the variable 'DISC_WHAT
 
@@ -1899,7 +1900,11 @@ class HelperA2GMeasurements(object):
             self.myGimbal.actual_bus.shutdown()
             
         if self.IsGPS and (DISC_WHAT=='ALL' or DISC_WHAT == 'GPS'):  
-            self.mySeptentrioGPS.stop_gps_data_retrieval()
+            for stream_info in self.mySeptentrioGPS.stream_info:
+                if int(stream) == int(stream_info['stream_number']):
+                    msg_type = stream_info['msg_type']
+                    interface = stream_info['interface']
+            self.mySeptentrioGPS.stop_gps_data_retrieval(stream_number=stream, msg_type=msg_type, interface=interface)
             print('\nStoping GPS stream')
             self.mySeptentrioGPS.stop_thread_gps()
         
