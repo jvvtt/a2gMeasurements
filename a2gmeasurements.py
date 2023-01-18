@@ -61,6 +61,7 @@ class GimbalRS2(object):
         self.keyboard_buff = []
 
         self.cntBytes = 0
+        self.TIME_POS_REQ = 0.005
   
     def seq_num(self):
         """
@@ -519,6 +520,12 @@ class GpsSignaling(object):
         self.register_sbf_sentences_by_id = [4006, 5938] # PVTCart, AttEul
         self.n_sbf_sentences = len(self.register_sbf_sentences_by_id)
         
+        self.ERR_GPS_CODE_GENERAL = -1.5e3
+        self.ERR_GPS_CODE_SMALL_BUFF_SZ = -2.5e3       
+        self.ERR_GPS_CODE_BUFF_NULL = -3.5e3
+        self.ERR_GPS_CODE_NO_COORD_AVAIL = -4.5e3 
+        self.ERR_GPS_CODE_NO_HEAD_AVAIL = -5.5e3
+        
     def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1', ip_port_number='IP11'):
         """
         Creates a socket to connect to the command-line terminal provided by Septentrio receiver. 
@@ -900,9 +907,97 @@ class GpsSignaling(object):
                 print('\nThis is the exception: ', e, )
                 logging.exception("\nError occurred: ")
     
+    def get_last_sbf_buffer_info(self, what='Coordinates'):
+        
+        # Coordinates
+        data_to_return = []       
+        
+        # Heading
+        data_to_return_2 = []     
+        
+        len_sbf_buffer = len(self.SBF_frame_buffer)
+                        
+        cnt = 1
+        if  len_sbf_buffer > 0:
+            if what == 'Coordinates' or what == 'Heading':
+                while(len(data_to_return) == 0):
+                    if cnt > len_sbf_buffer:
+                        print('\n[WARNING]: Either heading or coordinates information not available')
+                        
+                        if what == 'Coordinates':
+                            print('\n[WARNING]: Return ERR_GPS_CODE_NO_COORD_AVAIL for each coordinate in data_to_return')
+                            data_to_return = {'X': self.ERR_GPS_CODE_NO_COORD_AVAIL, 'Y': self.ERR_GPS_CODE_NO_COORD_AVAIL, 'Z': self.ERR_GPS_CODE_NO_COORD_AVAIL}
+                            return data_to_return
+                        
+                        elif what == 'Heading':
+                            print('\n[WARNING]: Return ERR_GPS_CODE_NO_HEAD_AVAIL for heading in data_to_return')
+                            data_to_return = {'Heading': self.ERR_GPS_CODE_NO_HEAD_AVAIL}
+                            return data_to_return
+                        
+                    dict_i = self.SBF_frame_buffer[-cnt]
+                    if dict_i['ID'] == what:
+                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
+                        if dict_i['ERR'] == 0:
+                            data_to_return = dict_i
+                                
+                    cnt = cnt + 1             
+                    
+                if self.DBG_LVL_1:
+                    print('\n[DEBUG_1]: retrieved a ' + what + ' response') 
+                
+                return data_to_return
+                    
+            elif what == 'Both':
+                while((len(data_to_return) == 0) or (len(data_to_return_2) == 0)):     
+                    if cnt > len_sbf_buffer:
+                        print('\n[WARNING]: heading stream not on or not heading info available /or/ coordinates stream not on or no coordinates available')
+                        print('\n[WARNING]: Return ERR_GPS_CODE_SMALL_BUFF_SZ for each coordinate in data_to_return')
+                        print('\n[WARNING]: Return ERR_GPS_CODE_SMALL_BUFF_SZ for heading in data_to_return_2')
+                        
+                        data_to_return = {'X': self.ERR_GPS_CODE_SMALL_BUFF_SZ, 'Y': self.ERR_GPS_CODE_SMALL_BUFF_SZ, 'Z': self.ERR_GPS_CODE_SMALL_BUFF_SZ}
+                        data_to_return_2 = {'Heading': self.ERR_GPS_CODE_SMALL_BUFF_SZ}
+                        
+                        return data_to_return, data_to_return_2
+                    
+                    dict_i = self.SBF_frame_buffer[-cnt]
+                    
+                    if dict_i['ID'] == 'Heading':
+                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
+                        if dict_i['ERR'] == 0:
+                            data_to_return_2 = dict_i                           
+                                
+                    elif dict_i['ID'] == 'Coordinates':
+                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
+                        if dict_i['ERR'] == 0:                            
+                            data_to_return = dict_i
+                                
+                    cnt = cnt + 1
+                    
+                if self.DBG_LVL_1:
+                    print('\n[DEBUG_1]: retrieved a Heading and Coordinates response') 
+                
+                return data_to_return, data_to_return_2
+        else:
+            print('\n[WARNING]: nothing in SBF buffer')
+            if what == 'Coordinates':
+                data_to_return = {'X': self.ERR_GPS_CODE_BUFF_NULL, 'Y': self.ERR_GPS_CODE_BUFF_NULL, 'Z': self.ERR_GPS_CODE_BUFF_NULL}
+                print('\n[ERROR]: Return ERR_GPS_CODE_BUFF_NULL for each coordinate in data_to_return')
+                return data_to_return
+            
+            elif what == 'Heading':
+                data_to_return = {'Heading': self.ERR_GPS_CODE_BUFF_NULL}
+                print('\n[ERROR]: Return ERR_GPS_CODE_BUFF_NULL for each heading in in data_to_return')
+                return data_to_return
+                
+            elif what == 'Both':
+                data_to_return = {'X': self.ERR_GPS_CODE_BUFF_NULL, 'Y': self.ERR_GPS_CODE_BUFF_NULL, 'Z': self.ERR_GPS_CODE_BUFF_NULL}
+                data_to_return_2 = {'Heading': self.ERR_GPS_CODE_BUFF_NULL}
+                print('\n[ERROR]: Return ERR_GPS_CODE_BUFF_NULL for each coordinate in data_to_return and for heading in data_to_return_2')
+                return data_to_return, data_to_return_2            
+                
     def util_merge_buffer_entries_by_timetag(self, type_msg='SBF'):
         """
-        Utility function to merge buffer entries that have the same timetag.
+        [DEPRECATED] Utility function to merge buffer entries that have the same timetag.
 
         Args:
             type_msg (str, optional): _description_. Defaults to 'SBF'.
@@ -1254,8 +1349,9 @@ class HelperA2GMeasurements(object):
         self.IsGimbal = IsGimbal
         self.IsGPS = IsGPS
         self.IsSignalGenerator = IsSignalGenerator
-        self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ = -1e3
-        self.ERROR_CODE = -6e3 # Assign a negative and high value number to error code : shoudl be unique
+        self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD = -7.5e3 
+        self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM = -8.5e3
+        self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY = -9.5e3
         self.SPEED_NODE = SPEED # m/s
         
         if IsGimbal:
@@ -1297,6 +1393,7 @@ class HelperA2GMeasurements(object):
         Finds the yaw and pitch angles to be set at the GROUND gimbal so it points towards the DRONE station.
 
         Args:
+            heading (float): 
             lat_gimbal (float): Latitude of GROUND station. In DDMMS format: i.e: 62.471541 N
             lon_gimbal (float): Longitude of GROUND station. In DDMMS format: i.e: 21.471541 E
             height_gimbal (float): Height of the GPS Antenna in GROUND station. In meters.
@@ -1310,61 +1407,24 @@ class HelperA2GMeasurements(object):
 
         # Ground station
         if self.IsGPS and self.ID == 'GROUND' and lat_ground is None  and lon_ground is None and height_ground is None and heading is None:
-            cnt = 1
-            len_sbf_buffer = len(self.mySeptentrioGPS.SBF_frame_buffer)
             
-            heading = []
-            lat_ground = []
-            lon_ground = []
+            time_distance_allowed = 2 # meters
             
-            time_tag_coords = 0
-            time_tag_heading = 0
-            time_distance_allowed = 2 # in meters            
+            coords, head_info = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
             
-            '''
-            NOTE: AttEuler and PVTCart messages should be retrieved from the GPS within the same time-interval.
-            This is for the entries of the SBF_frame_buffer alternate between heading info and coordinates info. 
-            If the entries of the SBF_frame_buffer alternate between heading info and coordinates info
-            the AttEuler message in the SBF_frame_buffer is ASSUMED to correspond to the position of the GPS at the
-            coordinates given by the next consecutive PVTCart in SBF_frame_buffer.
-            '''
-            
-            if len_sbf_buffer > 0:                
-                while((len(heading) == 0) or (len(lat_ground) == 0) or (len(lon_ground) == 0) or (len(height_ground) == 0)):     
-                    if cnt > len_sbf_buffer:
-                        print('\n[WARNING]: error in heading or no heading info available or error in coordinates or no coordinates available')
-                        return self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ, self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ, self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ
-                    
-                    dict_i = self.mySeptentrioGPS.SBF_frame_buffer[-cnt]
-                    
-                    if dict_i['ID'] == 'Heading':
-                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
-                        if dict_i['ERR'] == 0:
-                            if self.DBG_LVL_1:
-                                print('\n[DEBUG_1]: Retrieved  heading info')
-                            
-                            # If ERROR is 0, heading should be non-"zero" 
-                            heading = dict_i['Heading']
-                            time_tag_heading = dict_i['TOW']
-                                
-                    elif dict_i['ID'] == 'Coordinates':
-                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
-                        if dict_i['ERR'] == 0:
-                            if self.DBG_LVL_1:
-                                print('\n[DEBUG_1]: Retrieved  coordiantes info')
-                            
-                            # If ERROR is 0, X,Y, should be non-"zero" (in this case the values are negative i.e -2000, -2000, -2000, corresponding to the origin of the coordinate system in the actual datum)
-                            lat_ground = dict_i['Y']
-                            lon_ground = dict_i['X']
-                            height_ground = dict_i['Z']
-                            time_tag_coords = dict_i['TOW']
-                            datum_coordinates = dict_i['Datum']
-                                
-                    cnt = cnt + 1
-                        
+            if coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+                return self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL
+            elif coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ:
+                return self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ
             else:
-                print('\n[WARNING]: nothing in SBF buffer')
-                return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE
+                heading = head_info['Heading']
+                time_tag_heading = head_info['TOW']
+                
+                lat_ground = coords['Y']
+                lon_ground = coords['X']
+                height_ground = coords['Z']
+                time_tag_coords = coords['TOW']
+                datum_coordinates = coords['Datum']
             
             '''
             Check if the time difference (ms) between the heading and the coordinates info is less
@@ -1376,8 +1436,9 @@ class HelperA2GMeasurements(object):
             '''
             if self.SPEED_NODE > 0:
                 if  abs(time_tag_coords - time_tag_heading) > (time_distance_allowed/self.SPEED_NODE)*1000:
-                    return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE
-                
+                    print('\n[WARNING]: for the time_distance_allowed the heading info of the grounde node does not correspond to the coordinates')
+                    return self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD, self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD, self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD
+            
             # Z coordinate is geocentric and does not correspond to the actual height in meters: we need to transform to geodetic and take only the Z variable
             # Geocentric WGS84
             if datum_coordinates == 0:
@@ -1387,14 +1448,14 @@ class HelperA2GMeasurements(object):
                 _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, height_ground, EPSG_GEOCENTRIC=4346)
             else:
                 print('\n[ERROR]: Not known geocentric datum')
-                return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE            
+                return self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM            
             
             # If retrieved coordinates and heading info, we know they are geocentric (SBF buffer)
             coord_type = 'planar'
         
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
-            print("\n[ERROR]: Either ground or drone coordinates must be provided")
-            return self.ERROR_CODE, self.ERROR_CODE, self.ERROR_CODE
+            print("\n[ERROR]: Either ground or drone coordinates MUST be provided")
+            return self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY
 
         if coord_type == 'latlon':
             lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
@@ -1510,35 +1571,24 @@ class HelperA2GMeasurements(object):
             # Only need to send to the OTHER station our last coordinates, NOT heading.
             # Heading info required by the OTHER station is Heading info from the OTHER station
             
-            data_to_send = []            
-            len_sbf_buffer = len(self.mySeptentrioGPS.SBF_frame_buffer)
-            
             # It has to send over the socket the geocentric/geodetic coordinates
             # The only way there are no coordinates available is because:
             # 1) Didn't start gps thread with PVTCart and AttEuler type of messages
             # 2) Messages interval is too long and the program executed first than the first message arrived
             # 3) The receiver is not connected to enough satellites or multipath propagation is very strong, so that ERROR == 1
-                    
-            cnt = 1
-            if  len_sbf_buffer > 0:
-                
-                while(len(data_to_send) == 0):
-                    if cnt > len_sbf_buffer:
-                        print('\n[WARNING]: Either heading or coordinates information not available')
-                        print('\n[WARNING]: Return 0 for each coordinate')
-                        data_to_send = {'X': self.ERROR_CODE, 'Y': self.ERROR_CODE, 'Z': self.ERROR_CODE}
-                        break
-                    
-                    dict_i = self.mySeptentrioGPS.SBF_frame_buffer[-cnt]
-                    if dict_i['ID'] == 'Coordinates':
-                        # Both AttEuler and PVTCart return 'Error' field equal to 0, when there is no error
-                        if dict_i['ERR'] == 0:
-                            if self.DBG_LVL_1:
-                                print('\n[DEBUG_1]: Assigned GETGPS response')
-                            data_to_send = dict_i
-                            
-                    cnt = cnt + 1                    
-                    
+            
+            data_to_send = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Coordinates')
+            
+            if data_to_send['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+                # More verbose
+                return
+            
+            elif data_to_send['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
+                # More verbose
+                return
+            
+            # data_to_send wont be any of the other error codes, because they are not set for 'what'=='Coordinates'
+            else:            
                 frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
                 
                 if self.DBG_LVL_1:
@@ -1550,9 +1600,7 @@ class HelperA2GMeasurements(object):
                 
                 if self.DBG_LVL_1:
                     print('\n[DEBUG_1]: Sent SBF buffer')
-            else:
-                if self.DBG_LVL_1:
-                    print('\n[DEBUG_1]: No entries in SBF buffer')
+    
         else:
             print('\n[WARNING]:ASKED for GPS position but no GPS connected: IsGPS is False')
     
@@ -1619,11 +1667,11 @@ class HelperA2GMeasurements(object):
                 yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
                 
                 # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the ground_gimbal_follows_drone method
-                while ((yaw_to_set == self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ) or ...
-                       (pitch_to_set == self.ERROR_CODE_ground_gimbal_follows_drone_SMALL_BUFF_SZ)):
+                while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or ...
+                       (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
                     yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
                 
-                if yaw_to_set == self.ERROR_CODE:
+                if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
                     print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
                 else:
                     print(f"[WARNING]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
@@ -1695,22 +1743,35 @@ class HelperA2GMeasurements(object):
         elif self.ID == 'GROUND':
             self.a2g_conn.sendall(frame.encode())
     
-    def send_N_azimuth_angles(self, az_now, pitch_now, Naz, el_now=None, Nel=None, meas_number='1', meas_time=10):
+    def az_rot_gnd_gimbal_toggle_sig_generator(self, az_now, pitch_now, Naz, meas_time=10, filename=None):
         """
-        Divides the azimuth in Naz sections and for each correspondent angle sets the yaw of the gimbal,
-        and waits for the user input before moving gimbal to next angle. The angle count starts from az_now
+        Rotates the ground gimbal into "Naz" azimuth steps, while stopping at each angle step, to turn on the signal generator,
+        wait for it "meas_time"[seconds] to send signal, and turn it off again.
         
         Args:
             az_now (int): angle where to start the count. It lies between -1800 and 1800
             Naz (int): number of sectors in azimuth circle
-            el_now (_type_, optional): _description_. Defaults to None.
-            Nel (_type_, optional): _description_. Defaults to None.
-            meas_number (str, optional): number of measurement according to Flight Plan. Defaults to '1'.
         """
-
+        
+        def fcn_to_execute(state):
+            '''
+            This local function template must be replaced with the instruction to execute when the ground gimbal
+            stops for 'meas_time' seconds in a given position. 
+            
+            The instruction to execute has to have 2 states: 
+                'On') What to execute when ground gimbal just stopped at a new position
+                'Off') What to execute when 'meas_time' finishes, and ground gimbal must start again to move to the next position
+            '''
+            if state == 'On': # 'On' state
+                self.inst.write('RF1\n')
+            elif state == 'Off': # 'Off' state
+                self.inst.write('RF0\n')
+            else:
+                print('\n[ERROR]: function to execute must toggle between two states')
+        
         reset_ang_buffer = []
-        to_save_file = []
-        if self.IsGimbal:
+        file_to_save = []
+        if self.IsGimbal and self.IsGPS:
             for i in range(Naz):
                 ang = int((i+1)*3600/Naz)
                 ang = az_now + ang
@@ -1723,32 +1784,50 @@ class HelperA2GMeasurements(object):
                 
                 self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=pitch_now)
                 
-                # Approximate gimbal speed of 56 deg/s:
-                # Max angular movement is 1800 which is done in 3.5 at the actual speed 
+                # 1. Sleep until ground gimbal reaches the position, before the instruction gets executed
+                # Approximate gimbal speed of 56 deg/s: Max angular movement is 1800 which is done in 3.5 at the actual speed 
                 time.sleep(1800/self.myGimbal.speed + 1) 
 
-                self.inst.write('RF1\n')
-                print('Measuring for ' + str(meas_time) + '  secs\n')
+                # 2. Execute instruction state 1
+                fcn_to_execute('On')
+                
+                if self.DBG_LVL_1:
+                    print('\n[WARNING]: instruction executed, now block thread for ' + str(meas_time) + '  [s]')
+                
+                # 3. Sleep for 'meas_time', waiting for instruction to be executed
                 time.sleep(meas_time)
-                self.inst.write('RF0\n')
                 
-                to_save = self.mySeptentrioGPS.NMEA_buffer[-1]
-                self.myGimbal.request_current_position()
-                time.sleep(0.0015)
+                # 4. Execute instruction state 0
+                fcn_to_execute('Off')
                 
-                to_save['GROUND_GIMBAL_YAW'] = self.myGimbal.yaw
-                to_save['GROUND_GIMBAL_PITCH'] = self.myGimbal.pitch
-                to_save_file.append(to_save)
+                # 5. Get last gps coordinates and save them with gimbal info
+                coords = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Coordinates')
+            
+                if coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+                    print('\n[ERROR]: gps sbf stream not started or not a single entry in buffer yet')
+                    return 
+                elif coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
+                    print('\n[ERROR]: gps stream started but not enough satellites or strong multipath propagation interference')
+                    return 
+                else:                    
+                    self.myGimbal.request_current_position()
+                    time.sleep(self.myGimbal.TIME_POS_REQ)
+                    
+                    coords['GROUND_GIMBAL_YAW'] = self.myGimbal.yaw
+                    coords['GROUND_GIMBAL_PITCH'] = self.myGimbal.pitch
+                    file_to_save.append(coords)
         else:
-            print('To call this function, IsGimbal has to be set')
+            print('\n[ERROR]: To call this function, IsGimbal and IsGPS have to be set')
+            print('\n[WARNING]: No file with coordinates and gimbal yaw, pitch saved')
+            return 
         
-        to_save_now = json.dumps(to_save_file)
-        filename = 'MEASUREMENT_' + meas_number
-        f = open(filename + '.json', 'w')
-        f.write(to_save_now)
-        f.close()
+        file_to_save = json.dumps(file_to_save)
+        #filename = 'MEASUREMENT_' + meas_number
+        fid = open(filename + '.json', 'w')
+        fid.write(file_to_save)
+        fid.close()
         
-        print(f'File {filename} saved')
+        print('\nFile ' + filename + ' saved')
         
         reset_buffer = reset_ang_buffer[-2::-1]
         reset_buffer.append(reset_ang_buffer[-1])
