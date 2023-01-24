@@ -1631,7 +1631,13 @@ class HelperA2GMeasurements(object):
             print('\n[WARNING]: Action to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
     def process_answer(self, msg):
-        
+        """
+        This function is in charge of processing the answer message received. So far, the only message that requires
+        an answer is the "GETGPS" command type message. The "GETGPS" command is used to update the gimbal orientation.
+
+        Args:
+            msg (dictionary): 
+        """
         if self.DBG_LVL_1:
                 print(f'\nTHIS ({self.ID}) receives protocol ANS')
                 
