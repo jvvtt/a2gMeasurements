@@ -5,9 +5,9 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
     
     if gps_state == 'off':
         # 1. Call all the functions with the gps off
-        COORD = gpsObject.get_last_sbf_buffer(what='Coordinates')
-        HEAD = gpsObject.get_last_sbf_buffer(what='Heading')
-        COORD_1, HEAD_1 = gpsObject.get_last_sbf_buffer(what='Both')
+        COORD = gpsObject.get_last_sbf_buffer_info(what='Coordinates')
+        HEAD = gpsObject.get_last_sbf_buffer_info(what='Heading')
+        COORD_1, HEAD_1 = gpsObject.get_last_sbf_buffer_info(what='Both')
         
         if COORD['X'] == gpsObject.ERR_GPS_CODE_BUFF_NULL:
             print('\nTest 1 passed')
@@ -24,9 +24,9 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
         gpsObject.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
         gpsObject.start_thread_gps()
         
-        COORD = gpsObject.get_last_sbf_buffer(what='Coordinates')
-        HEAD = gpsObject.get_last_sbf_buffer(what='Heading')
-        COORD_1, HEAD_1 = gpsObject.get_last_sbf_buffer(what='Both')
+        COORD = gpsObject.get_last_sbf_buffer_info(what='Coordinates')
+        HEAD = gpsObject.get_last_sbf_buffer_info(what='Heading')
+        COORD_1, HEAD_1 = gpsObject.get_last_sbf_buffer_info(what='Both')
 
         if COORD['X'] == gpsObject.ERR_GPS_CODE_NO_COORD_AVAIL:
             print('\nTest 4 passed')
@@ -48,9 +48,9 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
         
         time.sleep(1)
                 
-        COORD = gpsObject.get_last_sbf_buffer(what='Coordinates')
-        HEAD = gpsObject.get_last_sbf_buffer(what='Heading')
-        COORD_1, HEAD_1 = gpsObject.get_last_sbf_buffer(what='Both')
+        COORD = gpsObject.get_last_sbf_buffer_info(what='Coordinates')
+        HEAD = gpsObject.get_last_sbf_buffer_info(what='Heading')
+        COORD_1, HEAD_1 = gpsObject.get_last_sbf_buffer_info(what='Both')
 
         if COORD['X'] != gpsObject.ERR_GPS_CODE_NO_COORD_AVAIL:
             print('\nTest 7 passed, ' + str(COORD['X']))
@@ -64,11 +64,16 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
     
         
 # Turn on all debugging verbose
-mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True, DBG_LVL_0=True, DBG_LVL_1=True)
+mySeptentrioGPS = GpsSignaling(DBG_LVL_0=False, DBG_LVL_1=False, DBG_LVL_2=False)
 
-input('For Tests 1,2,3: GPS must be OFF')
-test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='off')
-input('For Tests 4,5,6: GPS must be ON but indoor')
-test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_INDOOR')
-input('For Tests 7,8,9: GPS must be ON and outdoor')
-test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_ENOUGH_BUFF_SZ')
+which = 3
+
+if which == 1 or which == 'all':
+    input('For Tests 1,2,3: GPS must be OFF')
+    test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='off')
+elif which == 2 or which == 'all':
+    input('For Tests 4,5,6: GPS must be ON but indoor')
+    test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_INDOOR')
+elif which == 3 or which == 'all':
+    input('For Tests 7,8,9: GPS must be ON and outdoor')
+    test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_ENOUGH_BUFF_SZ')

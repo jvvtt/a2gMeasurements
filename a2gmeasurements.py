@@ -34,7 +34,12 @@ Gimbal control adapted and extended from https://github.com/ceinem/dji_rs2_ros_c
 """
 
 class GimbalRS2(object):
-    def __init__(self, speed=1800/3.47):
+    def __init__(self, speed_yaw=40, speed_pitch=40, speed_roll=40, DBG_LVL_1=False, DBG_LVL_0=False):
+        '''
+        Input speeds are in deg/s
+
+        '''
+
         self.header = 0xAA
         self.enc = 0x00
         self.res1 = 0x00
@@ -55,13 +60,22 @@ class GimbalRS2(object):
         self.pitch = 0.0
         self.yaw = 0.0
 
-        self.speed =  speed# deg/s
+        self.SPEED_YAW =  speed_yaw # deg/s
+        self.SPEED_PITCH =  speed_pitch # deg/s
+        self.SPEED_ROLL =  speed_roll # deg/s
+
         self.MAIN_LOOP_STOP = True
         self.keyboard_set_flag = False
         self.keyboard_buff = []
 
         self.cntBytes = 0
-        self.TIME_POS_REQ = 0.005
+        self.TIME_POS_REQ = 0.01
+        self.DBG_LVL_0 = DBG_LVL_0
+        self.DBG_LVL_1 = DBG_LVL_1
+
+        self.TIME2MOVE_180_DEG_YAW = 180/speed_yaw
+        self.TIME2MOVE_180_DEG_YAW = 180/speed_pitch
+        self.TIME2MOVE_180_DEG_YAW = 180/speed_roll
   
     def seq_num(self):
         """
@@ -171,34 +185,76 @@ class GimbalRS2(object):
         Args:
             data (): DJI frame message
         """
-        #if data.id == self.recv_id:
-            # print(len(data.data))
-            # print(data)
-        
-        #str_data = ['{:02X}'.format(struct.unpack('<1B', i)[0]) for i in data.data]
+    
         str_data = ['{:02X}'.format(i) for i in data.data]
-
-        # print(str_data)
-        
+    
         self.can_recv_msg_buffer.append(str_data)
         self.can_recv_msg_len_buffer.append(data.dlc)
 
         if len(self.can_recv_msg_buffer) > self.can_recv_buffer_len:
-                # print("Pop")
             self.can_recv_msg_buffer.pop(0)
             self.can_recv_msg_len_buffer.pop(0)
 
         full_msg_frames = self.can_buffer_to_full_frame()
-
-            # print(full_msg_frames)
+            
         for hex_data in full_msg_frames:
             if self.validate_api_call(hex_data):
-                # ic(':'.join(hex_data[16:-4]))
                 request_data = ":".join(hex_data[12:14])
-                # print("Req: " + str(request_data))
                 if request_data == "0E:02":
                     # This is response data to a get position request
+                    if self.DBG_LVL_1:
+                        print('\nResponse received to request_current_position on gimbal RS2')
                     self.parse_position_response(hex_data)
+                elif request_data == "0E:00":
+                    # Parse response to control handheld gimbal position
+                    1
+                elif request_data == "0E:01":
+                    # Parse response to Control handheld gimbal speed
+                    print('\nObtained a response to setSpeedControl')
+                elif request_data == "0E:03":
+                    # Parse response to Set handheld gimbal limit angle
+                    1
+                elif request_data == "0E:04":
+                    # Parse response to Obtain handheld gimbal limit angle
+                    1
+                elif request_data == "0E:05":
+                    # Parse response to Set handheld gimbal motor stifness
+                    1
+                elif request_data == "0E:06":
+                    # Parse response to Obtain handheld gimbal limit angle
+                    1
+                elif request_data == "0E:07":
+                    # Parse response to Set information push of handheld gimbal parameters
+                    1
+                elif request_data == "0E:08":
+                    # Parse response to Push handheld gimbal parameters
+                    1
+                elif request_data == "0E:09":
+                    # Parse response to Obtain module version number
+                    1
+                elif request_data == "0E:0A":
+                    # Parse response to Push joystick control comand
+                    1
+                elif request_data == "0E:0B":
+                    # Parse response to Obtain handheld gimbal user parameters
+                    1
+                elif request_data == "0E:0C":
+                    # Parse response to Set handheld gimbal user parameters
+                    1
+                elif request_data == "0E:0D":
+                    # Parse response to Set handheld gimbal operation mode
+                    1
+                elif request_data == "0E:0E":
+                    # Parse response to Set gimbal Recenter, Selfie, amd Follow modes
+                    1
+                elif request_data == "0D:00":
+                    # Parse response to Third-party motion comand
+                    1
+                elif request_data == "0D:01":
+                    # Parse response to Third-party camera status obtain comand
+                    1
+                else:
+                    print('\n[ERROR]: error on gimbal command reception, error code: ', request_data)
 
     def setPosControl(self, yaw, roll, pitch, ctrl_byte=0x01, time_for_action=0x14):
         """
@@ -235,6 +291,9 @@ class GimbalRS2(object):
         
         Sets speed for each axis of the gimbal.
 
+        Always after seting the speed the gimbal roll is moved (strange behaviour). 
+        Developer has to send a setPosControl to set again the position of the gimbal where it was previously.
+
         Args:
             yaw (int): yaw speed in units of 0.1 deg/s
             roll (int): roll speed in units of 0.1 deg/s
@@ -248,8 +307,7 @@ class GimbalRS2(object):
         if -3600 <= yaw <= 3600 and -3600 <= roll <= 3600 and -3600 <= pitch <= 3600:
         
             hex_data = struct.pack('<3hB', yaw, roll, pitch, ctrl_byte)
-            pack_data = ['{:02X}'.format(struct.unpack('<1B', i)[
-                0]) for i in hex_data]
+            pack_data = ['{:02X}'.format(i) for i in hex_data]
             cmd_data = ':'.join(pack_data)
 
             cmd = self.assemble_can_msg(cmd_type='03', cmd_set='0E',
@@ -263,7 +321,9 @@ class GimbalRS2(object):
 
     def request_current_position(self):
         """
-        Sends command to request the current position of the gimbal
+        Sends command to request the current position of the gimbal.
+
+        BLOCKS for 0.05 s to allow the response to be received
         
         """
         
@@ -274,6 +334,9 @@ class GimbalRS2(object):
         cmd = self.assemble_can_msg(cmd_type='03', cmd_set='0E',
                                     cmd_id='02', data=cmd_data)
         self.send_cmd(cmd)
+        
+        # Time to receive response from gimbal
+        time.sleep(self.TIME_POS_REQ)
 
     def assemble_can_msg(self, cmd_type, cmd_set, cmd_id, data):
         """
@@ -374,9 +437,10 @@ class GimbalRS2(object):
         for m in full_msg:
             try:
                 self.actual_bus.send(m)
-                print(f"Message sent on {self.actual_bus.channel_info}" + '\n')
+                if self.DBG_LVL_0:
+                    print('\ngimbal RS2 Message sent on ', self.actual_bus.channel_info)
             except can.CanError:
-                print("Message NOT sent\n")
+                print("\n[ERROR]: gimbal RS2 Message NOT sent")
                 return
 
     def receive(self, bus, stop_event):
@@ -388,17 +452,16 @@ class GimbalRS2(object):
             bus (python can object): object pointing to the type of bus (i.e. PCAN)
             stop_event (boolean): flag to stop receiving messages
         """
-        
-        print("Start receiving messages")
+        if self.DBG_LVL_0:
+            print("Start receiving messages")
         while not stop_event.is_set():
             rx_msg = bus.recv(1)
-            if rx_msg is not None:
-                #print(f"rx: {rx_msg}")
+            if rx_msg is not None:    
                 self.cntBytes = self.cntBytes + 1
                 self.can_callback(rx_msg)
-                #print(' CNT: ', self.cntBytes)
                 
-        print("Stopped receiving messages")
+        if self.DBG_LVL_0:
+            print("Stopped receiving messages")
 
     def on_press(self, key):
         """Keboard handling. This function is called when the user press a button. Its an early implementation of the GUI to request
@@ -494,6 +557,8 @@ class GimbalRS2(object):
         self.event_stop_thread_gimbal = threading.Event()                              
         t_receive = threading.Thread(target=self.receive, args=(self.actual_bus,self.event_stop_thread_gimbal))
         t_receive.start()
+
+        #self.setSpeedControl(int(self.SPEED_YAW*10), int(self.SPEED_ROLL*10), int(self.SPEED_PITCH*10))
 
     def stop_thread_gimbal(self):
         """
@@ -1066,9 +1131,12 @@ class GpsSignaling(object):
             #rx_msg = serial_instance_actual.readline()
             
             # This looks for the start of a sentence in either NMEA or SBF messages
-            rx_msg = serial_instance_actual.read_until(expected='$'.encode('utf-8'))
-            if len(rx_msg) > 0:
-                self.parse_septentrio_msg(rx_msg)
+            try:
+                rx_msg = serial_instance_actual.read_until(expected='$'.encode('utf-8'))
+                if len(rx_msg) > 0:
+                    self.parse_septentrio_msg(rx_msg)
+            except Exception as e:
+                print('[WARNING]: No bytes to read, ', e)
     
     def start_thread_gps(self, interface='USB'):
         """
@@ -1281,6 +1349,7 @@ class myAnritsuSpectrumAnalyzer(object):
     
     def iterate_xml_file(self, iterable):
         """
+        [NOT TESTED  DEPRECATED MAINTAINED ONLY FOR HISTORY BACKUP]
         Extracts timestamp, sample number and sample value of the Anritsu MS276XA Spectrum Analyzer, from
         the .rsm file generated by the device. This file is similar in structure to a XML file.
 
@@ -1750,7 +1819,7 @@ class HelperA2GMeasurements(object):
         elif self.ID == 'GROUND':
             self.a2g_conn.sendall(frame.encode())
     
-    def az_rot_gnd_gimbal_toggle_sig_generator(self, az_now, pitch_now, Naz, meas_time=10, filename=None):
+    def az_rot_gnd_gimbal_toggle_sig_generator(self, Naz, meas_time=10, filename=None):
         """
         Rotates the ground gimbal into "Naz" azimuth steps, while stopping at each angle step, to turn on the signal generator,
         wait for it "meas_time"[seconds] to send signal, and turn it off again.
@@ -1770,36 +1839,38 @@ class HelperA2GMeasurements(object):
                 'Off') What to execute when 'meas_time' finishes, and ground gimbal must start again to move to the next position
             '''
             if state == 'On': # 'On' state
-                self.inst.write('RF1\n')
+                #self.inst.write('RF1\n')
+                print('\nOn state... just print')
             elif state == 'Off': # 'Off' state
-                self.inst.write('RF0\n')
+                #self.inst.write('RF0\n')
+                print('\nOff state... just print')
             else:
                 print('\n[ERROR]: function to execute must toggle between two states')
         
-        reset_ang_buffer = []
+        aux_ang_buff = []
         file_to_save = []
         if self.IsGimbal and self.IsGPS:
-            for i in range(Naz):
-                ang = int((i+1)*3600/Naz)
-                ang = az_now + ang
-                if ang > 1800:
-                    ang = ang - 3600
-                if ang < -1800:
-                    ang = ang + 3600
-                
-                reset_ang_buffer.append(ang)
-                
-                self.myGimbal.setPosControl(yaw=ang, roll=0, pitch=pitch_now)
+            
+            if self.DBG_LVL_1:
+                # Remember that reques_current_position is a blocking function
+                self.myGimbal.request_current_position()
+                az_now = int(round(self.myGimbal.yaw))*10
+                pitch_now = int(round(self.myGimbal.pitch))*10
+                print('\nYAW NOW: ', az_now, ' PITCH NOW: ', pitch_now)
+
+            ang_step = int(3600/Naz)
+            for i in range(Naz):                
+                self.myGimbal.setPosControl(yaw=ang_step, roll=0, pitch=0, ctrl_byte=0x00)
                 
                 # 1. Sleep until ground gimbal reaches the position, before the instruction gets executed
                 # Approximate gimbal speed of 56 deg/s: Max angular movement is 1800 which is done in 3.5 at the actual speed 
-                time.sleep(1800/self.myGimbal.speed + 1) 
+                time.sleep(self.myGimbal.TIME2MOVE_180_DEG_YAW) 
 
                 # 2. Execute instruction state 1
                 fcn_to_execute('On')
                 
                 if self.DBG_LVL_1:
-                    print('\n[WARNING]: instruction executed, now block thread for ' + str(meas_time) + '  [s]')
+                    print('\n[WARNING]: in iteration ' + str(i+1) + ' of ' + str(Naz)  +', instruction executed, now block thread for ' + str(meas_time) + '  [s]')
                 
                 # 3. Sleep for 'meas_time', waiting for instruction to be executed
                 time.sleep(meas_time)
@@ -1818,7 +1889,6 @@ class HelperA2GMeasurements(object):
                     return 
                 else:                    
                     self.myGimbal.request_current_position()
-                    time.sleep(self.myGimbal.TIME_POS_REQ)
                     
                     coords['GROUND_GIMBAL_YAW'] = self.myGimbal.yaw
                     coords['GROUND_GIMBAL_PITCH'] = self.myGimbal.pitch
@@ -1829,16 +1899,16 @@ class HelperA2GMeasurements(object):
             return 
         
         file_to_save = json.dumps(file_to_save)
-        #filename = 'MEASUREMENT_' + meas_number
-        fid = open(filename + '.json', 'w')
+        fid = open(filename + '.json', 'w') # this overwrites the file
         fid.write(file_to_save)
         fid.close()
         
-        print('\nFile ' + filename + ' saved')
+        if self.DBG_LVL_1:
+            print('\nFile ' + filename + ' saved')
         
-        reset_buffer = reset_ang_buffer[-2::-1]
-        reset_buffer.append(reset_ang_buffer[-1])
-        return reset_buffer
+        for i in range(Naz):
+            self.myGimbal.setPosControl(yaw=-ang_step, pitch=0, roll=0, ctrl_byte=0x00)
+            time.sleep(self.myGimbal.TIME2MOVE_180_DEG_YAW)
         
     def HelperStartA2GCom(self, PORT=10000):
         """
@@ -1910,9 +1980,11 @@ class HelperA2GMeasurements(object):
                 if int(stream) == int(stream_info['stream_number']):
                     msg_type = stream_info['msg_type']
                     interface = stream_info['interface']
+            
             self.mySeptentrioGPS.stop_gps_data_retrieval(stream_number=stream, msg_type=msg_type, interface=interface)
             print('\nStoping GPS stream')
             self.mySeptentrioGPS.stop_thread_gps()
+            
         
         if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
             self.inst.write('RF0\n')   
