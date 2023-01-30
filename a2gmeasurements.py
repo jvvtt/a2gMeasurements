@@ -1770,6 +1770,11 @@ class HelperA2GMeasurements(object):
                 self.do_getgps_action()
             elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
                 self.do_setgimbal_action(rx_msg['DATA'])
+            elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
+                if self.ID == 'GROUND':
+                    print('\nReceived msg from ' + self.CLIENT_ADDRESS + ' is: ' + rx_msg['DATA'])
+                elif self.ID == 'DRONE':
+                    print('\nReceived msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
     
     def socket_receive(self, stop_event):
         """
@@ -1808,11 +1813,8 @@ class HelperA2GMeasurements(object):
             type_cmd (_type_, optional): _description_. Defaults to None.
             data (object, optional): _description_. Defaults to None.
         """
-        if type_cmd == 'GETGPS':
-            frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd)
-        
-        elif type_cmd == 'SETGIMBAL':
-            frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd, data=data)
+       
+        frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd, data=data)
         
         if self.ID == 'DRONE':
             self.socket.sendall(frame.encode())
