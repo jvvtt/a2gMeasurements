@@ -23,14 +23,20 @@ import pandas as pd
 from sys import platform
 from crc import Calculator, Configuration, Crc16
 from a2gUtils import geocentric2geodetic, geodetic2geocentric
+from pyproj import Transformer, Geod
+#import readline
+#import ctypes
+
 
 """
 Author: Julian D. Villegas G.
 Organization: VTT
-Version: 1.1
+Version: 1.0
 e-mail: julian.villegas@vtt.fi
 
-Gimbal control adapted and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software.
+*Gimbal control modified and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software.
+*SBUS encoder modified and extended from https://github.com/ljanyst/pipilot
+
 """
 
 class GimbalRS2(object):
@@ -624,18 +630,18 @@ class GpsSignaling(object):
         Open a serial connection. The Septentrio mosaic-go provides 2 virtual serial ports.
         
         In Windows the name of the virtual serial ports are typically: 
-        -COM15 (Virtual serial port 1)
-        -COM14 (Virtual serial port 2)
+        -COM# (Virtual serial port 1)
+        -COM# (Virtual serial port 2)
 
         In Linux the name of the virtual serial ports (controlled by the standard Linux CDC-ACM driver) are:
         -/dev/ttyACM0 (Virtual serial port 1)
         -/dev/ttyACM1 (Virtual serial port 2)
 
-        For the virtual serial ports the interface name in Septentrio receiver is 'USB' as they
+        For the virtual serial ports the interface name in Septentrio receiver is 'USB' as their
         communication is made through the USB connection with the host computer. 
         
         Additionally there is an actual serial port in the mosaic-go device. Under Linux,
-        the name of this port is '/dev/serial0' (or '/dev/serial0') which is the symbolic link
+        the name of this port is '/dev/serial0' which is the symbolic link
         to either 'dev/ttyS#' or '/dev/ttyAMA#'.
         
         Args:
@@ -834,6 +840,36 @@ class GpsSignaling(object):
 
         self.SBF_frame_buffer.append(pvt_data_we_care)
     
+    def process_pvtgeodetic_sbf_data(self, raw_data):
+        """
+        Process the PVTGeodetic data type
+        
+        Args:
+            raw_data (bytes): received raw data
+        """
+        
+        TOW = struct.unpack('<1I', raw_data[7:11])[0]
+        WNc = struct.unpack('<1H', raw_data[11:13])[0]        
+        MODE =  struct.unpack('<1B', raw_data[13:14])[0]
+        ERR =  struct.unpack('<1B', raw_data[14:15])[0]
+        LAT =  struct.unpack('<1d', raw_data[15:23])[0]
+        LON =  struct.unpack('<1d', raw_data[23:31])[0]
+        H = struct.unpack('<1d', raw_data[31:39])[0]
+        Undulation =  struct.unpack('<1f', raw_data[39:43])[0]
+        Vx =  struct.unpack('<1f', raw_data[43:47])[0]
+        Vy = struct.unpack('<1f', raw_data[47:51])[0]
+        Vz =  struct.unpack('<1f', raw_data[51:55])[0]
+        COG =  struct.unpack('<1f', raw_data[55:59])[0]
+        RxClkBias = struct.unpack('<1d', raw_data[59:67])[0]
+        RxClkDrift =  struct.unpack('<1f', raw_data[67:71])[0]
+        TimeSystem = struct.unpack('<1B', raw_data[71:72])[0]
+        Datum =  struct.unpack('<1B', raw_data[72:73])[0]        
+        
+        pvt_data_we_care = {'ID': 'Coordinates', 'TOW': TOW, 'WNc': WNc, 'MODE': MODE, 'ERR': ERR, 
+                            'LAT': LAT, 'LON': LON, 'HEIGHT': H, 'Datum': Datum}
+
+        self.SBF_frame_buffer.append(pvt_data_we_care)
+    
     def process_atteuler_sbf_data(self, raw_data):
         """
         Parse the AttEuler SBF sentence.
@@ -916,6 +952,10 @@ class GpsSignaling(object):
                         print('\nDiscarded frame cause it did not pass the CRC check')
                     return
                 '''
+                
+                # PVTGeodetic SBF sentenced identified by ID 4007
+                if ID_SBF_msg[0] & 8191 == 4007: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
+                    self.process_pvtgeodetic_sbf_data(rx_msg)
                 
                 # PVTCart SBF sentence identified by ID 4006
                 if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
@@ -1058,64 +1098,7 @@ class GpsSignaling(object):
                 data_to_return = {'X': self.ERR_GPS_CODE_BUFF_NULL, 'Y': self.ERR_GPS_CODE_BUFF_NULL, 'Z': self.ERR_GPS_CODE_BUFF_NULL}
                 data_to_return_2 = {'Heading': self.ERR_GPS_CODE_BUFF_NULL}
                 print('\n[ERROR]: Return ERR_GPS_CODE_BUFF_NULL for each coordinate in data_to_return and for heading in data_to_return_2')
-                return data_to_return, data_to_return_2            
-                
-    def util_merge_buffer_entries_by_timetag(self, type_msg='SBF'):
-        """
-        [DEPRECATED] Utility function to merge buffer entries that have the same timetag.
-
-        Args:
-            type_msg (str, optional): _description_. Defaults to 'SBF'.
-        """
-
-        if type_msg == 'SBF':
-            tmp_buff = []
-            for key, value in groupby(self.SBF_frame_buffer[-2*self.n_sbf_sentences:], key = itemgetter('TOW')):
-                tmp_buff.append({'TOW': key})
-                for dict_i in value:
-                    for key_dict_i, value_dict_i in dict_i.items():
-                        if key_dict_i == 'ERR':
-                            if 'Heading' in dict_i:
-                                tmp_buff[-1]['ERR_ATTEUL'] = value_dict_i
-                            elif 'X' in dict_i:
-                                tmp_buff[-1]['ERR_PVT'] = value_dict_i
-                        elif key_dict_i == 'MODE':
-                            if 'Heading' in dict_i:
-                                tmp_buff[-1]['MODE_ATTEUL'] = value_dict_i
-                            elif 'X' in dict_i:
-                                tmp_buff[-1]['MODE_PVT'] = value_dict_i
-                        else:
-                            tmp_buff[-1][key_dict_i] = value_dict_i
-                    
-            self.SBF_frame_buffer[-2*self.n_sbf_sentences:] = tmp_buff    
-
-        # NMEA doesn't send GGA and HDT at the same time. They are tipycally spaced by a second.
-        # So we consider to groupy by a time bin of 1 second
-        elif type_msg == 'NMEA':
-            self.NMEA_buffer[-2*2:].sort(key=lambda k : k['Timestamp'])
-            
-            # Group the buffer entries by timestamps close in time by a max of 'time_bin -1' seconds
-            groups = []
-            time_bin = 2
-            
-            if len(self.NMEA_buffer) >= 4 :
-                start_time = datetime.datetime.strptime(str(int(self.NMEA_buffer[-2*2]['Timestamp'])), '%H%M%S')
-            else:
-                start_time = datetime.datetime.strptime(str(int(self.NMEA_buffer[-len(self.NMEA_buffer)]['Timestamp'])), '%H%M%S')
-            
-            for list_i in self.NMEA_buffer[-2*2:]:
-                t_c = datetime.datetime.strptime(str(int(list_i['Timestamp'])), '%H%M%S')
-                groups.append(int((t_c - start_time).total_seconds() // time_bin) + 1)
-            print(groups)
-            tmp_buf = []
-            for i in np.unique(groups):
-                tmp_buf.append({})
-                for cnt, dict_i in enumerate(self.NMEA_buffer[-2*2:]):
-                    if groups[cnt] == i:
-                        for key, value in dict_i.items():
-                            tmp_buf[-1][key] = value
-
-            self.NMEA_buffer[-2*2:] = tmp_buf       
+                return data_to_return, data_to_return_2    
         
     def serial_receive(self, serial_instance_actual, stop_event):
         """
@@ -1397,7 +1380,7 @@ class HelperA2GMeasurements(object):
                  DBG_LVL_0=False, DBG_LVL_1=False, 
                  IsGimbal=False, IsGPS=False, IsSignalGenerator=False, 
                  F0=None, L0=None,
-                 SPEED=None,
+                 SPEED=0,
                  GPS_Stream_Interval='sec1'):
         """        
         GROUND station is the server and AIR station is the client.
@@ -1455,24 +1438,7 @@ class HelperA2GMeasurements(object):
                                     lat_drone=None, lon_drone=None, height_drone=None, 
                                     coord_type='latlon'):
         """
-        Ground gimbal points to the drone. 
-        
-        The user must input either the 3 ground coordinates or the 3 drone coordinates, but both of them can't be None. 
-        Moreover, the user must input exactly the 3 coordinates, otherwise the computation won't work.
-
-        Finds the yaw and pitch angles to be set at the GROUND gimbal so it points towards the DRONE station.
-
-        Args:
-            heading (float): 
-            lat_gimbal (float): Latitude of GROUND station. In DDMMS format: i.e: 62.471541 N
-            lon_gimbal (float): Longitude of GROUND station. In DDMMS format: i.e: 21.471541 E
-            height_gimbal (float): Height of the GPS Antenna in GROUND station. In meters.
-            lat_drone (float): Latitude of DRONE station. In DDMMS format: i.e: 62.471541 N
-            lon_drone (float): Longitude of DRONE station. In DDMMS format: i.e: 21.471541 E
-            height_drone (float): Height of the GPS Antenna in DRONE station. In meters.
-
-        Returns:
-            yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
+        DEPRECATED.
         """
 
         # Ground station
@@ -1547,7 +1513,7 @@ class HelperA2GMeasurements(object):
         pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
                             
         alpha = np.arctan2(lat_drone_planar - lat_ground_planar, lon_drone_planar - lon_ground_planar)
-
+ 
         # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
         if heading > np.pi:
             heading = heading - np.pi*2
@@ -1562,7 +1528,103 @@ class HelperA2GMeasurements(object):
         yaw_to_set = int(np.rad2deg(-yaw_to_set)*10)
         
         return yaw_to_set, pitch_to_set, alpha
+    
+    def gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
+                                    lat_drone=None, lon_drone=None, height_drone=None):
+        """
+
+        Args:
+            
+            heading (float): angle between [0, 2*pi]. ONLY provided for debugging.
+            lat_ground (float): Latitude of GROUND station. ONLY provided for debugging if ID is GROUND.
+            lon_ground (float): Longitude of GROUND station. ONLY provided for debugging if ID is GROUND.
+            height_ground (float): Height of the GPS Antenna in GROUND station if ID is GROUND. 
+            lat_drone (float): Latitude of DRONE station. In DDMMS format: i.e: 62.471541 N
+            lon_drone (float): Longitude of DRONE station. In DDMMS format: i.e: 21.471541 E
+            height_drone (float): Height of the GPS Antenna in DRONE station. In meters.
+
+        Returns:
+            yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
+        """
+
+        # Ground station
+        if self.IsGPS:            
+            coords, head_info = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
+            
+            if coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+                return self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL
+            elif coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ:
+                return self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ
+            else:
+                heading = head_info['Heading']
+                time_tag_heading = head_info['TOW']
+                time_tag_coords = coords['TOW']
+                datum_coordinates = coords['Datum']
+            
+            '''
+            Check if the time difference (ms) between the heading and the coordinates info is less
+            than the time it takes the node to move a predefined distance with the actual speed.           
+            If the node is not moving (self.SPEED = 0) it means the heading info will be always the same
+            and the check is not required.
+            '''
+            if self.SPEED_NODE > 0:
+                time_distance_allowed = 2 # meters
+                if  abs(time_tag_coords - time_tag_heading) > (time_distance_allowed/self.SPEED_NODE)*1000:
+                    print('\n[WARNING]: for the time_distance_allowed the heading info of the grounde node does not correspond to the coordinates')
+                    return self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD, self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD, self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD
+            
+            if self.ID == 'GROUND':
+            # Convert Geocentric WGS84 to Geodetic to compute distance and Inverse Transform Forward Azimuth (ITFA) 
+                if datum_coordinates == 0:
+                    lat_ground, lon_ground, height_ground = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
+                # Geocentric ETRS89
+                elif datum_coordinates == 30:
+                    lat_ground, lon_ground, height_ground = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'], EPSG_GEOCENTRIC=4346)
+                else:
+                    print('\n[ERROR]: Not known geocentric datum')
+                    return self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM
+            
+            elif self.ID == 'DRONE':
+                # Convert Geocentric WGS84 to Geodetic to compute distance and Inverse Transform Forward Azimuth (ITFA) 
+                if datum_coordinates == 0:
+                    lat_drone, lon_drone, height_drone = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
+                # Geocentric ETRS89
+                elif datum_coordinates == 30:
+                    lat_drone, lon_drone, height_drone = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'], EPSG_GEOCENTRIC=4346)
+                else:
+                    print('\n[ERROR]: Not known geocentric datum')
+                    return self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM
+        # Testing mode
+        elif self.IsGPS == False:
+            # Both coordinates must be provided and must be in geodetic format
+            1
         
+        if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
+            print("\n[ERROR]: Either ground or drone coordinates MUST be provided")
+            return self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY
+        
+        wgs84_geod = Geod(ellps='WGS84')
+        
+        ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_ground, lat_ground, lon_drone, lat_drone)
+                                
+        pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)
+        pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
+ 
+        # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
+        if heading > 180:
+            heading = heading - 360
+                    
+        yaw_to_set = ITFA - heading
+
+        if yaw_to_set > 180:
+            yaw_to_set = yaw_to_set - 360
+        elif yaw_to_set < -180:
+            yaw_to_set = yaw_to_set + 360
+            
+        yaw_to_set = int(yaw_to_set*10)
+        
+        return yaw_to_set, pitch_to_set
+    
     def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3067):
             """
             Converts from DDMMS coordinates to planar coordinates by using a specified projection.
@@ -1740,17 +1802,22 @@ class HelperA2GMeasurements(object):
                     print('\nERROR: Not known geocentric datum')
                     return
 
-                yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
+                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
-                # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the ground_gimbal_follows_drone method
+                # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the gimbal_follows_drone method
                 while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or ...
                        (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
-                    yaw_to_set, pitch_to_set, _ = self.ground_gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, coord_type='planar')
+                    yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
                 if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
                     print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
                 else:
                     print(f"[WARNING]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
+                    
+                    if self.IsGimbal:
+                        self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set, ctrl_byte=0x00)
+                    else:
+                        print('\n[WARNING]: No gimbal available, so no rotation will happen')
                 
     def parse_rx_msg(self, rx_msg):
         """
@@ -1990,3 +2057,102 @@ class HelperA2GMeasurements(object):
         
         if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
             self.inst.write('RF0\n')   
+
+class RepeatTimer(threading.Timer):  
+    def run(self):  
+        while not self.finished.wait(self.interval):  
+            self.function(*self.args,**self.kwargs)
+
+class SBUSEncoder:
+    
+    def __init__(self):
+        self.channels = [1024] * 16
+
+    def bit_not(n, numbits=8):
+        return (1 << numbits) - 1 - n
+    
+    def set_channel(self, channel, data):
+        self.channels[channel] = data & 0x07ff
+
+    def get_data(self):
+        # Create the header
+        data = bytearray(25)
+        data[0] = 0x0f # start byte
+
+        # Encode channels
+        current_byte = 1
+        available_bits  = 8
+        for ch in self.channels:
+            ch &= 0x7ff
+            remaining_bits = 11
+            while remaining_bits:
+                mask = self.bit_not(0xffff >> available_bits << available_bits, 16)
+                enc = (ch & mask) << (8 - available_bits)
+                data[current_byte] |= enc
+
+                encoded_bits = 0
+                if remaining_bits < available_bits:
+                    encoded_bits = remaining_bits
+                else:
+                    encoded_bits = available_bits
+
+                remaining_bits -= encoded_bits
+                available_bits -= encoded_bits
+                ch >>= encoded_bits
+
+                if available_bits == 0:
+                    current_byte += 1
+                    available_bits = 8
+
+        # Ignore the flags and end byte
+        data[23] = 0
+        data[24] = 0
+
+        return data
+    
+    def start_sbus(self):
+        """
+        Serial port on Raspberry Pi 4 ground node is /dev/ttyAMA#
+        
+        """
+        
+        #self.encoder = SBUSEncoder()
+        self.port = serial.Serial('/dev/ttyAMA0', baudrate=100000,
+                                  parity=serial.PARITY_EVEN,
+                                  stopbits=serial.STOPBITS_TWO)
+        
+        ##We are now creating a thread timer and controling it  
+        self.timer_fcn = RepeatTimer(0.07, self.send_sbus_msg)  
+        self.timer_fcn.start() #recalling run  
+        
+        print('\n[DEBUG]: SBUS threading started')
+
+    
+    def stop_updating(self):
+        self.timer_fcn.cancel()
+    
+    def send_sbus_msg(self):
+        #self.port.write(self.encoder.get_data())
+        self.port.write(self.get_data())
+    
+    def update_channel(self, channel, value):
+        """
+        Update the value of each channel.
+        
+        For Gremsy H16 gimbal the recommended mapping of channels is:
+        Channel 5 --> Mode --> 3-position switch
+        Channel 2 --> Tilt
+        Channel 4 --> Roll
+        Channel 1 --> Pan
+        Channel 3 --> Tilt speed
+        Channel 6 --> Pan speed
+
+        Args:
+            channel (int): number of the channel
+            value (int): a number between  -100 and 100 representing the value of the channel
+        """
+        scale = value + 100.
+        scale /= 200
+        #self.encoder.set_channel(channel, int(scale * 2047))
+        self.set_channel(channel, int(scale * 2047))
+    

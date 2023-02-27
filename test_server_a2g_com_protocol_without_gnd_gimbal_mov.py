@@ -2,7 +2,7 @@ from a2gmeasurements import HelperA2GMeasurements
 import time
 
 SERVER_ADDRESS = ''
-ground_a2g_helper = HelperA2GMeasurements('GROUND', SERVER_ADDRESS, DBG_LVL_0=True, DBG_LVL_1=True, IsGPS=True)
+ground_a2g_helper = HelperA2GMeasurements('GROUND', SERVER_ADDRESS, DBG_LVL_0=True, DBG_LVL_1=True, IsGPS=True, IsGimbal=True)
 ground_a2g_helper.HelperStartA2GCom()
 
 
@@ -16,4 +16,4 @@ except Exception as e:
     #ground_a2g_helper.mySeptentrioGPS.stop_gps_data_retrieval()
     #ground_a2g_helper.mySeptentrioGPS.stop_thread_gps()
     
-    ground_a2g_helper.HelperA2GStopCom(DISC_WHAT='GPS')
+    ground_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
