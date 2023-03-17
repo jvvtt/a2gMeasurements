@@ -1381,7 +1381,7 @@ class HelperA2GMeasurements(object):
                  IsGimbal=False, IsGPS=False, IsSignalGenerator=False, 
                  F0=None, L0=None,
                  SPEED=0,
-                 GPS_Stream_Interval='sec1'):
+                 GPS_Stream_Interval='sec1', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -1393,6 +1393,11 @@ class HelperA2GMeasurements(object):
             IsGimbal (bool): An RS2 Gimbal is going to be connected.
             IsGPS (bool): A Septentrio GPS is going to be connected.
         """
+        
+        self.AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN = AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN
+        self.MAX_TIME_EMPTY_SOCKETS = 20 # in [s]
+        self.MAX_NUM_RX_EMPTY_SOCKETS = round(self.MAX_TIME_EMPTY_SOCKETS / self.AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN)
+        self.rxEmptySockCounter = 0
         
         self.ID = ID
         self.SERVER_ADDRESS = SERVER_ADDRESS  
@@ -1532,6 +1537,9 @@ class HelperA2GMeasurements(object):
     def gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
                                     lat_drone=None, lon_drone=None, height_drone=None):
         """
+        
+        If 'IsGPS' is False (no GPS connected), then heading, lat,lon, height coordinates of both nodes must be provided. 
+        In that case, all coordinates provided must be geodetic (lat, lon alt).
 
         Args:
             
@@ -1783,21 +1791,21 @@ class HelperA2GMeasurements(object):
                 1
             elif self.ID == 'GROUND':
 
-                lat_drone = data['Y']
-                lon_drone = data['X']
+                y_drone = data['Y']
+                x_drone = data['X']
                 datum_coordinates = data['Datum']
                 
-                if lat_drone == self.ERROR_CODE or lon_drone == self.ERROR_CODE:
+                if y_drone == self.ERROR_CODE or x_drone == self.ERROR_CODE:
                     print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
                     return
 
                 # Z is in geocentric coordinates and does not correspond to the actual height:
                 # Geocentric WGS84
                 if datum_coordinates == 0:
-                    _, _, height_drone = geocentric2geodetic(lat_drone, lon_drone, data['Z'])
+                    lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'])
                 # Geocentric ETRS89
                 elif datum_coordinates == 30:
-                    _, _, height_drone = geocentric2geodetic(lat_drone, lon_drone, data['Z'], EPSG_GEOCENTRIC=4346)
+                    lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'], EPSG_GEOCENTRIC=4346)
                 else:
                     print('\nERROR: Not known geocentric datum')
                     return
@@ -1805,8 +1813,7 @@ class HelperA2GMeasurements(object):
                 yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
                 # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the gimbal_follows_drone method
-                while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or ...
-                       (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
+                while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
                     yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
                 if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
@@ -1815,7 +1822,7 @@ class HelperA2GMeasurements(object):
                     print(f"[WARNING]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
                     
                     if self.IsGimbal:
-                        self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set, ctrl_byte=0x00)
+                        self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set, ctrl_byte=0x00) # relative movement
                     else:
                         print('\n[WARNING]: No gimbal available, so no rotation will happen')
                 
@@ -1839,7 +1846,7 @@ class HelperA2GMeasurements(object):
                 self.do_setgimbal_action(rx_msg['DATA'])
             elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
                 if self.ID == 'GROUND':
-                    print('\nReceived msg from ' + self.CLIENT_ADDRESS + ' is: ' + rx_msg['DATA'])
+                    print('\nReceived msg from ' + self.CLIENT_ADDRESS[0] + ' is: ' + rx_msg['DATA'])
                 elif self.ID == 'DRONE':
                     print('\nReceived msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
     
@@ -1859,10 +1866,28 @@ class HelperA2GMeasurements(object):
                     data = json.loads(self.socket.recv(1024).decode())
                 if data:
                     if self.DBG_LVL_0:
-                        print(data)
+                        print('\n[DEBUG_0]: This is the data received: ', data)
                     self.parse_rx_msg(data)
+                else:
+                    if self.DBG_LVL_0:
+                        print('\n[DEBUG_0]: "data" in "if data" in "socket_receive" is None')
             # i.e.  Didn't receive anything
             except Exception as e:
+                # Handle the assumed connection lost
+                if self.rxEmptySockCounter > self.MAX_NUM_RX_EMPTY_SOCKETS:
+                    print('\n[WARNING]:SOCKETS HAVE BEEN EMPTY FOR LONG TIME. DRONE MUST COME CLOSER')
+                    self.rxEmptySockCounter = 0
+                        
+                self.rxEmptySockCounter = self.rxEmptySockCounter + 1
+                
+                '''
+                Types of known errors:
+                1. 'timed out'
+                
+                *This error is reported in the client but not in the server. Happens when the client hasn't received anything in a while, so that 'recv' function raises the exception.
+                *The conn is open and if any node send something again the other node will receive it
+                '''
+                
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
          
@@ -2016,7 +2041,10 @@ class HelperA2GMeasurements(object):
             
             self.a2g_conn = a2g_connection
             self.CLIENT_ADDRESS = client_address
-            
+        
+        # This runs a thread that constantly checks for received messages
+        # If there are no messages thre will be an error
+        # The error might be because there is no sent package(but there is still connection) or because there is no connection anymore
         self.event_stop_thread_helper = threading.Event()
         thread_rx_helper = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_helper,))
         thread_rx_helper.start()
@@ -2064,6 +2092,7 @@ class RepeatTimer(threading.Timer):
             self.function(*self.args,**self.kwargs)
 
 class SBUSEncoder:
+    "This class is under test"
     
     def __init__(self):
         self.channels = [1024] * 16
@@ -2086,7 +2115,8 @@ class SBUSEncoder:
             ch &= 0x7ff
             remaining_bits = 11
             while remaining_bits:
-                mask = self.bit_not(0xffff >> available_bits << available_bits, 16)
+                #mask = self.bit_not(0xffff >> available_bits << available_bits, 16)
+                mask = (1 << 16) - 1 - (0xffff >> available_bits << available_bits)
                 enc = (ch & mask) << (8 - available_bits)
                 data[current_byte] |= enc
 
@@ -2110,19 +2140,20 @@ class SBUSEncoder:
 
         return data
     
-    def start_sbus(self):
+    def start_sbus(self,serial_interface='/dev/ttyUSB'):
         """
         Serial port on Raspberry Pi 4 ground node is /dev/ttyAMA#
         
         """
         
         #self.encoder = SBUSEncoder()
-        self.port = serial.Serial('/dev/ttyAMA0', baudrate=100000,
+        self.port = serial.Serial(serial_interface, baudrate=100000,
                                   parity=serial.PARITY_EVEN,
                                   stopbits=serial.STOPBITS_TWO)
         
         ##We are now creating a thread timer and controling it  
-        self.timer_fcn = RepeatTimer(0.07, self.send_sbus_msg)  
+        self.timer_fcn = RepeatTimer(0.014, self.send_sbus_msg)  
+        #self.timer_fcn = threading.Timer(0.07, self.send_sbus_msg)  
         self.timer_fcn.start() #recalling run  
         
         print('\n[DEBUG]: SBUS threading started')
@@ -2133,7 +2164,10 @@ class SBUSEncoder:
     
     def send_sbus_msg(self):
         #self.port.write(self.encoder.get_data())
-        self.port.write(self.get_data())
+        data = self.get_data()
+        
+        #print('\nDATA: ', data)
+        self.port.write(data)
     
     def update_channel(self, channel, value):
         """
