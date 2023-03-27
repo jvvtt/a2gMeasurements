@@ -2101,46 +2101,40 @@ class SBUSEncoder:
         return (1 << numbits) - 1 - n
     
     def set_channel(self, channel, data):
-        self.channels[channel] = data & 0x07ff
-
-    def get_data(self):
-        # Create the header
-        data = bytearray(25)
-        data[0] = 0x0f # start byte
-
-        # Encode channels
-        current_byte = 1
-        available_bits  = 8
-        for ch in self.channels:
-            ch &= 0x7ff
-            remaining_bits = 11
-            while remaining_bits:
-                #mask = self.bit_not(0xffff >> available_bits << available_bits, 16)
-                mask = (1 << 16) - 1 - (0xffff >> available_bits << available_bits)
-                enc = (ch & mask) << (8 - available_bits)
-                data[current_byte] |= enc
-
-                encoded_bits = 0
-                if remaining_bits < available_bits:
-                    encoded_bits = remaining_bits
-                else:
-                    encoded_bits = available_bits
-
-                remaining_bits -= encoded_bits
-                available_bits -= encoded_bits
-                ch >>= encoded_bits
-
-                if available_bits == 0:
-                    current_byte += 1
-                    available_bits = 8
-
-        # Ignore the flags and end byte
-        data[23] = 0
-        data[24] = 0
-
-        return data
+        self.channels[channel] = data & 0x07ff    
     
-    def start_sbus(self,serial_interface='/dev/ttyUSB'):
+    def encode_data(self):
+        
+        packet = np.zeros(25, dtype=np.uint8)
+        packet[0] = 0x0f
+        packet[1] = self.channels[0] & 0x07FF
+        packet[2] = (self.channels[0] & 0x07FF)>>8 | (self.channels[1] & 0x07FF)<<3
+        packet[3] = (self.channels[1] & 0x07FF)>>5 | (self.channels[2] & 0x07FF)<<6
+        packet[4] = (self.channels[2] & 0x07FF)>>2
+        packet[5] = (self.channels[2] & 0x07FF)>>10 | (self.channels[3] & 0x07FF)<<1
+        packet[6] = (self.channels[3] & 0x07FF)>>7 | (self.channels[4] & 0x07FF)<<4
+        packet[7] = (self.channels[4] & 0x07FF)>>4 | (self.channels[5] & 0x07FF)<<7
+        packet[8] = (self.channels[5] & 0x07FF)>>1
+        packet[9] =  (self.channels[5] & 0x07FF)>>9 | (self.channels[6] & 0x07FF)<<2
+        packet[10] = (self.channels[6] & 0x07FF)>>6 | (self.channels[7] & 0x07FF)<<5
+        packet[11] = (self.channels[7] & 0x07FF)>>3
+        packet[12] = self.channels[8] & 0x07FF
+        packet[13] = (self.channels[8] & 0x07FF)>>8 | (self.channels[9] & 0x07FF)<<3
+        packet[14] = (self.channels[9] & 0x07FF)>>5 | (self.channels[10] & 0x07FF)<<6
+        packet[15] = (self.channels[10] & 0x07FF)>>2
+        packet[16] = (self.channels[10] & 0x07FF)>>10 | (self.channels[11] & 0x07FF)<<1
+        packet[17] = (self.channels[11] & 0x07FF)>>7 | (self.channels[12] & 0x07FF)<<4
+        packet[18] = (self.channels[12] & 0x07FF)>>4 | (self.channels[13] & 0x07FF)<<7
+        packet[19] = (self.channels[13] & 0x07FF)>>1
+        packet[20] = (self.channels[13] & 0x07FF)>>9 | (self.channels[14] & 0x07FF)<<2
+        packet[21] = (self.channels[14] & 0x07FF)>>6 | (self.channels[15] & 0x07FF)<<5
+        packet[22] = (self.channels[15] & 0x07FF)>>3
+        packet[23] = 0xFF
+        packet[24] = 0xFF
+
+        return packet
+        
+    def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.007):
         """
         Serial port on Raspberry Pi 4 ground node is /dev/ttyAMA#
         
@@ -2152,26 +2146,26 @@ class SBUSEncoder:
                                   stopbits=serial.STOPBITS_TWO)
         
         ##We are now creating a thread timer and controling it  
-        self.timer_fcn = RepeatTimer(0.014, self.send_sbus_msg)  
+        self.timer_fcn = RepeatTimer(period_packet, self.send_sbus_msg)  
         #self.timer_fcn = threading.Timer(0.07, self.send_sbus_msg)  
         self.timer_fcn.start() #recalling run  
         
         print('\n[DEBUG]: SBUS threading started')
 
-    
     def stop_updating(self):
         self.timer_fcn.cancel()
     
     def send_sbus_msg(self):
-        #self.port.write(self.encoder.get_data())
-        data = self.get_data()
         
-        #print('\nDATA: ', data)
-        self.port.write(data)
+        data = self.encode_data()
+        self.port.write(data.tobytes())
     
     def update_channel(self, channel, value):
         """
-        Update the value of each channel.
+        Update the value of each channel. Slow updating function. While the 'encode_data' function is called
+        every period_packet time [ms], this function might be called within seconds order of magnitude. 
+        
+        This is a function for user.
         
         For Gremsy H16 gimbal the recommended mapping of channels is:
         Channel 5 --> Mode --> 3-position switch
@@ -2182,11 +2176,17 @@ class SBUSEncoder:
         Channel 6 --> Pan speed
 
         Args:
-            channel (int): number of the channel
+            channel (int): number of the channel: 1-16
             value (int): a number between  -100 and 100 representing the value of the channel
         """
-        scale = value + 100.
-        scale /= 200
-        #self.encoder.set_channel(channel, int(scale * 2047))
-        self.set_channel(channel, int(scale * 2047))
+        # This is from the oscilloscope
+        m, b = np.linalg.solve([[-100, 1], [100, 1]], [1864, 237])
+        
+        # What intuitively should be is
+        # np.linalg.solve([[-100, 1], [100, 1]], [0, 2047]) 
+        # or according to some repositories, for FrSky receivers:
+        # np.linalg.solve([[-100, 1], [100, 1]], [127, 1811])
+        
+        self.channels[channel-1] = int(m*value + b)
+        #self.set_channel(channel, int(scale * 2047))
     
