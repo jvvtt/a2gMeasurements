@@ -1822,7 +1822,7 @@ class HelperA2GMeasurements(object):
                     print(f"[WARNING]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
                     
                     if self.IsGimbal:
-                        self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set, ctrl_byte=0x00) # relative movement
+                        self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set) # has to be absolute movement, cause the 0 is the heading value.
                     else:
                         print('\n[WARNING]: No gimbal available, so no rotation will happen')
                 
