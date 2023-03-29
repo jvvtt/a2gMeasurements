@@ -11,26 +11,22 @@ continue_cond = True
 input('Start test?')
 
 server_ip_addr = '192.168.0.2'
-myHelper = HelperA2GMeasurements('DRONE', server_ip_addr, DBG_LVL_0=False, DBG_LVL_1=True)
+myHelper = HelperA2GMeasurements('DRONE', server_ip_addr, DBG_LVL_0=False, DBG_LVL_1=False)
 myHelper.HelperStartA2GCom()
 print('\nStarting CLIENT...')
 time.sleep(1)
 
-size_to_compute = 3000
+size_to_compute = 1600
 try:
     while(continue_cond):
-
-        # Main thread: calculate something expensive and based on a received parameter update computation
-        sz = np.random.randint(size_to_compute, np.round(size_to_compute*(1.5)))
-        tmp = dummy_fcn(sz)
+        tmp = dummy_fcn(size_to_compute)
         data = 'Result of random matmul sum norm is ' + str(tmp)
         
         myHelper.socket_send_cmd(type_cmd='DEBUG_WIFI_RANGE', data=data)
 
         del tmp
 
-except:
+except KeyboardInterrupt:
     pass
 
-input('Stopping test...')
 myHelper.HelperA2GStopCom()

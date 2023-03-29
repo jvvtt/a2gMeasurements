@@ -1772,7 +1772,7 @@ class HelperA2GMeasurements(object):
                 self.do_setgimbal_action(rx_msg['DATA'])
             elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
                 if self.ID == 'GROUND':
-                    print('\nReceived msg from ' + self.CLIENT_ADDRESS + ' is: ' + rx_msg['DATA'])
+                    print('\nReceived msg from ' + 'client' + ' is: ' + rx_msg['DATA'])
                 elif self.ID == 'DRONE':
                     print('\nReceived msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
     
