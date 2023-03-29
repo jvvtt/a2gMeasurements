@@ -1,54 +1,44 @@
-import socket
-import time
+import json
 import numpy as np
-import threading
-from timeit import default_timer as timer
+from socket import socket
+import time
+from a2gmeasurements import HelperA2GMeasurements, GimbalRS2, GpsSignaling
 
-# Time consuming task
 def dummy_fcn(sz):
     return np.sum(np.matmul(np.random.rand(sz,sz), np.random.rand(sz,sz)), axis=(0,1))
 
-def receive(stop_event, sock):
-    while not stop_event.is_set():
-        data = sock.recv(1024)
-        data = data.decode()
-        if data:
-            print(data)
+continue_cond = True
+input('Start test?')
 
-ip_addr = ''
-port = 10000
+server_ip_addr = '0.0.0.0'
+myHelper = HelperA2GMeasurements('GROUND', server_ip_addr, DBG_LVL_0=True, DBG_LVL_1=True)
+myHelper.HelperStartA2GCom()
+print('\nStarting SERVER...')
+time.sleep(1)
 
-serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serverSock.bind((ip_addr, port))
-print('\nSERVER bound')
-
-serverSock.listen()
-
-(clientConn, clientAddr) = serverSock.accept()
-print(f'\nSERVER accepted connection of {clientAddr}')
-
-time.sleep(3)
-
-event_stop_thread = threading.Event()
-myThread = threading.Thread(target=receive, args=(event_stop_thread, clientConn))
-myThread.start()
-
-print('\nEntering main SERVER thread')
-
-try:    
-    # Heavy task with some randomness
-    while(True):
-        sz = np.random.randint(5000, 6000)
-        start = timer()
+size_to_compute = 2000
+times_to_send = 0
+try:
+    while(continue_cond):
+            
+        # Main thread: calculate something expensive and based on a received parameter update computation
+        sz = np.random.randint(size_to_compute, np.round(size_to_compute*(1.5)))
         tmp = dummy_fcn(sz)
-        del tmp
+        data = 'Result of random matmul sum norm is ' + str(tmp)
         
-        msg = 'Computing time of SERVER task is: ' + str(timer() - start)
-        
-        print('\n[LOCALDEBUG]: ', msg)
-        clientConn.sendall(msg.encode())           
-        print('\nSERVER messages sent')
-
+               
+        if times_to_send == 20:
+            myHelper.socket_send_cmd(type_cmd='DEBUG_WIFI_RANGE', data=data)
+            print('\nPacket just sent')
+        if (times_to_send >= 3) or (times_to_send > 30):
+            print('Computed data: ', data)
+        if times_to_send < 3:
+            myHelper.socket_send_cmd(type_cmd='DEBUG_WIFI_RANGE', data=data)
+            print('\nPacket just sent')
+            
+        times_to_send += 1
 except KeyboardInterrupt:
-    event_stop_thread.set()
-    serverSock.close()
+    pass
+
+input('Stopping test...')
+myHelper.HelperA2GStopCom()
