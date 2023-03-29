@@ -10,13 +10,13 @@ def dummy_fcn(sz):
 continue_cond = True
 input('Start test?')
 
-server_ip_addr = '192.168.0.4'
+server_ip_addr = '192.168.0.2'
 myHelper = HelperA2GMeasurements('DRONE', server_ip_addr, DBG_LVL_0=False, DBG_LVL_1=False)
 myHelper.HelperStartA2GCom()
 print('\nStarting CLIENT...')
 time.sleep(1)
 
-size_to_compute = 10
+size_to_compute = 1600
 try:
     while(continue_cond):
         tmp = dummy_fcn(size_to_compute)
@@ -27,7 +27,7 @@ try:
 
         del tmp
 
-except:
+except KeyboardInterrupt:
     pass
 
 myHelper.HelperA2GStopCom()
