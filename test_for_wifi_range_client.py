@@ -23,6 +23,7 @@ try:
         data = 'Result of random matmul sum norm is ' + str(tmp)
         
         myHelper.socket_send_cmd(type_cmd='DEBUG_WIFI_RANGE', data=data)
+        time.sleep(1)
 
         del tmp
 
