@@ -1795,7 +1795,7 @@ class HelperA2GMeasurements(object):
                 x_drone = data['X']
                 datum_coordinates = data['Datum']
                 
-                if y_drone == self.ERROR_CODE or x_drone == self.ERROR_CODE:
+                if y_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
                     print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
                     return
 
@@ -2016,7 +2016,7 @@ class HelperA2GMeasurements(object):
         self.socket = s
         
         # This will block, so keep it low
-        self.socket.settimeout(10) 
+        self.socket.settimeout(15) 
         
         # CLIENT
         if self.ID == 'DRONE':
