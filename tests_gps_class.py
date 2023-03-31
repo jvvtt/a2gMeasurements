@@ -1,5 +1,5 @@
 from a2gmeasurements import GpsSignaling
-import time
+import time, json, datetime
 
 def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
     
@@ -62,11 +62,29 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
         gpsObject.stop_gps_data_retrieval(stream_number=1, msg_type='SBF')
         gpsObject.stop_thread_gps()        
     
+def test_get_last_sbf_buffer_on_drone(gpsObject, filename, time_of_test):
+    
+    gpsObject.serial_connect()
+        
+    gpsObject.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+    gpsObject.start_thread_gps()
+        
+    time.sleep(time_of_test)
+                
+    gpsObject.stop_gps_data_retrieval(stream_number=1, msg_type='SBF')
+    gpsObject.stop_thread_gps()        
+    
+    file_to_save = json.dumps(gpsObject.SBF_frame_buffer)
+    
+    # Overwrite the file
+    fid = open(filename + '.json', 'w') 
+    fid.write(file_to_save)
+    fid.close()
         
 # Turn on all debugging verbose
 mySeptentrioGPS = GpsSignaling(DBG_LVL_0=False, DBG_LVL_1=False, DBG_LVL_2=False)
 
-which = 3
+which = 2
 
 if which == 1 or which == 'all':
     input('For Tests 1,2,3: GPS must be OFF')
@@ -77,3 +95,7 @@ elif which == 2 or which == 'all':
 elif which == 3 or which == 'all':
     input('For Tests 7,8,9: GPS must be ON and outdoor')
     test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_ENOUGH_BUFF_SZ')
+elif which == 4:
+    input('For test 4, GPS must be ON, outdoor and on drone')
+    filename = 'test_record_gps_on_drone_Torbacka_' + str(datetime.date.today())
+    test_get_last_sbf_buffer_on_drone(filename=filename, time_of_test=60)
