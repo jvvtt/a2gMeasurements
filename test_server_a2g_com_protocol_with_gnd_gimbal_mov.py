@@ -5,7 +5,7 @@ SERVER_ADDRESS = ''
 ground_a2g_helper = HelperA2GMeasurements('GROUND', SERVER_ADDRESS, DBG_LVL_0=True, DBG_LVL_1=True, IsGPS=True, IsGimbal=True)
 ground_a2g_helper.HelperStartA2GCom()
 
-
+input('\nStart experiment')
 try:    
     while(True):
         ground_a2g_helper.socket_send_cmd(type_cmd='GETGPS')
