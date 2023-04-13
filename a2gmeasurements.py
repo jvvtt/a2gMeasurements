@@ -1381,7 +1381,7 @@ class HelperA2GMeasurements(object):
                  IsGimbal=False, IsGPS=False, IsSignalGenerator=False, 
                  F0=None, L0=None,
                  SPEED=0,
-                 GPS_Stream_Interval='sec1', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
+                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
         """        
         GROUND station is the server and AIR station is the client.
 
