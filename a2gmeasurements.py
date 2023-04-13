@@ -1795,7 +1795,7 @@ class HelperA2GMeasurements(object):
                 x_drone = data['X']
                 datum_coordinates = data['Datum']
                 
-                if y_drone == self.ERROR_CODE or x_drone == self.ERROR_CODE:
+                if y_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
                     print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
                     return
 
@@ -2016,7 +2016,7 @@ class HelperA2GMeasurements(object):
         self.socket = s
         
         # This will block, so keep it low
-        self.socket.settimeout(10) 
+        self.socket.settimeout(15) 
         
         # CLIENT
         if self.ID == 'DRONE':
@@ -2095,56 +2095,76 @@ class SBUSEncoder:
     "This class is under test"
     
     def __init__(self):
-        self.channels = [1024] * 16
+        #self.channels = [1024] * 16
+        self.channels = np.ones(16, dtype=np.uint16)*1024
 
-    def bit_not(n, numbits=8):
-        return (1 << numbits) - 1 - n
+        # This is from the oscilloscope
+        #m, b = np.linalg.solve([[-99, 1], [100, 1]], [1870, 239])
+        m, b = np.linalg.solve([[-99, 1], [0, 1]], [1870, 1055])
+        
+        # What intuitively should be is
+        # m, b = np.linalg.solve([[-100, 1], [100, 1]], [0, 2047]) 
+        # or according to some repositories, for FrSky receivers:
+
+        #m, b = np.linalg.solve([[-100, 1], [100, 1]], [127, 1811])
+        #m, b = np.linalg.solve([[-100, 1], [100, 1]], [237, 1864])
+        #m, b = np.linalg.solve([[-100, 1], [100, 1]], [0, 2047])
+
+        self.m = m
+        self.b = b
     
     def set_channel(self, channel, data):
         self.channels[channel] = data & 0x07ff    
     
     def encode_data(self):
         
-        packet = np.zeros(25, dtype=np.uint8)
-        packet[0] = 0x0f
-        packet[1] = self.channels[0] & 0x07FF
-        packet[2] = (self.channels[0] & 0x07FF)>>8 | (self.channels[1] & 0x07FF)<<3
-        packet[3] = (self.channels[1] & 0x07FF)>>5 | (self.channels[2] & 0x07FF)<<6
-        packet[4] = (self.channels[2] & 0x07FF)>>2
-        packet[5] = (self.channels[2] & 0x07FF)>>10 | (self.channels[3] & 0x07FF)<<1
-        packet[6] = (self.channels[3] & 0x07FF)>>7 | (self.channels[4] & 0x07FF)<<4
-        packet[7] = (self.channels[4] & 0x07FF)>>4 | (self.channels[5] & 0x07FF)<<7
-        packet[8] = (self.channels[5] & 0x07FF)>>1
-        packet[9] =  (self.channels[5] & 0x07FF)>>9 | (self.channels[6] & 0x07FF)<<2
-        packet[10] = (self.channels[6] & 0x07FF)>>6 | (self.channels[7] & 0x07FF)<<5
-        packet[11] = (self.channels[7] & 0x07FF)>>3
-        packet[12] = self.channels[8] & 0x07FF
-        packet[13] = (self.channels[8] & 0x07FF)>>8 | (self.channels[9] & 0x07FF)<<3
-        packet[14] = (self.channels[9] & 0x07FF)>>5 | (self.channels[10] & 0x07FF)<<6
-        packet[15] = (self.channels[10] & 0x07FF)>>2
-        packet[16] = (self.channels[10] & 0x07FF)>>10 | (self.channels[11] & 0x07FF)<<1
-        packet[17] = (self.channels[11] & 0x07FF)>>7 | (self.channels[12] & 0x07FF)<<4
-        packet[18] = (self.channels[12] & 0x07FF)>>4 | (self.channels[13] & 0x07FF)<<7
-        packet[19] = (self.channels[13] & 0x07FF)>>1
-        packet[20] = (self.channels[13] & 0x07FF)>>9 | (self.channels[14] & 0x07FF)<<2
-        packet[21] = (self.channels[14] & 0x07FF)>>6 | (self.channels[15] & 0x07FF)<<5
-        packet[22] = (self.channels[15] & 0x07FF)>>3
-        packet[23] = 0xFF
-        packet[24] = 0xFF
+        #packet = np.zeros(25, dtype=np.uint8)
+        packet = [0]*25
+        packet[0] = 0x0F
+        packet[1] = self.channels[0] & 0x7F
+        packet[2] = ((self.channels[0] & 0x07FF)>>8 | (self.channels[1] & 0x07FF)<<3) & 0xFF
+        packet[3] = ((self.channels[1] & 0x07FF)>>5 | (self.channels[2] & 0x07FF)<<6) & 0xFF
+        packet[4] = ((self.channels[2] & 0x07FF)>>2) & 0xff
+        packet[5] = ((self.channels[2] & 0x07FF)>>10 | (self.channels[3] & 0x07FF)<<1) & 0xff
+        packet[6] = ((self.channels[3] & 0x07FF)>>7 | (self.channels[4] & 0x07FF)<<4) & 0xff
+        packet[7] = ((self.channels[4] & 0x07FF)>>4 | (self.channels[5] & 0x07FF)<<7) & 0xff
+        packet[8] = ((self.channels[5] & 0x07FF)>>1) & 0xff
+        packet[9] =  ((self.channels[5] & 0x07FF)>>9 | (self.channels[6] & 0x07FF)<<2) & 0xff
+        packet[10] = ((self.channels[6] & 0x07FF)>>6 | (self.channels[7] & 0x07FF)<<5) & 0xff
+        packet[11] = ((self.channels[7] & 0x07FF)>>3) & 0xff
+        packet[12] = (self.channels[8] & 0x07FF) & 0xff
+        packet[13] = ((self.channels[8] & 0x07FF)>>8 | (self.channels[9] & 0x07FF)<<3) & 0xff
+        packet[14] = ((self.channels[9] & 0x07FF)>>5 | (self.channels[10] & 0x07FF)<<6) & 0xff
+        packet[15] = ((self.channels[10] & 0x07FF)>>2) & 0xff
+        packet[16] = ((self.channels[10] & 0x07FF)>>10 | (self.channels[11] & 0x07FF)<<1) & 0xff
+        packet[17] = ((self.channels[11] & 0x07FF)>>7 | (self.channels[12] & 0x07FF)<<4) & 0xff
+        packet[18] = ((self.channels[12] & 0x07FF)>>4 | (self.channels[13] & 0x07FF)<<7) & 0xff
+        packet[19] = ((self.channels[13] & 0x07FF)>>1) & 0xff
+        packet[20] = ((self.channels[13] & 0x07FF)>>9 | (self.channels[14] & 0x07FF)<<2) & 0xff
+        packet[21] = ((self.channels[14] & 0x07FF)>>6 | (self.channels[15] & 0x07FF)<<5) & 0xff
+        packet[22] = ((self.channels[15] & 0x07FF)>>3) & 0xff
+        packet[23] = 0x00
+        packet[24] = 0x00
+
+        # This is done to cope for the hardware inversion done on sbus signal before connecting it to the gimbal.
+        for i in range(1, 23):
+            packet[i] = ~packet[i] & 0xff
 
         return packet
         
-    def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.007):
+    def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.009):
         """
         Serial port on Raspberry Pi 4 ground node is /dev/ttyAMA#
         
         """
         
         #self.encoder = SBUSEncoder()
-        self.port = serial.Serial(serial_interface, baudrate=100000,
+        self.serial_port = serial.Serial(serial_interface, baudrate=100000,
                                   parity=serial.PARITY_EVEN,
                                   stopbits=serial.STOPBITS_TWO)
         
+        print('\n[DEBUG_0]: serial port connected')
+
         ##We are now creating a thread timer and controling it  
         self.timer_fcn = RepeatTimer(period_packet, self.send_sbus_msg)  
         #self.timer_fcn = threading.Timer(0.07, self.send_sbus_msg)  
@@ -2156,9 +2176,9 @@ class SBUSEncoder:
         self.timer_fcn.cancel()
     
     def send_sbus_msg(self):
-        
         data = self.encode_data()
-        self.port.write(data.tobytes())
+        #self.serial_port.write(data.tobytes())
+        self.serial_port.write(bytes(data))
     
     def update_channel(self, channel, value):
         """
@@ -2179,14 +2199,7 @@ class SBUSEncoder:
             channel (int): number of the channel: 1-16
             value (int): a number between  -100 and 100 representing the value of the channel
         """
-        # This is from the oscilloscope
-        m, b = np.linalg.solve([[-100, 1], [100, 1]], [1864, 237])
         
-        # What intuitively should be is
-        # np.linalg.solve([[-100, 1], [100, 1]], [0, 2047]) 
-        # or according to some repositories, for FrSky receivers:
-        # np.linalg.solve([[-100, 1], [100, 1]], [127, 1811])
-        
-        self.channels[channel-1] = int(m*value + b)
+        self.channels[channel-1] = int(self.m*value + self.b)
         #self.set_channel(channel, int(scale * 2047))
     
