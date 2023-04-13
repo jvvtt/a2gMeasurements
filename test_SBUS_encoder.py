@@ -18,7 +18,7 @@ def not_move_command(sbus):
     sbus.update_channel(channel=5, value=0)
     #time.sleep(0.1)
 
-def test_speed_Y_axis(sbus, ail, mov_time):
+def test_Y_axis(sbus, ail, mov_time):
     '''
     Test the roll axis speed
 
@@ -33,7 +33,7 @@ def test_speed_Y_axis(sbus, ail, mov_time):
     not_move_command(sbus)
 
 
-def test_speed_Z_axis(sbus, ele, mov_time):
+def test_Z_axis(sbus, ele, mov_time):
     '''
     Test the pitch axis speed
 
@@ -47,7 +47,7 @@ def test_speed_Z_axis(sbus, ele, mov_time):
     time.sleep(mov_time)
     not_move_command(sbus)
 
-def test_speed_pan_axis(sbus, rud, mov_time):
+def test_pan_axis(sbus, rud, mov_time):
     '''
     Test the pan axis speed
     '''
@@ -66,71 +66,23 @@ sbus = SBUSEncoder()
 serial_interface = input('\nType serial interface:')
 print(serial_interface)
 
-sbus.start_sbus(serial_interface=serial_interface)
+sbus.start_sbus(serial_interface=serial_interface, period_packet=0.007)
 
 time.sleep(3)
 
 ###### CHANGE FROME HERE ########
 
-########
-val_ail = -30
-val_ele = 0
-val_rud = 0
-sbus.update_channel(channel=1, value=val_ail)
-sbus.update_channel(channel=2, value=val_ele)
-sbus.update_channel(channel=3, value=-100)
-sbus.update_channel(channel=4, value=val_rud)
-sbus.update_channel(channel=5, value=0)
-time.sleep(2)
-not_move_command(sbus)
+'''
+rud = -20
+mov_time_pan_axis = 20
+test_pan_axis(sbus, rud, mov_time_pan_axis)
+input('\nPress ENTER to continue to the next test')
+'''
 
-input('\nAIL: ' + str(val_ail) + ', ELE: ' + str(val_ele) + ', RUD: ' + str(val_rud) + '... CHECK:')
-
-#########
-val_ail = -20
-val_ele = 0
-val_rud = 0
-sbus.update_channel(channel=1, value=val_ail)
-sbus.update_channel(channel=2, value=val_ele)
-sbus.update_channel(channel=3, value=-100)
-sbus.update_channel(channel=4, value=val_rud)
-sbus.update_channel(channel=5, value=0)
-time.sleep(2)
-not_move_command(sbus)
-
-input('\nAIL: ' + str(val_ail) + ', ELE: ' + str(val_ele) + ', RUD: ' + str(val_rud) + '... CHECK:')
-
-###########
-val_ail = -10
-val_ele = 0
-val_rud = 0
-sbus.update_channel(channel=1, value=val_ail)
-sbus.update_channel(channel=2, value=val_ele)
-sbus.update_channel(channel=3, value=-100)
-sbus.update_channel(channel=4, value=val_rud)
-sbus.update_channel(channel=5, value=0)
-time.sleep(2)
-not_move_command(sbus)
-
-input('\nAIL: ' + str(val_ail) + ', ELE: ' + str(val_ele) + ', RUD: ' + str(val_rud) + '... CHECK:')
-
-
-########
-val_ail = 10
-val_ele = 0
-val_rud = 0
-sbus.update_channel(channel=1, value=val_ail)
-sbus.update_channel(channel=2, value=val_ele)
-sbus.update_channel(channel=3, value=-100)
-sbus.update_channel(channel=4, value=val_rud)
-sbus.update_channel(channel=5, value=0)
-time.sleep(2)
-not_move_command(sbus)
-
-input('\nAIL: ' + str(val_ail) + ', ELE: ' + str(val_ele) + ', RUD: ' + str(val_rud) + '... CHECK:')
-
-#### COPY AND PASTE CODE SECTION HERE #######
-
+ele = 20
+mov_time_elevation_axis = 5
+test_Z_axis(sbus, ele, mov_time_elevation_axis)
+#input('\nPress ENTER to continue to the next test')
 
 
 #### UNTIL HERE YOU CAN CHANGE #######
