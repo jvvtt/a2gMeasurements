@@ -575,12 +575,14 @@ class GimbalRS2(object):
         self.event_stop_thread_gimbal.set()        
             
 class GpsSignaling(object):
-    def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False):
+    def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False, save_filename='GPS'):
         # Initializations
-        # Dummy initialization
+        
+        self.save_filename = save_filename + '-' + datetime.datetime.now().strftime('%Y-%m-%d')
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
         self.stream_info = []
+        self.MAX_SBF_BUFF_LEN = 1000  # Maximum number of entries in the SBF frame buffer
 
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
@@ -839,6 +841,11 @@ class GpsSignaling(object):
                             'X': X, 'Y': Y, 'Z': Z, 'Datum': Datum}
 
         self.SBF_frame_buffer.append(pvt_data_we_care)
+        
+        if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
+            with open(self.save_filename + '.txt', 'a+') as file:      
+                file.write(json.dumps(self.SBF_frame_buffer))            
+            self.SBF_frame_buffer = []
     
     def process_pvtgeodetic_sbf_data(self, raw_data):
         """
@@ -869,7 +876,12 @@ class GpsSignaling(object):
                             'LAT': LAT, 'LON': LON, 'HEIGHT': H, 'Datum': Datum}
 
         self.SBF_frame_buffer.append(pvt_data_we_care)
-    
+        
+        if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
+            with open(self.save_filename + '.txt', 'a+') as file:      
+                file.write(json.dumps(self.SBF_frame_buffer))            
+            self.SBF_frame_buffer = []
+            
     def process_atteuler_sbf_data(self, raw_data):
         """
         Parse the AttEuler SBF sentence.
@@ -901,7 +913,12 @@ class GpsSignaling(object):
                              'Heading': Heading, 'Pitch': Pitch, 'Roll': Roll}
         
         self.SBF_frame_buffer.append(atteul_msg_useful)
-    
+        
+        if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
+            with open(self.save_filename + '.txt', 'a+') as file:      
+                file.write(json.dumps(self.SBF_frame_buffer))            
+            self.SBF_frame_buffer = []
+        
     def parse_septentrio_msg(self, rx_msg):
         """
         Parse the received message and process it depending if it is a SBF or NMEA message
@@ -2092,7 +2109,16 @@ class RepeatTimer(threading.Timer):
             self.function(*self.args,**self.kwargs)
 
 class SBUSEncoder:
-    "This class is under test"
+    """
+    Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver 
+    (idle, stop and parity bits are different than conventional UART).
+    
+    For Gremsy H16:
+    Channel 2 is assumed to be elevation (pitch)
+    Channel 4 is assumed to be pan (yaw)
+    Channel 5 is assumed to be mode (lock, follow, off)
+    
+    """
     
     def __init__(self):
         #self.channels = [1024] * 16
@@ -2182,18 +2208,7 @@ class SBUSEncoder:
     
     def update_channel(self, channel, value):
         """
-        Update the value of each channel. Slow updating function. While the 'encode_data' function is called
-        every period_packet time [ms], this function might be called within seconds order of magnitude. 
-        
-        This is a function for user.
-        
-        For Gremsy H16 gimbal the recommended mapping of channels is:
-        Channel 5 --> Mode --> 3-position switch
-        Channel 2 --> Tilt
-        Channel 4 --> Roll
-        Channel 1 --> Pan
-        Channel 3 --> Tilt speed
-        Channel 6 --> Pan speed
+        Update a channel given by "channel" with the value provided in "value".
 
         Args:
             channel (int): number of the channel: 1-16
