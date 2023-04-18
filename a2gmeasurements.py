@@ -2203,3 +2203,32 @@ class SBUSEncoder:
         self.channels[channel-1] = int(self.m*value + self.b)
         #self.set_channel(channel, int(scale * 2047))
     
+    def not_move_command(self):
+        '''
+        Update the channel so that it does not continue moving
+
+        '''
+        
+        self.update_channel(channel=1, value=0)
+        self.update_channel(channel=2, value=0)
+        self.update_channel(channel=3, value=0)
+        self.update_channel(channel=4, value=0)
+        self.update_channel(channel=5, value=0)
+        #time.sleep(0.1)
+        
+    def move_gimbal(self, ele, rud, mov_time):
+        """
+        Move the gimbal in the pan and elevationa axis
+
+        Args:
+            ele (float): should be between -100 , 100
+            mov_time (float): time in seconds 
+        """
+
+        self.update_channel(channel=1, value=0)
+        self.update_channel(channel=2, value=ele)
+        self.update_channel(channel=3, value=0)
+        self.update_channel(channel=4, value=rud)
+        self.update_channel(channel=5, value=0)
+        time.sleep(mov_time)
+        self.not_move_command()
