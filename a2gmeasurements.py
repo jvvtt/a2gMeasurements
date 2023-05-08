@@ -329,7 +329,7 @@ class GimbalRS2(object):
         """
         Sends command to request the current position of the gimbal.
 
-        BLOCKS for 0.05 s to allow the response to be received
+        BLOCKS for 0.01 s to allow the response to be received
         
         """
         
