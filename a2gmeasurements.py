@@ -24,6 +24,7 @@ from sys import platform
 from crc import Calculator, Configuration, Crc16
 from a2gUtils import geocentric2geodetic, geodetic2geocentric
 from pyproj import Transformer, Geod
+from multiprocessing.shared_memory import SharedMemory
 #import readline
 #import ctypes
 
@@ -40,9 +41,12 @@ e-mail: julian.villegas@vtt.fi
 """
 
 class GimbalRS2(object):
-    def __init__(self, speed_yaw=40, speed_pitch=40, speed_roll=40, DBG_LVL_1=False, DBG_LVL_0=False):
+    def __init__(self, speed_yaw=40, speed_pitch=40, speed_roll=40, DBG_LVL_1=False, DBG_LVL_0=False, shared_memory_buffer=None):
         '''
         Input speeds are in deg/s
+        
+        The variable shared_memory_buffer is a shared memory buffer created by the thread/process creating an instance of this class.
+        This variable stores the print messages, to later be read by the GUI application.
 
         '''
 
@@ -575,7 +579,19 @@ class GimbalRS2(object):
         self.event_stop_thread_gimbal.set()        
             
 class GpsSignaling(object):
-    def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False, save_filename='GPS'):
+    def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False, save_filename='GPS', shared_memory_buffer=None):
+        """
+        
+        The variable shared_memory_buffer is a shared memory buffer created by the thread/process creating an instance of this class.
+        This variable stores the print messages, to later be read by the GUI application.
+
+        Args:
+            DBG_LVL_1 (bool, optional): _description_. Defaults to False.
+            DBG_LVL_2 (bool, optional): _description_. Defaults to False.
+            DBG_LVL_0 (bool, optional): _description_. Defaults to False.
+            save_filename (str, optional): _description_. Defaults to 'GPS'.
+        """
+        
         # Initializations
         
         self.save_filename = save_filename + '-' + datetime.datetime.now().strftime('%Y-%m-%d')
@@ -1409,7 +1425,7 @@ class HelperA2GMeasurements(object):
             DBG_LVL_1 (bool): provides DEBUG support at the medium level (i.e printing exceptions)
             IsGimbal (bool): An RS2 Gimbal is going to be connected.
             IsGPS (bool): A Septentrio GPS is going to be connected.
-        """
+        """      
         
         self.AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN = AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN
         self.MAX_TIME_EMPTY_SOCKETS = 20 # in [s]
@@ -1429,13 +1445,16 @@ class HelperA2GMeasurements(object):
         self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY = -9.5e3
         self.SPEED_NODE = SPEED # m/s
         
+        # Shared memory buffer for storing the logging data passed to the GUI application
+        self.shared_memory_buffer = SharedMemory(create=True, size=1024)
+        
         if IsGimbal:
-            self.myGimbal = GimbalRS2()
+            self.myGimbal = GimbalRS2(shared_memory_buffer=self.shared_memory_buffer)
             self.myGimbal.start_thread_gimbal()
             print('\nGimbal RS2 thread opened')
             time.sleep(0.5)
         if IsGPS:
-            self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
+            self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True,shared_memory_buffer=self.shared_memory_buffer)
             self.mySeptentrioGPS.serial_connect()
             self.mySeptentrioGPS.serial_instance.reset_input_buffer()
             
@@ -2103,6 +2122,38 @@ class HelperA2GMeasurements(object):
         if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
             self.inst.write('RF0\n')   
 
+class LoggerQueue(object):
+    """
+    Ring buffer for logging messages to be passed to GUI app.
+    Args:
+        object (_type_): _description_
+    """
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.queue = [None] * capacity
+        self.tail = 0
+        self.head = 0
+        self.size = 0
+    
+    def Enqueue(self, msg):
+        if self.size == self.capacity:
+            #print('\n[ERROR]: Queue is full')
+            self.Dequeue()
+        
+        self.queue[self.tail] = msg
+        self.tail = (self.tail + 1) % self.capacity
+        self.size += 1
+    
+    def Dequeue(self):
+        if self.size == 0:
+            print('\n[ERROR]: Queue is empty')
+        else:
+            msg = self.queue[self.head]
+            self.queue[self.head] = None
+            self.head = (self.head + 1) % self.capacity
+            self.size -= 1
+        return msg
+
 class RepeatTimer(threading.Timer):  
     def run(self):  
         while not self.finished.wait(self.interval):  
@@ -2110,7 +2161,7 @@ class RepeatTimer(threading.Timer):
 
 class SBUSEncoder:
     """
-    Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver 
+    Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
     (idle, stop and parity bits are different than conventional UART).
     
     For Gremsy H16:

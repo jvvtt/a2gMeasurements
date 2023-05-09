@@ -1,48 +1,6 @@
-#!/usr/bin/env python
-
-
-#############################################################################
-##
-## Copyright (C) 2013 Riverbank Computing Limited.
-## Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
-## All rights reserved.
-##
-## This file is part of the examples of PyQt.
-##
-## $QT_BEGIN_LICENSE:BSD$
-## You may use this file under the terms of the BSD license as follows:
-##
-## "Redistribution and use in source and binary forms, with or without
-## modification, are permitted provided that the following conditions are
-## met:
-##   * Redistributions of source code must retain the above copyright
-##     notice, this list of conditions and the following disclaimer.
-##   * Redistributions in binary form must reproduce the above copyright
-##     notice, this list of conditions and the following disclaimer in
-##     the documentation and/or other materials provided with the
-##     distribution.
-##   * Neither the name of Nokia Corporation and its Subsidiary(-ies) nor
-##     the names of its contributors may be used to endorse or promote
-##     products derived from this software without specific prior written
-##     permission.
-##
-## THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-## "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-## LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-## A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-## OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-## SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-## LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-## DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-## THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-## (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-## OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
-## $QT_END_LICENSE$
-##
-#############################################################################
-
 #from fbs_runtime.application_context.PyQt5 import ApplicationContext
-from PyQt5.QtCore import QDateTime, Qt, QTimer
+import typing
+from PyQt5.QtCore import QDateTime, Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QDial, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
         QProgressBar, QPushButton, QRadioButton, QScrollBar, QSizePolicy,
@@ -50,6 +8,7 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QVBoxLayout, QWidget)
 
 import sys
+from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements
 
 class WidgetGallery(QDialog):
     def __init__(self, parent=None):
@@ -76,6 +35,11 @@ class WidgetGallery(QDialog):
         self.create_GPS_panel()
         self.create_log_terminal()
         self.create_Gimbal_TX_panel()
+        self.create_Gimbal_RX_panel()
+        self.create_FPGA_settings_panel()
+        self.create_Beamsteering_settings_panel()
+        self.create_Planning_Measurements_panel()
+        self.create_pdp_plot_panel()
         
         self.createTopLeftGroupBox()
         self.createTopRightGroupBox()
@@ -98,15 +62,15 @@ class WidgetGallery(QDialog):
         topLayout.addWidget(disableWidgetsCheckBox)
 
         mainLayout = QGridLayout()
-        mainLayout.addLayout(topLayout, 0, 0, 1, 2)
-        #mainLayout.addWidget(self.topLeftGroupBox, 1, 0)
+        mainLayout.addWidget(self.gimbalTXPanel, 0, 0)
+        mainLayout.addWidget(self.gimbalRXPanel, 0, 1)
         mainLayout.addWidget(self.gpsPanel, 1, 0)
-        #mainLayout.addWidget(self.topRightGroupBox, 1, 1)
-        mainLayout.addWidget(self.gimbalTXPanel, 1, 1)
-        mainLayout.addWidget(self.bottomLeftTabWidget, 2, 0)
-        mainLayout.addWidget(self.bottomRightGroupBox, 2, 1)
-        #mainLayout.addWidget(self.progressBar, 3, 0, 1, 2)
-        mainLayout.addWidget(self.log_widget, 3, 0, 1, 2)
+        mainLayout.addWidget(self.planningMeasurementsPanel, 1, 1)
+        mainLayout.addWidget(self.fpgaSettingsPanel, 2, 0)
+        mainLayout.addWidget(self.beamsteeringSettingsPanel, 2, 1)
+        mainLayout.addWidget(self.pdpPlotPanel, 3, 0, 1, 2)        
+        mainLayout.addWidget(self.log_widget, 4, 0, 1, 2)
+        
         
         self.write_to_log_terminal('This is an example text')
         self.write_to_log_terminal('This is a new line')
@@ -117,17 +81,17 @@ class WidgetGallery(QDialog):
         self.write_to_log_terminal('what ,mndsfb')
         self.write_to_log_terminal('sdafnb fd')        
                 
-        mainLayout.setRowStretch(1, 1)
-        mainLayout.setRowStretch(2, 1)
-        mainLayout.setRowStretch(3, 0)
-        
-        mainLayout.setColumnStretch(0, 1)
-        mainLayout.setColumnStretch(1, 1)
         self.setLayout(mainLayout)
 
         self.setWindowTitle("Styles")
-        self.changeStyle('Windows')
-    
+        self.changeStyle('Windows')        
+        
+        self.init_external_objs()
+
+
+    def init_external_objs(self):
+        1
+        
     def write_to_log_terminal(self, newLine):
         '''
         New line to be written into the log terminal. The number of new lines it can handle is controlled
@@ -168,14 +132,12 @@ class WidgetGallery(QDialog):
 
     def create_log_terminal(self):
         '''
-        
         Access the widget contents by using self.log_widget.setPlainText('')
         
         '''
         self.log_widget = QTextEdit(self)
         self.log_widget.setReadOnly(True) # make it read-only        
         
-    
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')
         
@@ -188,41 +150,77 @@ class WidgetGallery(QDialog):
         yaw_label = QLabel('Yaw [D]:')
         pitch_label = QLabel('Pitch [D]:')
         
-        self.abs_radio_button = QRadioButton("Absolute")
-        self.rel_radio_button = QRadioButton("Relative")        
-        self.abs_radio_button.setChecked(True)
+        self.tx_abs_radio_button = QRadioButton("Absolute")
+        self.tx_rel_radio_button = QRadioButton("Relative")        
+        self.tx_abs_radio_button.setChecked(True)
         
-        self.yaw_value_text_edit = QLineEdit('')
-        self.pitch_value_text_edit = QLineEdit('')
+        self.tx_yaw_value_text_edit = QLineEdit('')
+        self.tx_pitch_value_text_edit = QLineEdit('')
         
-        self.step_manual_move_gimbal_text_edit = QLineEdit('')
+        self.tx_step_manual_move_gimbal_text_edit = QLineEdit('')
         
-        self.gimbal_manual_move_push_button = QPushButton('Move')
-        self.gimbal_move_left_push_button = QPushButton('<-')
-        self.gimbal_move_right_push_button = QPushButton('->')
-        self.gimbal_move_up_push_button = QPushButton('^')
-        self.gimbal_move_down_push_button = QPushButton('v')
+        self.tx_gimbal_manual_move_push_button = QPushButton('Move')
+        self.tx_gimbal_move_left_push_button = QPushButton('<-')
+        self.tx_gimbal_move_right_push_button = QPushButton('->')
+        self.tx_gimbal_move_up_push_button = QPushButton('^')
+        self.tx_gimbal_move_down_push_button = QPushButton('v')
         
         layout = QGridLayout()
-        layout.addWidget(self.abs_radio_button, 0, 0, 1, 3)
-        layout.addWidget(self.rel_radio_button, 0, 3, 1, 3)
-        layout.addWidget(self.gimbal_manual_move_push_button, 0, 6, 1, 4)
+        layout.addWidget(self.tx_abs_radio_button, 0, 0, 1, 3)
+        layout.addWidget(self.tx_rel_radio_button, 0, 3, 1, 3)
+        layout.addWidget(self.tx_gimbal_manual_move_push_button, 0, 6, 1, 4)
         
         layout.addWidget(yaw_label, 1, 0, 1, 1)
-        layout.addWidget(self.yaw_value_text_edit, 1, 1, 1, 4)
+        layout.addWidget(self.tx_yaw_value_text_edit, 1, 1, 1, 4)
         layout.addWidget(pitch_label, 1, 5, 1, 1)        
-        layout.addWidget(self.pitch_value_text_edit, 1, 6, 1, 4)
+        layout.addWidget(self.tx_pitch_value_text_edit, 1, 6, 1, 4)
         
-        layout.addWidget(self.gimbal_move_left_push_button, 3, 2, 1, 2)
-        layout.addWidget(self.gimbal_move_right_push_button, 3, 6, 1, 2)
-        layout.addWidget(self.gimbal_move_up_push_button, 2, 4, 1, 2)
-        layout.addWidget(self.gimbal_move_down_push_button, 4, 4, 1, 2)
-        layout.addWidget(self.step_manual_move_gimbal_text_edit, 3, 4, 1, 2)
+        layout.addWidget(self.tx_gimbal_move_left_push_button, 3, 2, 1, 2)
+        layout.addWidget(self.tx_gimbal_move_right_push_button, 3, 6, 1, 2)
+        layout.addWidget(self.tx_gimbal_move_up_push_button, 2, 4, 1, 2)
+        layout.addWidget(self.tx_gimbal_move_down_push_button, 4, 4, 1, 2)
+        layout.addWidget(self.tx_step_manual_move_gimbal_text_edit, 3, 4, 1, 2)
         
         self.gimbalTXPanel.setLayout(layout)
         
     def create_Gimbal_RX_panel(self):
         self.gimbalRXPanel = QGroupBox('Gimbal RX')
+        
+        yaw_label = QLabel('Yaw [D]:')
+        pitch_label = QLabel('Pitch [D]:')
+        
+        self.rx_abs_radio_button = QRadioButton("Absolute")
+        self.rx_rel_radio_button = QRadioButton("Relative")        
+        self.rx_abs_radio_button.setChecked(True)
+        
+        self.rx_yaw_value_text_edit = QLineEdit('')
+        self.rx_pitch_value_text_edit = QLineEdit('')
+        
+        self.rx_step_manual_move_gimbal_text_edit = QLineEdit('')
+        
+        self.rx_gimbal_manual_move_push_button = QPushButton('Move')
+        self.rx_gimbal_move_left_push_button = QPushButton('<-')
+        self.rx_gimbal_move_right_push_button = QPushButton('->')
+        self.rx_gimbal_move_up_push_button = QPushButton('^')
+        self.rx_gimbal_move_down_push_button = QPushButton('v')
+        
+        layout = QGridLayout()
+        layout.addWidget(self.rx_abs_radio_button, 0, 0, 1, 3)
+        layout.addWidget(self.rx_rel_radio_button, 0, 3, 1, 3)
+        layout.addWidget(self.rx_gimbal_manual_move_push_button, 0, 6, 1, 4)
+        
+        layout.addWidget(yaw_label, 1, 0, 1, 1)
+        layout.addWidget(self.rx_yaw_value_text_edit, 1, 1, 1, 4)
+        layout.addWidget(pitch_label, 1, 5, 1, 1)        
+        layout.addWidget(self.rx_pitch_value_text_edit, 1, 6, 1, 4)
+        
+        layout.addWidget(self.rx_gimbal_move_left_push_button, 3, 2, 1, 2)
+        layout.addWidget(self.rx_gimbal_move_right_push_button, 3, 6, 1, 2)
+        layout.addWidget(self.rx_gimbal_move_up_push_button, 2, 4, 1, 2)
+        layout.addWidget(self.rx_gimbal_move_down_push_button, 4, 4, 1, 2)
+        layout.addWidget(self.rx_step_manual_move_gimbal_text_edit, 3, 4, 1, 2)
+        
+        self.gimbalRXPanel.setLayout(layout)
     
     def create_Planning_Measurements_panel(self):
         self.planningMeasurementsPanel = QGroupBox('Planning measurements')
