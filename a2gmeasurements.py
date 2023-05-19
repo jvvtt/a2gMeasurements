@@ -2298,3 +2298,10 @@ class SBUSEncoder:
         self.update_channel(channel=5, value=0)
         time.sleep(mov_time)
         self.not_move_command()
+
+class dummyErase():
+    def __init__(self):
+        print("Redirecting output to qtextedit")
+        
+    def test2(self):
+        print("123456789abcdefghijklmnopqrstuvwxyz")

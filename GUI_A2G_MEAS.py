@@ -8,14 +8,22 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QVBoxLayout, QWidget)
 
 import sys
-from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements
+from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, dummyErase
+
+class CustomTextEdit(QTextEdit):
+    def write(self, text):
+        cursor = self.textCursor()
+        cursor.movePosition(cursor.End)
+        cursor.insertText(text)
+        self.setTextCursor(cursor)
+        self.ensureCursorVisible()
 
 class WidgetGallery(QDialog):
     def __init__(self, parent=None):
         super(WidgetGallery, self).__init__(parent)
 
         # Parameters of the GUI
-        self.number_lines_log_terminal = 5
+        self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
         
         self.originalPalette = QApplication.palette()
@@ -90,7 +98,15 @@ class WidgetGallery(QDialog):
 
 
     def init_external_objs(self):
-        1
+        b=dummyErase()
+        b.test2()
+        b.test2()
+        b.test2()
+        b.test2()
+        b.test2()
+        b.test2()
+        b.test2()
+        b.test2()
         
     def write_to_log_terminal(self, newLine):
         '''
@@ -135,8 +151,13 @@ class WidgetGallery(QDialog):
         Access the widget contents by using self.log_widget.setPlainText('')
         
         '''
-        self.log_widget = QTextEdit(self)
+        self.log_widget = CustomTextEdit(self)
+        
+        #self.log_widget = QTextEdit(self)
         self.log_widget.setReadOnly(True) # make it read-only        
+        
+        # Redirect output of myFunc to the QTextEdit widget
+        sys.stdout = self.log_widget
         
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')
