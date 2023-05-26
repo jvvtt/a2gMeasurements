@@ -2121,39 +2121,6 @@ class HelperA2GMeasurements(object):
         
         if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
             self.inst.write('RF0\n')   
-
-class LoggerQueue(object):
-    """
-    Ring buffer for logging messages to be passed to GUI app.
-    Args:
-        object (_type_): _description_
-    """
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.queue = [None] * capacity
-        self.tail = 0
-        self.head = 0
-        self.size = 0
-    
-    def Enqueue(self, msg):
-        if self.size == self.capacity:
-            #print('\n[ERROR]: Queue is full')
-            self.Dequeue()
-        
-        self.queue[self.tail] = msg
-        self.tail = (self.tail + 1) % self.capacity
-        self.size += 1
-    
-    def Dequeue(self):
-        if self.size == 0:
-            print('\n[ERROR]: Queue is empty')
-        else:
-            msg = self.queue[self.head]
-            self.queue[self.head] = None
-            self.head = (self.head + 1) % self.capacity
-            self.size -= 1
-        return msg
-
 class RepeatTimer(threading.Timer):  
     def run(self):  
         while not self.finished.wait(self.interval):  
@@ -2298,7 +2265,6 @@ class SBUSEncoder:
         self.update_channel(channel=5, value=0)
         time.sleep(mov_time)
         self.not_move_command()
-
 class dummyErase():
     def __init__(self):
         print("Redirecting output to qtextedit")
