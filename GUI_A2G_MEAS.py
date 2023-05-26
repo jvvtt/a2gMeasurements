@@ -7,6 +7,9 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QSlider, QSpinBox, QStyleFactory, QTableWidget, QTabWidget, QTextEdit,
         QVBoxLayout, QWidget)
 
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
 import sys
 from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, dummyErase
 
@@ -47,6 +50,7 @@ class WidgetGallery(QDialog):
         self.create_FPGA_settings_panel()
         self.create_Beamsteering_settings_panel()
         self.create_Planning_Measurements_panel()
+        self.create_GPS_visualization_panel()
         self.create_pdp_plot_panel()
         
         self.createTopLeftGroupBox()
@@ -77,7 +81,8 @@ class WidgetGallery(QDialog):
         mainLayout.addWidget(self.fpgaSettingsPanel, 2, 0)
         mainLayout.addWidget(self.beamsteeringSettingsPanel, 2, 1)
         mainLayout.addWidget(self.pdpPlotPanel, 3, 0, 1, 2)        
-        mainLayout.addWidget(self.log_widget, 4, 0, 1, 2)
+        mainLayout.addWidget(self.gps_vis_panel, 4, 0, 1, 2)
+        mainLayout.addWidget(self.log_widget, 5, 0, 1, 2)
         
         
         self.write_to_log_terminal('This is an example text')
@@ -158,7 +163,7 @@ class WidgetGallery(QDialog):
         
         # Redirect output of myFunc to the QTextEdit widget
         sys.stdout = self.log_widget
-        
+    
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')
         
@@ -245,7 +250,43 @@ class WidgetGallery(QDialog):
     
     def create_Planning_Measurements_panel(self):
         self.planningMeasurementsPanel = QGroupBox('Planning measurements')
+    
+    def create_GPS_visualization_panel(self):
+        self.gps_vis_panel = QGroupBox('GPS visualization')
+        # Create a Figure object
+        fig = Figure()
+
+        # Create a FigureCanvas widget
+        canvas = FigureCanvas(fig)
+
+        # Create a QVBoxLayout to hold the canvas
+        layout = QVBoxLayout()
+        layout.addWidget(canvas)
+
+        # Set the layout of the group box
+        self.gps_vis_panel.setLayout(layout)
+
+        # Create a subplot on the Figure
+        ax = fig.add_subplot(111)
+
         
+        vis = GPSVis(map_path='test_map_micronova.png',  # Path to map downloaded from the OSM.
+             points=(upper_left['LAT'], upper_left['LON'], lower_right['LAT'], lower_right['LON'])) # Two coordinates of the map (upper left, lower right)
+
+        vis.update_map_marker((hi_q['LAT'], hi_q['LON']), r=10)
+        vis.update_map_marker((fut_hub['LAT'], fut_hub['LON']), r=10)
+        vis.update_map_marker((fat_liz['LAT'], fat_liz['LON']), r=10)
+        vis.update_map_marker((aalto_metro['LAT'], aalto_metro['LON']), r=10)
+        vis.plot_map(output='-')
+        
+        # Plot some data
+        x = [1, 2, 3, 4, 5]
+        y = [2, 4, 6, 8, 10]
+        ax.plot(x, y)
+
+        # Refresh the canvas
+        canvas.draw()
+       
     def create_GPS_panel(self):
         self.gpsPanel = QGroupBox('GPS Information')
         
