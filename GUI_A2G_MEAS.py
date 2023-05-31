@@ -1,4 +1,8 @@
-#from fbs_runtime.application_context.PyQt5 import ApplicationContext
+import paramiko
+import ping3
+import time
+import can#from fbs_runtime.application_context.PyQt5 import ApplicationContext
+from serial.tools.list_ports import comports
 import typing
 from PyQt5.QtCore import QDateTime, Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
@@ -12,6 +16,11 @@ from matplotlib.figure import Figure
 
 import sys
 from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, dummyErase
+from a2gUtils import GpsOnMap
+
+import tkinter as tk
+from tkinter import simpledialog, messagebox
+
 
 class CustomTextEdit(QTextEdit):
     def write(self, text):
@@ -101,17 +110,153 @@ class WidgetGallery(QDialog):
         
         self.init_external_objs()
 
+    
+    def check_if_ssh_reached(self, drone_ip, username, password):
+        response_2_ping_network = ping3.ping(drone_ip, timeout=7)
+        if response_2_ping_network is not None:
+            try:
+                remote_client_conn = paramiko.SSHClient()
+                remote_client_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                remote_client_conn.connect(drone_ip, username=username, password=password)
+                self.remote_client_conn = remote_client_conn
+                print("[DEBUG]: SSH connection successful.")            
+            except paramiko.AuthenticationException:
+                print("SSH Authentication failed. Please check your credentials.")
+                response_2_ssh = None
+            except paramiko.SSHException as ssh_exception:
+                print(f"Unable to establish SSH connection: {ssh_exception}")
+                response_2_ssh = None
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                response_2_ssh = None
+            else:
+                response_2_ssh = 1
+                self.check_if_drone_fpga_connected()
+        
+        return response_2_ping_network, response_2_ssh
+    
+    def check_if_drone_fpga_connected(self, drone_fpga_static_ip_addr='10.1.1.40'):
+        # Execute the command and obtain the input, output, and error streams
+        stdin, stdout, stderr = self.remote_client_conn.exec_command('ping ' + drone_fpga_static_ip_addr)
 
+        # Read the output from the command
+        output = stdout.read().decode('utf-8')
+        error = stderr.read().decode('utf-8')
+
+        # Print the output and error, if any
+        if output:
+            print(f"Command output:\n{output}")
+        if error:
+            print(f"Command error:\n{error}")
+    
+    def check_if_gnd_fpga_connected(self, gnd_fpga_static_ip_addr='10.1.1.30'):
+        response_2_ping_gnd = ping3.ping(gnd_fpga_static_ip_addr, timeout=7)
+        if response_2_ping_gnd is not None:
+            print("[DEBUG]: GND FPGA is detected in GND node")
+        else:
+            print("[DEBUG]: GND FPGA is NOT detected in GND node")
+
+        return response_2_ping_gnd
+    
+    def check_if_gimbal_connected(self):
+        """
+        Function for checking if gimbal RS2 is connected on ground node.
+
+        Returns:
+            MODE_NO_GIMBAL (int): 0 if gimbal RS2 is connected. 
+                                  1 if gimbal is NOT connected and USER wants to continue WITHOUT gimbal.
+                                  2 if gimbal is NOT connected and USER wants to continue WITH gimbal.
+        """
+               
+        try:
+            # Check if gimbal is connected by looking if connection is established
+            bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=1000000)
+        except Exception as e:
+            tmp = messagebox.askyesno(title="NO GIMBAL CONNECTED", message="No ground gimbal was detected. The system can not work without a ground gimbal. You can always control the gimbal manually, but check that the gimbal is powered on and connected to the computer. \n\nIf the gimbal is NOT connected to the computer but powered on, the system can work, but no information about gimbal direction will be obtained, neither control of the gimbal through the GUI will be allowed. \n\nDo you want to continue without a gimbal connection?")
+            if tmp:
+                MODE_NO_GIMBAL = 1
+            else:
+                MODE_NO_GIMBAL = 2
+        else:
+            bus.shutdown()
+            del bus
+            MODE_NO_GIMBAL = 0
+        
+        return MODE_NO_GIMBAL
+    
+    def check_if_gnd_gps_connected(self):
+        """
+        Function for checking if gps is connected to the ground node.
+
+        Returns:
+            MODE_NO_GPS (int): 0 if gps is connected. 
+                               1 if gps is NOT connected and USER wants to continue WITHOUT gps.
+                               2 if gps is NOT connected and USER wants to continue WITH gps.
+        """
+        
+        tmp = []
+        for (_, desc, _) in sorted(comports()):
+            tmp.append("Septentrio" in desc)
+        if any(tmp):
+            MODE_NO_GPS = 0
+        else:
+            tmp = messagebox.askyesno(title="NO GPS CONNECTED", message="No gps was detected. The system can work without the GPS, but no ground GPS coordinates will be saved and FOLLOWING MODE will not be available. \n\nDo you want to continue without gps?")
+            
+            if tmp:
+                MODE_NO_GPS = 1
+            else:
+                MODE_NO_GPS = 2
+            
+        return MODE_NO_GPS
+    
     def init_external_objs(self):
-        b=dummyErase()
-        b.test2()
-        b.test2()
-        b.test2()
-        b.test2()
-        b.test2()
-        b.test2()
-        b.test2()
-        b.test2()
+        ROOT = tk.Tk()
+
+        ROOT.withdraw()
+        
+        #SERVER_ADDRESS = '192.168.0.2' # default address, but needs to be checked
+        SERVER_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
+        CLIENT_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
+        
+        if SERVER_ADDRESS is None and CLIENT_ADDRESS is None:
+            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
+        if SERVER_ADDRESS is None and CLIENT_ADDRESS is not None:
+            1
+        if SERVER_ADDRESS is not None and CLIENT_ADDRESS is None:
+            1
+        if SERVER_ADDRESS is not None and CLIENT_ADDRESS is not None:
+            1
+        
+        SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
+        SUCCESS_PING_CLIENT, SUCCESS_SSH = self.check_if_ssh_reached(CLIENT_ADDRESS, "manifold-uav-vtt", "mfold2208")
+        
+        MODE_NO_GIMBAL = self.check_if_gimbal_connected()        
+        MODE_NO_GPS = self.check_if_gnd_gps_connected()
+        
+        while(MODE_NO_GIMBAL == 2):
+            MODE_NO_GIMBAL = self.check_if_gimbal_connected()
+            time.sleep(0.5)
+                
+        while(MODE_NO_GPS == 2):
+            MODE_NO_GPS = self.check_if_gnd_gps_connected()
+            time.sleep(0.5)        
+        
+        if MODE_NO_GIMBAL == 0 and MODE_NO_GPS == 0:        
+            self.myhelpera2g = HelperA2GMeasurements('GROUND', SERVER_ADDRESS, 
+                 DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=True, IsGPS=True, 
+                 GPS_Stream_Interval='sec1', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
+        
+            print(self.myhelpera2g.myGimbal.GIMBAL_CONN_SUCCES)
+            print(self.myhelpera2g.mySeptentrioGPS.GPS_CONN_SUCCESS)
+            
+            disc_what = []
+            if self.myhelpera2g.myGimbal.GIMBAL_CONN_SUCCES:
+                disc_what.append('GIMBAL')
+            if self.myhelpera2g.mySeptentrioGPS.GPS_CONN_SUCCESS:
+                disc_what.append('GPS')
+            
+            if len(disc_what) > 0:            
+                self.myhelpera2g.HelperA2GStopCom(DISC_WHAT=disc_what)
         
     def write_to_log_terminal(self, newLine):
         '''
@@ -269,7 +414,11 @@ class WidgetGallery(QDialog):
         # Create a subplot on the Figure
         ax = fig.add_subplot(111)
 
-        
+        hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
+        mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig, ax=ax, air_coord=hi_q)
+
+        mygpsonmap.show_air_moving()
+        '''
         vis = GPSVis(map_path='test_map_micronova.png',  # Path to map downloaded from the OSM.
              points=(upper_left['LAT'], upper_left['LON'], lower_right['LAT'], lower_right['LON'])) # Two coordinates of the map (upper left, lower right)
 
@@ -286,7 +435,14 @@ class WidgetGallery(QDialog):
 
         # Refresh the canvas
         canvas.draw()
-       
+        '''
+        
+        
+        
+        
+        
+        
+        
     def create_GPS_panel(self):
         self.gpsPanel = QGroupBox('GPS Information')
         

@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Arc
 from matplotlib.transforms import IdentityTransform, TransformedBbox, Bbox
+from matplotlib.animation import FuncAnimation
 from pyproj import CRS, Transformer, Geod
 import pandas as pd
 from PIL import Image, ImageDraw
@@ -10,6 +11,7 @@ from selenium import webdriver
 import folium
 import os
 import math
+from pyrosm import OSM, get_data
 
 def geocentric2geodetic(X, Y, Z, EPSG_GEODETIC=4979, EPSG_GEOCENTRIC=4978):
     """
@@ -259,7 +261,111 @@ class GPSVis(object):
 
         zoom = min(lat_zoom, lng_zoom)
         return int(zoom)
+
+
+
+class GpsOnMap(object):
     
+    def __init__(self, path_to_osmpbf, canvas=None,fig=None, ax=None, air_coord=None, gnd_coord=None):
+        """
+        This is a handler for the canvas element where gps coords are plot
+
+        It requires an .osm.pbf picture of the map get from https://extract.bbbike.org/
+        
+        Args:
+            path_to_osmpbf (str): path to .osm.pbf file
+            canvas (widget, optional): canvas widget from app. Defaults to None.
+            fig (fig, optional): _description_. Defaults to None.
+            ax (ax, optional): _description_. Defaults to None.
+            air_coord (dictionary, optional): the keys of the dictionary should be "LAT" and "LON". Defaults to None.
+            gnd_coord (dictionary, optional): the keys of the dictionary should be "LAT" and "LON". Defaults to None.
+        """
+        
+        #plt.rcParams['animation.html'] = 'jshtml'
+        if ax is None and fig is None:
+            fig, ax = plt.subplots()
+        elif ax is not None and fig is None:
+            print('\n[DEBUG]: figure handle not provided')
+        elif fig is not None and ax is None:
+            print('\n[DEBUG]: axes handle not provided')
+        
+        self.ax = ax
+        self.fig = fig
+        self.canvas = canvas
+        
+        # Initialize the OSM parser object
+        osm = OSM(path_to_osmpbf)
+        
+        # Plot cycling, driving and walking layers, and also buildings
+        cycling_net = osm.get_network(network_type="cycling")
+        drive_net = osm.get_network(network_type="driving")
+        walking_net = osm.get_network(network_type="walking")
+        buildings = osm.get_buildings()
+
+        cycling_net.plot(ax=self.ax)
+        buildings.plot(ax=self.ax)
+        walking_net.plot(ax=self.ax)
+        
+        self.air_coord = air_coord
+        
+        if air_coord is not None:
+            self.rx_pos, =self.ax.plot(air_coord['LON'], air_coord['LAT'], 'b+', markersize=15)
+
+        self.test_cnt = 1
+        self.fut_hub = {'LAT': 60.18650, 'LON': 24.81350}
+        self.rx_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
+        
+        if canvas is None:
+            plt.show()
+        else:
+            self.canvas.draw()
+        
+    def show_air_moving(self):     
+        """
+        Updates the plot with the new positions
+        """
+        
+        if self.test_cnt % 2:
+            self.rx_pos.set_data(self.fut_hub['LON'], self.fut_hub['LAT'])
+        else:
+            self.rx_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
+        
+        if self.canvas is None:
+            plt.show()
+        else:
+            self.canvas.draw()
+        
+        self.test_cnt = self.test_cnt + 1
+        
+    def animate(self, i):
+        """
+        Function to be passed to FuncAnimation
+
+        Args:
+            i (int): frame number
+        """
+        if i % 2:
+            self.rx_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
+        else:
+            fut_hub = {'LAT': 60.18650, 'LON': 24.81350}
+            self.rx_pos.set_data(fut_hub['LON'], fut_hub['LAT'])
+
+    def show(self, frames=None, interval=100):
+        """
+        Executes the animation for the number of frames. It executes a function 
+        for the given number of frames.
+
+        Args:
+            frames (_type_, optional): _description_. Defaults to None.
+            interval (int, optional): _description_. Defaults to 100.
+        """
+        anim = FuncAnimation(self.fig, self.animate, frames=frames, interval=interval)
+        if self.canvas is None:
+            plt.show()
+        else:
+            self.canvas.draw()
+
+
 class AngleAnnotation(Arc):
     """
     Draws an arc between two vectors which appears circular in display space. Implementation
