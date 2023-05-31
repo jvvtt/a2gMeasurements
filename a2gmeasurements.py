@@ -24,9 +24,8 @@ from sys import platform
 from crc import Calculator, Configuration, Crc16
 from a2gUtils import geocentric2geodetic, geodetic2geocentric
 from pyproj import Transformer, Geod
-#import readline
-#import ctypes
-
+from multiprocessing.shared_memory import SharedMemory
+from PyQt5.QtCore import pyqtSignal
 
 """
 Author: Julian D. Villegas G.
@@ -43,7 +42,7 @@ class GimbalRS2(object):
     def __init__(self, speed_yaw=40, speed_pitch=40, speed_roll=40, DBG_LVL_1=False, DBG_LVL_0=False):
         '''
         Input speeds are in deg/s
-
+        
         '''
 
         self.header = 0xAA
@@ -329,7 +328,7 @@ class GimbalRS2(object):
         """
         Sends command to request the current position of the gimbal.
 
-        BLOCKS for 0.05 s to allow the response to be received
+        BLOCKS for 0.01 s to allow the response to be received
         
         """
         
@@ -556,13 +555,21 @@ class GimbalRS2(object):
         Args:
             bitrate (int, optional): Bitrate used for pcan device. Defaults to 1000000.
         """
-        
-        bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=bitrate)
-        self.actual_bus = bus
+        try:
+            bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=bitrate)
+            self.actual_bus = bus
+        except Exception as e:
+            print(e)
+            self.GIMBAL_CONN_SUCCES = False
+            print("\n[DEBUG]: Gimbal thread NOT started")
+            return
 
         self.event_stop_thread_gimbal = threading.Event()                              
         t_receive = threading.Thread(target=self.receive, args=(self.actual_bus,self.event_stop_thread_gimbal))
         t_receive.start()
+        
+        self.GIMBAL_CONN_SUCCES = True
+        print("\n[DEBUG]: Gimbal thread started")
 
         #self.setSpeedControl(int(self.SPEED_YAW*10), int(self.SPEED_ROLL*10), int(self.SPEED_PITCH*10))
 
@@ -576,6 +583,15 @@ class GimbalRS2(object):
             
 class GpsSignaling(object):
     def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False, save_filename='GPS'):
+        """
+
+        Args:
+            DBG_LVL_1 (bool, optional): _description_. Defaults to False.
+            DBG_LVL_2 (bool, optional): _description_. Defaults to False.
+            DBG_LVL_0 (bool, optional): _description_. Defaults to False.
+            save_filename (str, optional): _description_. Defaults to 'GPS'.
+        """
+        
         # Initializations
         
         self.save_filename = save_filename + '-' + datetime.datetime.now().strftime('%Y-%m-%d')
@@ -617,7 +633,7 @@ class GpsSignaling(object):
      
     def socket_receive(self, stop_event):
         """
-        Callback function to be called when incoming gps data
+        OUTDATED. TO BE IMPLEMENTED. OR SIMPLY USE THE SERIAL CONNECTION. MAINTAINED FOR BACKWARDS COMPATIBILITY.
 
         Args:
             stop_event (threading): the threading event that stops the TCP/IP com
@@ -653,14 +669,24 @@ class GpsSignaling(object):
         # Look for the first Virtual Com in Septentrio receiver. It is assumed that it is available, 
         # meaning that it has been closed by user if was used before.        
         for (this_port, desc, _) in sorted(comports()):
+            
             # Linux CDC-ACM driver
             if 'Septentrio USB Device - CDC Abstract Control Model (ACM)' in desc:
-                    self.serial_port = '/dev/ttyACM0'
-                    self.interface_number = 1
-            # Windows driver
-            elif 'Septentrio Virtual USB COM Port 1' in desc:
+                    #self.serial_port = '/dev/ttyACM0'
                     self.serial_port = this_port
                     self.interface_number = 1
+            # Windows driver
+            elif 'Septentrio Virtual USB COM Port 1' in desc: # Choose the first virtual COM port
+                    self.serial_port = this_port
+                    self.interface_number = 1
+        
+        if self.serial_port is None:
+            self.GPS_CONN_SUCCESS = False
+            print("\n[DEBUG]: NO GPS found in any serial port")
+            return
+        else:
+            self.GPS_CONN_SUCCESS = True
+            print("\n[DEBUG]: GPS found in one serial port")
         
         serial_instance = None
         while serial_instance is None:
@@ -1153,6 +1179,7 @@ class GpsSignaling(object):
             t_receive = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_gps))
 
         t_receive.start()
+        print('\n[DEBUG]: Septentrio GPS thread opened')
         time.sleep(0.5)
         
     def stop_thread_gps(self, interface='USB'):
@@ -1169,6 +1196,8 @@ class GpsSignaling(object):
             
         elif interface =='IP':
             self.socket.close()
+        
+        print('\n[DEBUG]: Septentrio GPS thread closed')
         
     def sendCommandGps(self, cmd, interface='USB'):
         """
@@ -1409,7 +1438,15 @@ class HelperA2GMeasurements(object):
             DBG_LVL_1 (bool): provides DEBUG support at the medium level (i.e printing exceptions)
             IsGimbal (bool): An RS2 Gimbal is going to be connected.
             IsGPS (bool): A Septentrio GPS is going to be connected.
-        """
+            SPEED (float): the speed of the node. If the node is GROUND it should be 0 (gnd node does not move) as it is by default.
+            GPS_Stream_Interval (str): check the GPS manual for the list of strings available. This is used to set the regularity at which 
+                                       the gps receiver asks its gps coordinates.
+            AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN (float): this is an estimation of the average time betweel calls of the socket_receive function 
+                                                          of this class. It is heavily dependent on the computer hardware. This value is not critical
+                                                          and is used to determine a maximum timeout of not receiving socket messages. Specifically,
+                                                          this parameter is used in conjunction with MAX_TIME_EMPTY_SOCKETS to determine the timeout 
+                                                          in terms of the number of empty sockets during a part of the connection.
+        """                                               
         
         self.AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN = AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN
         self.MAX_TIME_EMPTY_SOCKETS = 20 # in [s]
@@ -1432,22 +1469,22 @@ class HelperA2GMeasurements(object):
         if IsGimbal:
             self.myGimbal = GimbalRS2()
             self.myGimbal.start_thread_gimbal()
-            print('\nGimbal RS2 thread opened')
             time.sleep(0.5)
         if IsGPS:
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
             self.mySeptentrioGPS.serial_connect()
-            self.mySeptentrioGPS.serial_instance.reset_input_buffer()
             
-            if self.ID == 'DRONE':
-                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian')
-            elif self.ID == 'GROUND':
-                self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
-            
-            #self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
-            self.mySeptentrioGPS.start_thread_gps()
-            print('\nSeptentrio GPS thread opened')
-            time.sleep(0.5)
+            if self.mySeptentrioGPS.GPS_CONN_SUCCESS:
+                self.mySeptentrioGPS.serial_instance.reset_input_buffer()
+                
+                if self.ID == 'DRONE':
+                    self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian')
+                elif self.ID == 'GROUND':
+                    self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
+                
+                #self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
+                self.mySeptentrioGPS.start_thread_gps()
+                time.sleep(0.5)
         if IsSignalGenerator:
             rm = pyvisa.ResourceManager()
             inst = rm.open_resource('GPIB0::19::INSTR')
@@ -2071,7 +2108,7 @@ class HelperA2GMeasurements(object):
         Stops communications with all the devices or the specified ones in the variable 'DISC_WHAT
 
         Args:
-            DISC_WHAT (str, optional): specifies what to disconnect. Defaults to 'ALL'. Options are: 'SG', 'GIMBAL', 'GPS', 'ALL'
+            DISC_WHAT (str or list, optional): specifies what to disconnect. Defaults to 'ALL'. Options are: 'SG', 'GIMBAL', 'GPS', 'ALL'
         """
         try:   
             self.event_stop_thread_helper.set()
@@ -2081,36 +2118,55 @@ class HelperA2GMeasurements(object):
             elif self.ID == 'GROUND':
                 self.a2g_conn.close()
         except:
-            print('\nERROR closing connection: probably NO SOCKET created')         
+            print('\n[DEBUG]: ERROR closing connection: probably NO SOCKET created')         
         
-        if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
-            self.myGimbal.stop_thread_gimbal()
-            print('\nDisconnecting gimbal')
-            time.sleep(0.05)
-            self.myGimbal.actual_bus.shutdown()
+        if type(DISC_WHAT) == list:
+            for i in DISC_WHAT:
+                if self.IsGimbal and (i == 'GIMBAL'):  
+                    self.myGimbal.stop_thread_gimbal()
+                    print('\n[DEBUG]: Disconnecting gimbal')
+                    time.sleep(0.05)
+                    self.myGimbal.actual_bus.shutdown()
             
-        if self.IsGPS and (DISC_WHAT=='ALL' or DISC_WHAT == 'GPS'):  
-            for stream_info in self.mySeptentrioGPS.stream_info:
-                if int(stream) == int(stream_info['stream_number']):
-                    msg_type = stream_info['msg_type']
-                    interface = stream_info['interface']
+                if self.IsGPS and (i == 'GPS'):  
+                    for stream_info in self.mySeptentrioGPS.stream_info:
+                        if int(stream) == int(stream_info['stream_number']):
+                            msg_type = stream_info['msg_type']
+                            interface = stream_info['interface']
             
-            self.mySeptentrioGPS.stop_gps_data_retrieval(stream_number=stream, msg_type=msg_type, interface=interface)
-            print('\nStoping GPS stream')
-            self.mySeptentrioGPS.stop_thread_gps()
-            
+                        self.mySeptentrioGPS.stop_gps_data_retrieval(stream_number=stream, msg_type=msg_type, interface=interface)
+                        print('\n[DEBUG]: Stoping GPS stream')
+                        self.mySeptentrioGPS.stop_thread_gps()      
         
-        if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
-            self.inst.write('RF0\n')   
-
+                if self.IsSignalGenerator and (i == 'SG'):
+                    self.inst.write('RF0\n')   
+        else: # backwards compatibility
+            if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
+                self.myGimbal.stop_thread_gimbal()
+                print('\n[DEBUG]: Disconnecting gimbal')
+                time.sleep(0.05)
+                self.myGimbal.actual_bus.shutdown()
+                
+            if self.IsGPS and (DISC_WHAT=='ALL' or DISC_WHAT == 'GPS'):  
+                for stream_info in self.mySeptentrioGPS.stream_info:
+                    if int(stream) == int(stream_info['stream_number']):
+                        msg_type = stream_info['msg_type']
+                        interface = stream_info['interface']
+                
+                self.mySeptentrioGPS.stop_gps_data_retrieval(stream_number=stream, msg_type=msg_type, interface=interface)
+                print('\n[DEBUG]: Stoping GPS stream')
+                self.mySeptentrioGPS.stop_thread_gps()      
+            
+            if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
+                self.inst.write('RF0\n')   
 class RepeatTimer(threading.Timer):  
     def run(self):  
         while not self.finished.wait(self.interval):  
             self.function(*self.args,**self.kwargs)
-
+            
 class SBUSEncoder:
     """
-    Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver 
+    Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
     (idle, stop and parity bits are different than conventional UART).
     
     For Gremsy H16:
@@ -2247,3 +2303,10 @@ class SBUSEncoder:
         self.update_channel(channel=5, value=0)
         time.sleep(mov_time)
         self.not_move_command()
+
+class dummyErase():
+    def __init__(self):
+        print("Redirecting output to qtextedit")
+        
+    def test2(self):
+        print("123456789abcdefghijklmnopqrstuvwxyz")
