@@ -1420,7 +1420,6 @@ class myAnritsuSpectrumAnalyzer(object):
         """
         
         self.anritsu_con_socket.close()
-
 class HelperA2GMeasurements(object):
     def __init__(self, ID, SERVER_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, 
@@ -1729,7 +1728,7 @@ class HelperA2GMeasurements(object):
             type_frame (str, optional): 'cmd' or 'ans'. Defaults to 'cmd'.
             data (str, optional): data to be set with the 'cmd' (i.e. for the comand 'SETGIMBAL', data contains the gimbal position to be set).
                                   Or data to be sent in 'ans' frame. 
-            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL'. Defaults to None.
+            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL', 'STARTDRONERFSOC', 'STOPDRONERFSOC'. Defaults to None.
             cmd_source_for_ans (str, optional): always provide which command you are replying to, in the answer frame.
             
         Returns:
@@ -1823,6 +1822,22 @@ class HelperA2GMeasurements(object):
         else:
             print('\n[WARNING]: Action to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
+    def do_start_drone_rfsoc(self):
+        """
+        This comand is unidirectional. It is sent by the ground station (where the GUI resides) to the drone station.
+        The purpose is to START the drone rfsoc measurement (call to 'receive_data').
+        It is assumed that the ground rfsoc sending (tx) has been initiated previously and is working correctly.
+        
+        """
+    
+    def do_stop_drone_rfsoc(self):
+        """
+        This comand is unidirectional. It is sent by the ground station (where the GUI resides) to the drone station.
+        The purpose is to STOP the drone rfsoc measurement (call to 'receive_data').
+        It is assumed that the ground rfsoc sending (tx) has been initiated previously and is working correctly.
+        
+        """
+    
     def process_answer(self, msg):
         """
         This function is in charge of processing the answer message received. So far, the only message that requires
@@ -1898,6 +1913,10 @@ class HelperA2GMeasurements(object):
                 self.do_getgps_action()
             elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
                 self.do_setgimbal_action(rx_msg['DATA'])
+            elif rx_msg['CMD_SOURCE'] == 'STARTDRONERFSOC':
+                self.do_start_drone_rfsoc()
+            elif rx_msg['CMD_SOURCE'] == 'STOPDRONERFSOC':
+                self.do_stop_drone_rfsoc()
             elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
                 if self.ID == 'GROUND':
                     print('\nReceived msg from ' + self.CLIENT_ADDRESS[0] + ' is: ' + rx_msg['DATA'])
@@ -2303,6 +2322,83 @@ class SBUSEncoder:
         self.update_channel(channel=5, value=0)
         time.sleep(mov_time)
         self.not_move_command()
+class RFSoCRemoteControlFromHost():
+    """
+    Class that implements methods handling commands to be sent from the host computer (either the ground node or the drone node) to the server program
+    running in the RFSoC connected through ETH to that computer.
+    
+    The code used in this class was provided by Panagiotis Skrimponis and adpated by Julian D. Villegas G.    
+    
+    """
+    
+    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.30'):
+        self.radio_control_port = radio_control_port
+        self.radio_data_port = radio_data_port
+        
+        self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+        self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.radio_control.connect((rfsoc_static_ip_address, radio_control_port))
+
+        self.radio_data = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+        self.radio_data.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.radio_data.connect((rfsoc_static_ip_address, radio_data_port))
+            
+    def set_mode(self, mode):
+        if mode == 'RXen0_TXen1' or mode == 'RXen1_TXen0' or mode == 'RXen0_TXen0':
+            self.radio_control.sendall(b"setModeSiver "+str.encode(str(mode)))
+            data = self. radio_control.recv(1024)
+            print(data)
+            return data
+
+    def set_frequency(self, fc):
+        self.radio_control.sendall(b"setCarrierFrequency "+str.encode(str(fc)))
+        data = self.radio_control.recv(1024)
+        print(data)
+        return data
+
+    def set_rx_gain(self):
+        rx_gain_ctrl_bb1 = 0x77 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+        rx_gain_ctrl_bb2 = 0x00 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+        rx_gain_ctrl_bb3 = 0x99 # I[0:3]:[0-F]:0:6 dB, 16 steps, Q[0:3]:[0-F]:0:6 dB, 16 steps,
+        rx_gain_ctrl_bfrf = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps
+        self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
+                                                    + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
+                                                    + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
+                                                    + str.encode(str(int(rx_gain_ctrl_bfrf))))
+        data = self.radio_control.recv(1024)
+        print(data)
+        return data
+
+    def set_tx_gain(self):
+        tx_bb_gain = 0x3 # tx_ctrl bit 3 (BB Ibias set) = 0: 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB
+        # tx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB *
+        tx_bb_phase = 0x0 
+        tx_bb_iq_gain = 0x77 # this is the gain in BB, [0:3,I gain]: 0-6 dB, 16 steps, [4:7, Q gain]: 0-6 dB, 16 steps
+        tx_bfrf_gain = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps  
+
+        self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
+                                                    + str.encode(str(int(tx_bb_phase)) + " ") \
+                                                    + str.encode(str(int(tx_bb_iq_gain)) + " ") \
+                                                    + str.encode(str(int(tx_bfrf_gain))))
+        data = self.radio_control.recv(1024)
+        print(data)
+        return data
+    
+    def receive_data(self):
+        nbeams = 64
+        nbytes = 2
+        nread = 1024
+        self.radio_control.sendall(b"receiveSamples")
+        nbytes = nbeams * nbytes * nread * 2
+        buf = bytearray()
+
+        while len(buf) < nbytes:
+            data = self.radio_data.recv(nbytes)
+            buf.extend(data)
+        data = np.frombuffer(buf, dtype=np.int16)
+        rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
+        rxtd = rxtd.reshape(nbeams, nread)
+        return rxtd
 
 class dummyErase():
     def __init__(self):

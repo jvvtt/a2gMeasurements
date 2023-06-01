@@ -15,7 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import sys
-from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, dummyErase
+from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, dummyErase, RFSoCRemoteControlFromHost
 from a2gUtils import GpsOnMap
 
 import tkinter as tk
@@ -108,17 +108,17 @@ class WidgetGallery(QDialog):
         self.setWindowTitle("Styles")
         self.changeStyle('Windows')        
         
-        self.init_external_objs()
+        #self.init_external_objs()
 
     
     def check_if_ssh_reached(self, drone_ip, username, password):
         response_2_ping_network = ping3.ping(drone_ip, timeout=7)
         if response_2_ping_network is not None:
             try:
-                remote_client_conn = paramiko.SSHClient()
-                remote_client_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                remote_client_conn.connect(drone_ip, username=username, password=password)
-                self.remote_client_conn = remote_client_conn
+                remote_drone_conn = paramiko.SSHClient()
+                remote_drone_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                remote_drone_conn.connect(drone_ip, username=username, password=password)
+                self.remote_drone_conn = remote_drone_conn
                 print("[DEBUG]: SSH connection successful.")            
             except paramiko.AuthenticationException:
                 print("SSH Authentication failed. Please check your credentials.")
@@ -131,13 +131,17 @@ class WidgetGallery(QDialog):
                 response_2_ssh = None
             else:
                 response_2_ssh = 1
-                self.check_if_drone_fpga_connected()
+                response_drone_fpga = self.check_if_drone_fpga_connected()
         
-        return response_2_ping_network, response_2_ssh
+        else:
+            # Try again with a longer timeout
+            response_2_ping_network = ping3.ping(drone_ip, timeout=20)                            
+        
+        return response_2_ping_network, response_2_ssh, response_drone_fpga
     
     def check_if_drone_fpga_connected(self, drone_fpga_static_ip_addr='10.1.1.40'):
         # Execute the command and obtain the input, output, and error streams
-        stdin, stdout, stderr = self.remote_client_conn.exec_command('ping ' + drone_fpga_static_ip_addr)
+        stdin, stdout, stderr = self.remote_drone_conn.exec_command('ping ' + drone_fpga_static_ip_addr)
 
         # Read the output from the command
         output = stdout.read().decode('utf-8')
@@ -146,8 +150,12 @@ class WidgetGallery(QDialog):
         # Print the output and error, if any
         if output:
             print(f"Command output:\n{output}")
+            response_drone_fpga = 1
         if error:
             print(f"Command error:\n{error}")
+            response_drone_fpga = None
+        
+        return response_drone_fpga
     
     def check_if_gnd_fpga_connected(self, gnd_fpga_static_ip_addr='10.1.1.30'):
         response_2_ping_gnd = ping3.ping(gnd_fpga_static_ip_addr, timeout=7)
@@ -220,15 +228,17 @@ class WidgetGallery(QDialog):
         
         if SERVER_ADDRESS is None and CLIENT_ADDRESS is None:
             messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
+            return
         if SERVER_ADDRESS is None and CLIENT_ADDRESS is not None:
-            1
+            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
+            return
         if SERVER_ADDRESS is not None and CLIENT_ADDRESS is None:
-            1
+            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
         if SERVER_ADDRESS is not None and CLIENT_ADDRESS is not None:
-            1
+            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
         
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
-        SUCCESS_PING_CLIENT, SUCCESS_SSH = self.check_if_ssh_reached(CLIENT_ADDRESS, "manifold-uav-vtt", "mfold2208")
+        SUCCESS_PING_CLIENT, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_reached(CLIENT_ADDRESS, "manifold-uav-vtt", "mfold2208")
         
         MODE_NO_GIMBAL = self.check_if_gimbal_connected()        
         MODE_NO_GPS = self.check_if_gnd_gps_connected()
@@ -608,5 +618,6 @@ if __name__ == '__main__':
     app = QApplication([])
     gallery = WidgetGallery()
     gallery.show()
+    gallery.init_external_objs()
     #sys.exit(appctxt.app.exec())
     sys.exit(app.exec())
