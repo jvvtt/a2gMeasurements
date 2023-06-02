@@ -1467,8 +1467,7 @@ class HelperA2GMeasurements(object):
         self.SPEED_NODE = SPEED # m/s
         
         if IsRFSoC:
-            self.myRFSoC = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
-
+            self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
         if IsGimbal:
             self.myGimbal = GimbalRS2()
             self.myGimbal.start_thread_gimbal()
@@ -1732,7 +1731,7 @@ class HelperA2GMeasurements(object):
             type_frame (str, optional): 'cmd' or 'ans'. Defaults to 'cmd'.
             data (str, optional): data to be set with the 'cmd' (i.e. for the comand 'SETGIMBAL', data contains the gimbal position to be set).
                                   Or data to be sent in 'ans' frame. 
-            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL', 'STARTDRONERFSOC', 'STOPDRONERFSOC'. Defaults to None.
+            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL', 'STARTDRONERFSOC', 'STOPDRONERFSOC', 'FINISHDRONERFSOC'. Defaults to None.
             cmd_source_for_ans (str, optional): always provide which command you are replying to, in the answer frame.
             
         Returns:
@@ -1826,21 +1825,29 @@ class HelperA2GMeasurements(object):
         else:
             print('\n[WARNING]: Action to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
-    def do_start_drone_rfsoc(self):
+    def do_start_meas_drone_rfsoc(self):
         """
         This comand is unidirectional. It is sent by the ground station (where the GUI resides) to the drone station.
         The purpose is to START the drone rfsoc measurement (call to 'receive_data').
         It is assumed that the ground rfsoc sending (tx) has been initiated previously and is working correctly.
         
         """
+        if self.ID == 'DRONE': # double check that we are in the drone
+            self.myrfsoc.start_thread_receive_meas_data()
     
-    def do_stop_drone_rfsoc(self):
+    def do_stop_meas_drone_rfsoc(self):
         """
         This comand is unidirectional. It is sent by the ground station (where the GUI resides) to the drone station.
         The purpose is to STOP the drone rfsoc measurement (call to 'receive_data').
         It is assumed that the ground rfsoc sending (tx) has been initiated previously and is working correctly.
         
         """
+        if self.ID == 'DRONE': # double check that we are in the drone
+            self.myrfsoc.stop_thread_receive_meas_data()
+        
+    def do_finish_meas_drone_rfsoc(self):
+        if self.ID == 'DRONE': # double check that we are in the drone
+            self.myrfsoc.finish_measurement
     
     def process_answer(self, msg):
         """
@@ -1917,10 +1924,12 @@ class HelperA2GMeasurements(object):
                 self.do_getgps_action()
             elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
                 self.do_setgimbal_action(rx_msg['DATA'])
-            elif rx_msg['CMD_SOURCE'] == 'STARTDRONERFSOC':
-                self.do_start_drone_rfsoc()
-            elif rx_msg['CMD_SOURCE'] == 'STOPDRONERFSOC':
-                self.do_stop_drone_rfsoc()
+            elif rx_msg['CMD_SOURCE'] == 'STARTDRONERFSOC': # unidirectional command: from gnd node to drone node
+                self.do_start_meas_drone_rfsoc()
+            elif rx_msg['CMD_SOURCE'] == 'STOPDRONERFSOC': # unidirectional command: from gnd node to drone node
+                self.do_stop_meas_drone_rfsoc()
+            elif rx_msg['CMD_SOURCE'] == 'FINISHDRONERFSOC': # unidirectional command: from gnd node to drone node
+                self.do_finish_meas_drone_rfsoc()
             elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
                 if self.ID == 'GROUND':
                     print('\nReceived msg from ' + self.CLIENT_ADDRESS[0] + ' is: ' + rx_msg['DATA'])
@@ -2335,9 +2344,11 @@ class RFSoCRemoteControlFromHost():
     
     """
     
-    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40'):
+    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDPs'):
         self.radio_control_port = radio_control_port
         self.radio_data_port = radio_data_port
+        self.filename_to_save = filename
+        self.hest = []
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2389,7 +2400,12 @@ class RFSoCRemoteControlFromHost():
         return data
     
     def receive_data(self, stop_event):
+        """
+        Function callback for the measurement thread.
 
+        Args:
+            stop_event (threading.Event()): flag that is set when to stop the thread.
+        """
 
         while not stop_event.is_set():
             nbeams = 64
@@ -2402,29 +2418,31 @@ class RFSoCRemoteControlFromHost():
             while len(buf) < nbytes:
                 data = self.radio_data.recv(nbytes)
                 buf.extend(data)
-            data = np.frombuffer(buf, dtype=np.int16)
-            rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
-            rxtd = rxtd.reshape(nbeams, nread)
+                data = np.frombuffer(buf, dtype=np.int16)
+                rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
+                rxtd = rxtd.reshape(nbeams, nread)
+                
             self.hest.append(rxtd)
-
-        #return rxtd
 
     def start_thread_receive_meas_data(self):
         """
-        A tjread -instead of a subprocess- is good enough since the computational expense
+        A thread -instead of a subprocess- is good enough since the computational expense
         of the task is not donde in the host computer but in the RFSoC. The host just reads
         the data through ETH.
         """
-
-        t_receive = threading.Thread(target=self.receive_data(), args=(self.event_stop_thread_rfsoc))
-        t_receive.start()
+        
+        self.event_stop_thread_rfsoc = threading.Event()
+        self.t_receive = threading.Thread(target=self.receive_data(), args=(self.event_stop_thread_rfsoc))
+        self.t_receive.start()
+        time.sleep(0.5)
     
     def stop_thread_receive_meas_data(self):
         self.event_stop_thread_rfsoc.set()
+        self.t_receive.join()
     
     def finish_measurement(self):
         hest = np.array(self.hest)
-        with open('.npy', 'wb') as f:
+        with open(self.filename_to_save + '.npy', 'wb') as f:
             np.save(f, hest)
         self.hest = []
     
