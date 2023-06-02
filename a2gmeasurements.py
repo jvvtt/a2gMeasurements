@@ -1423,7 +1423,8 @@ class myAnritsuSpectrumAnalyzer(object):
 class HelperA2GMeasurements(object):
     def __init__(self, ID, SERVER_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, 
-                 IsGimbal=False, IsGPS=False, IsSignalGenerator=False, 
+                 IsGimbal=False, IsGPS=False, IsSignalGenerator=False, IsRFSoC=False,
+                 rfsoc_static_ip_address='10.1.1.40',
                  F0=None, L0=None,
                  SPEED=0,
                  GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
@@ -1465,6 +1466,9 @@ class HelperA2GMeasurements(object):
         self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY = -9.5e3
         self.SPEED_NODE = SPEED # m/s
         
+        if IsRFSoC:
+            self.myRFSoC = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
+
         if IsGimbal:
             self.myGimbal = GimbalRS2()
             self.myGimbal.start_thread_gimbal()
@@ -2331,7 +2335,7 @@ class RFSoCRemoteControlFromHost():
     
     """
     
-    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.30'):
+    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40'):
         self.radio_control_port = radio_control_port
         self.radio_data_port = radio_data_port
         
@@ -2384,25 +2388,43 @@ class RFSoCRemoteControlFromHost():
         print(data)
         return data
     
-    def receive_data(self):
-        nbeams = 64
-        nbytes = 2
-        nread = 1024
-        self.radio_control.sendall(b"receiveSamples")
-        nbytes = nbeams * nbytes * nread * 2
-        buf = bytearray()
+    def receive_data(self, stop_event):
 
-        while len(buf) < nbytes:
-            data = self.radio_data.recv(nbytes)
-            buf.extend(data)
-        data = np.frombuffer(buf, dtype=np.int16)
-        rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
-        rxtd = rxtd.reshape(nbeams, nread)
-        return rxtd
 
-class dummyErase():
-    def __init__(self):
-        print("Redirecting output to qtextedit")
-        
-    def test2(self):
-        print("123456789abcdefghijklmnopqrstuvwxyz")
+        while not stop_event.is_set():
+            nbeams = 64
+            nbytes = 2
+            nread = 1024
+            self.radio_control.sendall(b"receiveSamples")
+            nbytes = nbeams * nbytes * nread * 2
+            buf = bytearray()
+
+            while len(buf) < nbytes:
+                data = self.radio_data.recv(nbytes)
+                buf.extend(data)
+            data = np.frombuffer(buf, dtype=np.int16)
+            rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
+            rxtd = rxtd.reshape(nbeams, nread)
+            self.hest.append(rxtd)
+
+        #return rxtd
+
+    def start_thread_receive_meas_data(self):
+        """
+        A tjread -instead of a subprocess- is good enough since the computational expense
+        of the task is not donde in the host computer but in the RFSoC. The host just reads
+        the data through ETH.
+        """
+
+        t_receive = threading.Thread(target=self.receive_data(), args=(self.event_stop_thread_rfsoc))
+        t_receive.start()
+    
+    def stop_thread_receive_meas_data(self):
+        self.event_stop_thread_rfsoc.set()
+    
+    def finish_measurement(self):
+        hest = np.array(self.hest)
+        with open('.npy', 'wb') as f:
+            np.save(f, hest)
+        self.hest = []
+    
