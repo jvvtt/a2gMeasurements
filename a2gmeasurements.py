@@ -1847,7 +1847,7 @@ class HelperA2GMeasurements(object):
         
     def do_finish_meas_drone_rfsoc(self):
         if self.ID == 'DRONE': # double check that we are in the drone
-            self.myrfsoc.finish_measurement
+            self.myrfsoc.finish_measurement()
     
     def process_answer(self, msg):
         """
@@ -2349,6 +2349,7 @@ class RFSoCRemoteControlFromHost():
         self.radio_data_port = radio_data_port
         self.filename_to_save = filename
         self.hest = []
+        self.meas_time_tag = []
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2423,12 +2424,17 @@ class RFSoCRemoteControlFromHost():
                 rxtd = rxtd.reshape(nbeams, nread)
                 
             self.hest.append(rxtd)
+            self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
+            
 
     def start_thread_receive_meas_data(self):
         """
         A thread -instead of a subprocess- is good enough since the computational expense
         of the task is not donde in the host computer but in the RFSoC. The host just reads
         the data through ETH.
+        
+        A new thread is started each time the this function is called. It is required for the developer to call
+        'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
         
         self.event_stop_thread_rfsoc = threading.Event()
@@ -2441,8 +2447,14 @@ class RFSoCRemoteControlFromHost():
         self.t_receive.join()
     
     def finish_measurement(self):
+        datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
+    
         hest = np.array(self.hest)
-        with open(self.filename_to_save + '.npy', 'wb') as f:
+        with open(datestr + self.filename_to_save + '.npy', 'wb') as f:
             np.save(f, hest)
+        with open(datestr + self.filename_to_save + '-TIMETAGS' + '.npy', 'wb') as f:
+            np.save(f, self.meas_time_tag)
+        
         self.hest = []
+        self.meas_time_tag = []
     

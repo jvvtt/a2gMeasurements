@@ -15,7 +15,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import sys
-from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, dummyErase, RFSoCRemoteControlFromHost
+from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, RFSoCRemoteControlFromHost
 from a2gUtils import GpsOnMap
 
 import tkinter as tk
@@ -226,16 +226,9 @@ class WidgetGallery(QDialog):
         SERVER_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
         CLIENT_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
         
-        if SERVER_ADDRESS is None and CLIENT_ADDRESS is None:
-            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
+        if SERVER_ADDRESS is None or CLIENT_ADDRESS is None:
+            messagebox.showerror(title="MISSING CLIENT OR SERVER ADDRESSES", message="Both nodes IP addresses need to be specified. For controlling the drone gps, for following mode of the ground gimbal and to do measurements in a predefined way, WIFI is required. \nIf no WIFI network is present, measurements have to be started manually at both stations and will be recorded continuously without differentiating if the drone is on ground or on the air. \nFor such case, modify the variable 'ID' in the script 'do_continuous_measurements_no_wifi.py' depending on which node the file will be executed. \nExecute first the script in the ground node and then in the drone node.")
             return
-        if SERVER_ADDRESS is None and CLIENT_ADDRESS is not None:
-            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
-            return
-        if SERVER_ADDRESS is not None and CLIENT_ADDRESS is None:
-            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
-        if SERVER_ADDRESS is not None and CLIENT_ADDRESS is not None:
-            messagebox.showwarning(title="NO IP INFO", message="None of the two nodes ip addresses has been specified.")
         
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
         SUCCESS_PING_CLIENT, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_reached(CLIENT_ADDRESS, "manifold-uav-vtt", "mfold2208")
