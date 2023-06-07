@@ -398,6 +398,58 @@ class WidgetGallery(QDialog):
     
     def create_Planning_Measurements_panel(self):
         self.planningMeasurementsPanel = QGroupBox('Planning measurements')
+        
+        self.start_meas_togglePushButton = QPushButton("START")
+        self.start_meas_togglePushButton.setCheckable(True)
+        
+        #self.start_meas_togglePushButton.setChecked(True)
+        
+        self.stop_meas_togglePushButton = QPushButton("STOP")
+        self.stop_meas_togglePushButton.setCheckable(True)
+        #self.stop_meas_togglePushButton.setChecked(True)
+        
+        self.finish_meas_togglePushButton = QPushButton("FINISH")
+        self.finish_meas_togglePushButton.setCheckable(True)
+        #self.finish_meas_togglePushButton.setChecked(True)
+        
+        self.choose_what_time_is_specified_ComboBox = QComboBox()
+        self.choose_what_time_is_specified_ComboBox.addItems(["Time per edge (TPE)", "Time per stop (TPS)", "Total measurement time (TMT)"])
+
+        self.time_value_text_edit = QLineEdit('')
+        
+        self.how_trigger_measurements_radio_button_man = QRadioButton("Manual")
+        self.how_trigger_measurements_radio_button_auto = QRadioButton("Automatic") 
+        self.how_trigger_measurements_radio_button_man.setChecked(True)
+        
+        choose_what_type_time_label = QLabel('Choose parameter:')
+        value_parameter_label = QLabel('Value:')
+        
+        layout = QGridLayout()
+        layout.addWidget(self.how_trigger_measurements_radio_button_man, 0, 0, 1, 2)
+        layout.addWidget(self.how_trigger_measurements_radio_button_auto, 0, 2, 1, 2)
+        layout.addWidget(choose_what_type_time_label, 1, 0, 1, 1)
+        layout.addWidget(self.choose_what_time_is_specified_ComboBox, 1, 1, 1, 1)
+        layout.addWidget(value_parameter_label, 1, 2, 1, 1)
+        layout.addWidget(self.time_value_text_edit, 1, 3, 1, 1)
+        
+        layout.addWidget(self.start_meas_togglePushButton, 2, 0, 1, 1)
+        layout.addWidget(self.stop_meas_togglePushButton, 2, 1, 1, 1)
+        layout.addWidget(self.finish_meas_togglePushButton, 2, 2, 1, 2)
+        
+        self.planningMeasurementsPanel.setLayout(layout)
+    
+    def planningMeasurementsPanelButtonChecks(self):
+        
+        if self.start_meas_togglePushButton.isChecked():
+            self.stop_meas_togglePushButton.setEnabled('True')
+            self.finish_meas_togglePushButton.setEnabled('True')
+        
+        if self.stop_meas_togglePushButton.isChecked():
+            self.start_meas_togglePushButton.setEnabled('True')
+            self.finish_meas_togglePushButton.setEnabled('True')
+        
+        if self.finish_meas_togglePushButton.isChecked():
+            self.start_meas_togglePushButton.setEnabled('True')
     
     def create_GPS_visualization_panel(self):
         self.gps_vis_panel = QGroupBox('GPS visualization')
@@ -420,31 +472,7 @@ class WidgetGallery(QDialog):
         hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
         mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig, ax=ax, air_coord=hi_q)
 
-        mygpsonmap.show_air_moving()
-        '''
-        vis = GPSVis(map_path='test_map_micronova.png',  # Path to map downloaded from the OSM.
-             points=(upper_left['LAT'], upper_left['LON'], lower_right['LAT'], lower_right['LON'])) # Two coordinates of the map (upper left, lower right)
-
-        vis.update_map_marker((hi_q['LAT'], hi_q['LON']), r=10)
-        vis.update_map_marker((fut_hub['LAT'], fut_hub['LON']), r=10)
-        vis.update_map_marker((fat_liz['LAT'], fat_liz['LON']), r=10)
-        vis.update_map_marker((aalto_metro['LAT'], aalto_metro['LON']), r=10)
-        vis.plot_map(output='-')
-        
-        # Plot some data
-        x = [1, 2, 3, 4, 5]
-        y = [2, 4, 6, 8, 10]
-        ax.plot(x, y)
-
-        # Refresh the canvas
-        canvas.draw()
-        '''
-        
-        
-        
-        
-        
-        
+        mygpsonmap.show_air_moving() 
         
     def create_GPS_panel(self):
         self.gpsPanel = QGroupBox('GPS Information')
@@ -611,6 +639,6 @@ if __name__ == '__main__':
     app = QApplication([])
     gallery = WidgetGallery()
     gallery.show()
-    gallery.init_external_objs()
+    #gallery.init_external_objs()
     #sys.exit(appctxt.app.exec())
     sys.exit(app.exec())

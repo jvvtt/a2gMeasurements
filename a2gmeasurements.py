@@ -1142,7 +1142,35 @@ class GpsSignaling(object):
                 data_to_return_2 = {'Heading': self.ERR_GPS_CODE_BUFF_NULL}
                 print('\n[ERROR]: Return ERR_GPS_CODE_BUFF_NULL for each coordinate in data_to_return and for heading in data_to_return_2')
                 return data_to_return, data_to_return_2    
+    
+    def check_coord_closeness(self, coordinates2compare, tol=5):
+        """
+        Checks how close is a coordinate with respect to the actual node position.
         
+        It is assumed that both pair of coordinates to be compared lay at the same height.
+
+        Args:
+            coordinates2compare (dict): keys of the dictionary are 'LAT' and 'LON', and each of them has
+                                        ONLY ONE value.
+            tol (float): margin by which the coordinates in comparison are close or not
+        Returns:
+            close (bool): True if close, False if not. None if error.
+        """
+        coords, head_info = self.get_last_sbf_buffer_info(what='Both')
+            
+        if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
+            return None
+        else:
+            lat_node, lon_node, height_node = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
+            wgs84_geod = Geod(ellps='WGS84')
+            
+            _,_, dist = wgs84_geod.inv(lon_node, lat_node, coordinates2compare['LON'], coordinates2compare['LAT'])
+            
+            if dist < tol:
+                return True
+            else:
+                return False
+       
     def serial_receive(self, serial_instance_actual, stop_event):
         """
         The callback function invoked by the serial thread.
@@ -1282,7 +1310,7 @@ class GpsSignaling(object):
                 self.sendCommandGps(cmd1)
                 self.sendCommandGps(cmd2)       
                 self.sendCommandGps(cmd3)
-                self.sendCommandGps(cmd4)
+                self.sendCommandGps(cmd4)       
            
 class myAnritsuSpectrumAnalyzer(object):
     def __init__(self, is_debug=True, is_config=True):
@@ -2195,7 +2223,7 @@ class RepeatTimer(threading.Timer):
     def run(self):  
         while not self.finished.wait(self.interval):  
             self.function(*self.args,**self.kwargs)
-            
+
 class SBUSEncoder:
     """
     Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
@@ -2425,7 +2453,28 @@ class RFSoCRemoteControlFromHost():
                 
             self.hest.append(rxtd)
             self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
-            
+    
+    def receive_data_async(self):
+        """
+        Function callback when the drone stops at the calculated stops based on the Flight Graph Coordinates and other inputs provided 
+        in the Planning Measurements panel of the a2g App.
+        """
+        nbeams = 64
+        nbytes = 2
+        nread = 1024
+        self.radio_control.sendall(b"receiveSamples")
+        nbytes = nbeams * nbytes * nread * 2
+        buf = bytearray()
+
+        while len(buf) < nbytes:
+            data = self.radio_data.recv(nbytes)
+            buf.extend(data)
+            data = np.frombuffer(buf, dtype=np.int16)
+            rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
+            rxtd = rxtd.reshape(nbeams, nread)
+                
+        self.hest.append(rxtd)
+        self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
 
     def start_thread_receive_meas_data(self):
         """
@@ -2447,6 +2496,11 @@ class RFSoCRemoteControlFromHost():
         self.t_receive.join()
     
     def finish_measurement(self):
+        
+        # Check if the thread is finished and if not stop it
+        if self.t_receive.is_alive():
+            self.stop_thread_receive_meas_data()        
+        
         datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
     
         hest = np.array(self.hest)
