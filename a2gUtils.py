@@ -57,6 +57,50 @@ def geodetic2geocentric(lat, lon, height, EPSG_GEODETIC=4979, EPSG_GEOCENTRIC=49
 
     return X, Y, Z
 
+def make_flight_graph_coordinates(flight_graph, number_stops_per_edge):
+        """
+        Calculates the intermediate coordinates for the flight graph provided with the given number of stops per edge.
+
+        
+        Args:
+            flight_graph (numpy 2d-array): the provided array rows MUST be ordered according to the 
+                                           order of the planned stops of the drone. For example:
+                                           1st row corresponds to the first stop of the drone,
+                                           2nd row corresponds to the second stop of the drone, and so on.
+            number_stops_per_edge (int): number of stops per edge. It includes both vertexes of the edge.
+
+        Raises:
+            Exception: _description_
+
+        Returns:
+            intermediate_coords (dict): a dictionary whose structure is as follows:
+                                        {'EDGE_1': {'LAT': [], 'LON':[]}, 'EDGE_2': {'LAT': [], 'LON':[]}, ...}
+        """
+        
+        flight_graph_2nd_end = flight_graph[1:, :]
+        flight_graph_1st_before_end = flight_graph[:-1, :]
+
+        wgs84_geod = Geod(ellps='WGS84')
+                
+        az12, _, dist = wgs84_geod.inv(flight_graph_1st_before_end[:, 1], 
+                                          flight_graph_1st_before_end[:, 0], 
+                                          flight_graph_2nd_end[:, 1], 
+                                          flight_graph_2nd_end[:, 0])
+
+        intermediate_coords = {}
+        for i in range(flight_graph_2nd_end.shape[0]):
+            intermediate_coords['EDGE_'+str(i+1)] = {'LAT': [], 'LON': []}
+            lon_2, lat_2, _ = wgs84_geod.fwd(flight_graph_1st_before_end[i, 1], flight_graph_1st_before_end[i, 0], az12[i], dist[i]/(number_stops_per_edge-1))
+            intermediate_coords['EDGE_'+str(i+1)]['LAT'].append(lat_2)
+            intermediate_coords['EDGE_'+str(i+1)]['LON'].append(lon_2)
+            
+            for j in range(number_stops_per_edge-3):
+                lon_2, lat_2, _ = wgs84_geod.fwd(lon_2, lat_2, az12[i], dist[i]/(number_stops_per_edge-1))
+                intermediate_coords['EDGE_'+str(i+1)]['LAT'].append(lat_2)
+                intermediate_coords['EDGE_'+str(i+1)]['LON'].append(lon_2)
+        
+        return intermediate_coords
+
 class GPSVis(object):
     """
         Class for GPS data visualization using pre-downloaded OSM map in image format.
