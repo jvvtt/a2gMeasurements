@@ -37,20 +37,6 @@ class WidgetGallery(QDialog):
         # Parameters of the GUI
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
-        
-        self.originalPalette = QApplication.palette()
-
-        # Combined button and pop-up list
-        styleComboBox = QComboBox()
-        styleComboBox.addItems(QStyleFactory.keys())
-
-        styleLabel = QLabel("&Style:")
-        styleLabel.setBuddy(styleComboBox)
-
-        self.useStylePaletteCheckBox = QCheckBox("&Use style's standard palette")
-        self.useStylePaletteCheckBox.setChecked(True)
-
-        disableWidgetsCheckBox = QCheckBox("&Disable widgets")
 
         self.create_GPS_panel()
         self.create_log_terminal()
@@ -61,26 +47,6 @@ class WidgetGallery(QDialog):
         self.create_Planning_Measurements_panel()
         self.create_GPS_visualization_panel()
         self.create_pdp_plot_panel()
-        
-        self.createTopLeftGroupBox()
-        self.createTopRightGroupBox()
-        self.createBottomLeftTabWidget()
-        self.createBottomRightGroupBox()
-        self.createProgressBar()
-
-        styleComboBox.activated[str].connect(self.changeStyle)
-        self.useStylePaletteCheckBox.toggled.connect(self.changePalette)
-        disableWidgetsCheckBox.toggled.connect(self.topLeftGroupBox.setDisabled)
-        disableWidgetsCheckBox.toggled.connect(self.topRightGroupBox.setDisabled)
-        disableWidgetsCheckBox.toggled.connect(self.bottomLeftTabWidget.setDisabled)
-        disableWidgetsCheckBox.toggled.connect(self.bottomRightGroupBox.setDisabled)
-
-        topLayout = QHBoxLayout()
-        topLayout.addWidget(styleLabel)
-        topLayout.addWidget(styleComboBox)
-        topLayout.addStretch(1)
-        topLayout.addWidget(self.useStylePaletteCheckBox)
-        topLayout.addWidget(disableWidgetsCheckBox)
 
         mainLayout = QGridLayout()
         mainLayout.addWidget(self.gimbalTXPanel, 0, 0)
@@ -105,15 +71,13 @@ class WidgetGallery(QDialog):
                 
         self.setLayout(mainLayout)
 
-        self.setWindowTitle("Styles")
-        self.changeStyle('Windows')        
-        
         #self.init_external_objs()
-
     
     def check_if_ssh_reached(self, drone_ip, username, password):
-        response_2_ping_network = ping3.ping(drone_ip, timeout=7)
-        if response_2_ping_network is not None:
+        success_ping_network = ping3.ping(drone_ip, timeout=7)
+        if success_ping_network is not None:
+            success_ping_network = True
+            
             try:
                 remote_drone_conn = paramiko.SSHClient()
                 remote_drone_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -122,22 +86,26 @@ class WidgetGallery(QDialog):
                 print("[DEBUG]: SSH connection successful.")            
             except paramiko.AuthenticationException:
                 print("SSH Authentication failed. Please check your credentials.")
-                response_2_ssh = None
+                success_air_node_ssh = False
             except paramiko.SSHException as ssh_exception:
                 print(f"Unable to establish SSH connection: {ssh_exception}")
-                response_2_ssh = None
+                success_air_node_ssh = False
             except Exception as e:
                 print(f"An error occurred: {e}")
-                response_2_ssh = None
+                success_air_node_ssh = False
             else:
-                response_2_ssh = 1
-                response_drone_fpga = self.check_if_drone_fpga_connected()
-        
+                success_air_node_ssh = True
+                success_drone_fpga = self.check_if_drone_fpga_connected()
         else:
             # Try again with a longer timeout
-            response_2_ping_network = ping3.ping(drone_ip, timeout=20)                            
+            success_ping_network = ping3.ping(drone_ip, timeout=20)
+            
+            if success_ping_network is not None:
+                success_ping_network = True
+            else:
+                success_ping_network = False
         
-        return response_2_ping_network, response_2_ssh, response_drone_fpga
+        return success_ping_network, success_air_node_ssh, success_drone_fpga
     
     def check_if_drone_fpga_connected(self, drone_fpga_static_ip_addr='10.1.1.40'):
         # Execute the command and obtain the input, output, and error streams
@@ -148,23 +116,36 @@ class WidgetGallery(QDialog):
         error = stderr.read().decode('utf-8')
 
         # Print the output and error, if any
-        if output:
-            print(f"Command output:\n{output}")
-            response_drone_fpga = 1
+        if "Reply" in output:
+            print("[DEBUG]: RFSoC detected at drone node")
+            success_drone_fpga = True
+        else:
+            success_drone_fpga = False
         if error:
             print(f"Command error:\n{error}")
             response_drone_fpga = None
         
-        return response_drone_fpga
+        return success_drone_fpga
     
     def check_if_gnd_fpga_connected(self, gnd_fpga_static_ip_addr='10.1.1.30'):
-        response_2_ping_gnd = ping3.ping(gnd_fpga_static_ip_addr, timeout=7)
-        if response_2_ping_gnd is not None:
+        """
+        Check if ground fpga is connected to its host by pinging.
+
+        Args:
+            gnd_fpga_static_ip_addr (str, optional): _description_. Defaults to '10.1.1.30'.
+
+        Returns:
+            success_ping_gnd_fpga (bool): True if ping is successful, False otherwise.
+        """
+        success_ping_gnd_fpga = ping3.ping(gnd_fpga_static_ip_addr, timeout=7)
+        if success_ping_gnd_fpga is not None:
             print("[DEBUG]: GND FPGA is detected in GND node")
+            success_ping_gnd_fpga = True
         else:
             print("[DEBUG]: GND FPGA is NOT detected in GND node")
-
-        return response_2_ping_gnd
+            success_ping_gnd_fpga = False
+        
+        return success_ping_gnd_fpga
     
     def check_if_gimbal_connected(self):
         """
@@ -222,16 +203,23 @@ class WidgetGallery(QDialog):
 
         ROOT.withdraw()
         
-        #SERVER_ADDRESS = '192.168.0.2' # default address, but needs to be checked
-        SERVER_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
-        CLIENT_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
+        #GND_ADDRESS = '192.168.0.2' # default address, but needs to be checked
+        GND_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
+        DRONE_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
         
-        if SERVER_ADDRESS is None or CLIENT_ADDRESS is None:
-            messagebox.showerror(title="MISSING CLIENT OR SERVER ADDRESSES", message="Both nodes IP addresses need to be specified. For controlling the drone gps, for following mode of the ground gimbal and to do measurements in a predefined way, WIFI is required. \nIf no WIFI network is present, measurements have to be started manually at both stations and will be recorded continuously without differentiating if the drone is on ground or on the air. \nFor such case, modify the variable 'ID' in the script 'do_continuous_measurements_no_wifi.py' depending on which node the file will be executed. \nExecute first the script in the ground node and then in the drone node.")
+        if GND_ADDRESS is None or DRONE_ADDRESS is None:
+            messagebox.showerror(title="MISSING CLIENT OR SERVER ADDRESSES", message="Both nodes IP addresses need to be specified. \nFor controlling the drone gps, for following mode of the ground gimbal and to do measurements in a predefined way, WIFI is required. \nIf no WIFI network is present, measurements have to be started manually at both stations and will be recorded continuously without differentiating if the drone is on ground or on the air. \nFor such case, modify the variable 'ID' in the script 'do_continuous_measurements_no_wifi.py' depending on which node the file will be executed. \nExecute first the script in the ground node and then in the drone node.")
             return
         
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
-        SUCCESS_PING_CLIENT, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_reached(CLIENT_ADDRESS, "manifold-uav-vtt", "mfold2208")
+        SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_reached(DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
+        
+        if SUCCESS_GND_FPGA and SUCCES_DRONE_FPGA:
+            1
+        elif SUCCESS_GND_FPGA and SUCCESS_SSH:
+            1
+        elif SUCCESS_GND_FPGA and SUCCESS_PING_DRONE:
+            1
         
         MODE_NO_GIMBAL = self.check_if_gimbal_connected()        
         MODE_NO_GPS = self.check_if_gnd_gps_connected()
@@ -245,7 +233,7 @@ class WidgetGallery(QDialog):
             time.sleep(0.5)        
         
         if MODE_NO_GIMBAL == 0 and MODE_NO_GPS == 0:        
-            self.myhelpera2g = HelperA2GMeasurements('GROUND', SERVER_ADDRESS, 
+            self.myhelpera2g = HelperA2GMeasurements('GROUND', GND_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=True, IsGPS=True, 
                  GPS_Stream_Interval='sec1', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
         
@@ -283,21 +271,6 @@ class WidgetGallery(QDialog):
             self.log_terminal_txt = log_txt
             
         self.log_widget.setPlainText(self.log_terminal_txt)
-        
-    def changeStyle(self, styleName):
-        QApplication.setStyle(QStyleFactory.create(styleName))
-        self.changePalette()
-
-    def changePalette(self):
-        if (self.useStylePaletteCheckBox.isChecked()):
-            QApplication.setPalette(QApplication.style().standardPalette())
-        else:
-            QApplication.setPalette(self.originalPalette)
-
-    def advanceProgressBar(self):
-        curVal = self.progressBar.value()
-        maxVal = self.progressBar.maximum()
-        self.progressBar.setValue(int(curVal + (maxVal - curVal) / 100))
 
     def create_log_terminal(self):
         '''
@@ -438,19 +411,6 @@ class WidgetGallery(QDialog):
         
         self.planningMeasurementsPanel.setLayout(layout)
     
-    def planningMeasurementsPanelButtonChecks(self):
-        
-        if self.start_meas_togglePushButton.isChecked():
-            self.stop_meas_togglePushButton.setEnabled('True')
-            self.finish_meas_togglePushButton.setEnabled('True')
-        
-        if self.stop_meas_togglePushButton.isChecked():
-            self.start_meas_togglePushButton.setEnabled('True')
-            self.finish_meas_togglePushButton.setEnabled('True')
-        
-        if self.finish_meas_togglePushButton.isChecked():
-            self.start_meas_togglePushButton.setEnabled('True')
-    
     def create_GPS_visualization_panel(self):
         self.gps_vis_panel = QGroupBox('GPS visualization')
         # Create a Figure object
@@ -471,8 +431,6 @@ class WidgetGallery(QDialog):
 
         hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
         mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig, ax=ax, air_coord=hi_q)
-
-        mygpsonmap.show_air_moving() 
         
     def create_GPS_panel(self):
         self.gpsPanel = QGroupBox('GPS Information')
@@ -518,122 +476,7 @@ class WidgetGallery(QDialog):
         
     def create_pdp_plot_panel(self):
         self.pdpPlotPanel = QGroupBox('PDP')
-    
-    def createTopLeftGroupBox(self):
-        self.topLeftGroupBox = QGroupBox("Group 1")
-
-        radioButton1 = QRadioButton("Radio button 1")
-        radioButton2 = QRadioButton("Radio button 2")
-        radioButton3 = QRadioButton("Radio button 3")
-        radioButton1.setChecked(True)
-
-        checkBox = QCheckBox("Tri-state check box")
-        checkBox.setTristate(True)
-        checkBox.setCheckState(Qt.PartiallyChecked)
-
-        layout = QVBoxLayout()
-        layout.addWidget(radioButton1)
-        layout.addWidget(radioButton2)
-        layout.addWidget(radioButton3)
-        layout.addWidget(checkBox)
-        layout.addStretch(1)
-        self.topLeftGroupBox.setLayout(layout)    
-
-    def createTopRightGroupBox(self):
-        self.topRightGroupBox = QGroupBox("Group 2")
-
-        defaultPushButton = QPushButton("Default Push Button")
-        defaultPushButton.setDefault(True)
-
-        togglePushButton = QPushButton("Toggle Push Button")
-        togglePushButton.setCheckable(True)
-        togglePushButton.setChecked(True)
-
-        flatPushButton = QPushButton("Flat Push Button")
-        flatPushButton.setFlat(True)
-
-        layout = QVBoxLayout()
-        layout.addWidget(defaultPushButton)
-        layout.addWidget(togglePushButton)
-        layout.addWidget(flatPushButton)
-        layout.addStretch(1)
-        self.topRightGroupBox.setLayout(layout)
-
-    def createBottomLeftTabWidget(self):
-        self.bottomLeftTabWidget = QTabWidget()
-        self.bottomLeftTabWidget.setSizePolicy(QSizePolicy.Preferred,
-                QSizePolicy.Ignored)
-
-        tab1 = QWidget()
-        tableWidget = QTableWidget(10, 10)
-
-        tab1hbox = QHBoxLayout()
-        tab1hbox.setContentsMargins(5, 5, 5, 5)
-        tab1hbox.addWidget(tableWidget)
-        tab1.setLayout(tab1hbox)
-
-        tab2 = QWidget()
-        textEdit = QTextEdit()
-
-        textEdit.setPlainText("Twinkle, twinkle, little star,\n"
-                              "How I wonder what you are.\n" 
-                              "Up above the world so high,\n"
-                              "Like a diamond in the sky.\n"
-                              "Twinkle, twinkle, little star,\n" 
-                              "How I wonder what you are!\n")
-
-        tab2hbox = QHBoxLayout()
-        tab2hbox.setContentsMargins(5, 5, 5, 5)
-        tab2hbox.addWidget(textEdit)
-        tab2.setLayout(tab2hbox)
-
-        self.bottomLeftTabWidget.addTab(tab1, "&Table")
-        self.bottomLeftTabWidget.addTab(tab2, "Text &Edit")
-
-    def createBottomRightGroupBox(self):
-        self.bottomRightGroupBox = QGroupBox("Group 3")
-        self.bottomRightGroupBox.setCheckable(True)
-        self.bottomRightGroupBox.setChecked(True)
-
-        lineEdit = QLineEdit('s3cRe7')
-        lineEdit.setEchoMode(QLineEdit.Password)
-
-        spinBox = QSpinBox(self.bottomRightGroupBox)
-        spinBox.setValue(50)
-
-        dateTimeEdit = QDateTimeEdit(self.bottomRightGroupBox)
-        dateTimeEdit.setDateTime(QDateTime.currentDateTime())
-
-        slider = QSlider(Qt.Horizontal, self.bottomRightGroupBox)
-        slider.setValue(40)
-
-        scrollBar = QScrollBar(Qt.Horizontal, self.bottomRightGroupBox)
-        scrollBar.setValue(60)
-
-        dial = QDial(self.bottomRightGroupBox)
-        dial.setValue(30)
-        dial.setNotchesVisible(True)
-
-        layout = QGridLayout()
-        layout.addWidget(lineEdit, 0, 0, 1, 2)
-        layout.addWidget(spinBox, 1, 0, 1, 2)
-        layout.addWidget(dateTimeEdit, 2, 0, 1, 2)
-        layout.addWidget(slider, 3, 0)
-        layout.addWidget(scrollBar, 4, 0)
-        layout.addWidget(dial, 3, 1, 2, 1)
-        layout.setRowStretch(5, 1)
-        self.bottomRightGroupBox.setLayout(layout)
-
-    def createProgressBar(self):
-        self.progressBar = QProgressBar()
-        self.progressBar.setRange(0, 10000)
-        self.progressBar.setValue(0)
-
-        timer = QTimer(self)
-        timer.timeout.connect(self.advanceProgressBar)
-        timer.start(1000)
-
-
+                
 if __name__ == '__main__':
 #    appctxt = ApplicationContext()
     app = QApplication([])

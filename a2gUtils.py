@@ -353,33 +353,28 @@ class GpsOnMap(object):
         self.air_coord = air_coord
         
         if air_coord is not None:
-            self.rx_pos, =self.ax.plot(air_coord['LON'], air_coord['LAT'], 'b+', markersize=15)
+            self.air_pos, =self.ax.plot(air_coord['LON'], air_coord['LAT'], 'b+', markersize=15)
 
         self.test_cnt = 1
         self.fut_hub = {'LAT': 60.18650, 'LON': 24.81350}
-        self.rx_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
+        self.air_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
         
         if canvas is None:
             plt.show()
         else:
             self.canvas.draw()
-        
-    def show_air_moving(self):     
+    
+    def show_air_moving(self, lat, lon):
         """
         Updates the plot with the new positions
         """
         
-        if self.test_cnt % 2:
-            self.rx_pos.set_data(self.fut_hub['LON'], self.fut_hub['LAT'])
-        else:
-            self.rx_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
+        self.air_pos.set_data(lon, lat)
         
         if self.canvas is None:
             plt.show()
         else:
             self.canvas.draw()
-        
-        self.test_cnt = self.test_cnt + 1
         
     def animate(self, i):
         """
@@ -389,10 +384,10 @@ class GpsOnMap(object):
             i (int): frame number
         """
         if i % 2:
-            self.rx_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
+            self.air_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
         else:
             fut_hub = {'LAT': 60.18650, 'LON': 24.81350}
-            self.rx_pos.set_data(fut_hub['LON'], fut_hub['LAT'])
+            self.air_pos.set_data(fut_hub['LON'], fut_hub['LAT'])
 
     def show(self, frames=None, interval=100):
         """
