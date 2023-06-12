@@ -15,8 +15,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import sys
-from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, RFSoCRemoteControlFromHost
-from a2gUtils import GpsOnMap
+from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, RFSoCRemoteControlFromHost, RepeatTimer
+from a2gUtils import GpsOnMap, geocentric2geodetic, geodetic2geocentric
 
 import tkinter as tk
 from tkinter import simpledialog, messagebox
@@ -73,7 +73,7 @@ class WidgetGallery(QDialog):
 
         #self.init_external_objs()
     
-    def check_if_ssh_reached(self, drone_ip, username, password):
+    def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
         success_ping_network = ping3.ping(drone_ip, timeout=7)
         if success_ping_network is not None:
             success_ping_network = True
@@ -87,12 +87,15 @@ class WidgetGallery(QDialog):
             except paramiko.AuthenticationException:
                 print("SSH Authentication failed. Please check your credentials.")
                 success_air_node_ssh = False
+                self.remote_drone_conn = None
             except paramiko.SSHException as ssh_exception:
                 print(f"Unable to establish SSH connection: {ssh_exception}")
                 success_air_node_ssh = False
+                self.remote_drone_conn = None
             except Exception as e:
                 print(f"An error occurred: {e}")
                 success_air_node_ssh = False
+                self.remote_drone_conn = None
             else:
                 success_air_node_ssh = True
                 success_drone_fpga = self.check_if_drone_fpga_connected()
@@ -147,63 +150,64 @@ class WidgetGallery(QDialog):
         
         return success_ping_gnd_fpga
     
-    def check_if_gimbal_connected(self):
+    def check_if_gnd_gimbal_connected(self):
         """
         Function for checking if gimbal RS2 is connected on ground node.
 
         Returns:
-            MODE_NO_GIMBAL (int): 0 if gimbal RS2 is connected. 
-                                  1 if gimbal is NOT connected and USER wants to continue WITHOUT gimbal.
-                                  2 if gimbal is NOT connected and USER wants to continue WITH gimbal.
+            success_gnd_gimbal (bool): True if detected, False otherwise.
         """
                
         try:
             # Check if gimbal is connected by looking if connection is established
             bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=1000000)
         except Exception as e:
-            tmp = messagebox.askyesno(title="NO GIMBAL CONNECTED", message="No ground gimbal was detected. The system can not work without a ground gimbal. You can always control the gimbal manually, but check that the gimbal is powered on and connected to the computer. \n\nIf the gimbal is NOT connected to the computer but powered on, the system can work, but no information about gimbal direction will be obtained, neither control of the gimbal through the GUI will be allowed. \n\nDo you want to continue without a gimbal connection?")
-            if tmp:
-                MODE_NO_GIMBAL = 1
-            else:
-                MODE_NO_GIMBAL = 2
+            success_gnd_gimbal = False
         else:
             bus.shutdown()
             del bus
-            MODE_NO_GIMBAL = 0
+            success_gnd_gimbal = True
         
-        return MODE_NO_GIMBAL
+        return success_gnd_gimbal
     
     def check_if_gnd_gps_connected(self):
         """
         Function for checking if gps is connected to the ground node.
 
         Returns:
-            MODE_NO_GPS (int): 0 if gps is connected. 
-                               1 if gps is NOT connected and USER wants to continue WITHOUT gps.
-                               2 if gps is NOT connected and USER wants to continue WITH gps.
+            success_gnd_gps (bool): True connected, False otherwise
         """
         
         tmp = []
         for (_, desc, _) in sorted(comports()):
             tmp.append("Septentrio" in desc)
         if any(tmp):
-            MODE_NO_GPS = 0
+            success_gnd_gps = True
         else:
-            tmp = messagebox.askyesno(title="NO GPS CONNECTED", message="No gps was detected. The system can work without the GPS, but no ground GPS coordinates will be saved and FOLLOWING MODE will not be available. \n\nDo you want to continue without gps?")
+            success_gnd_gps = False
             
-            if tmp:
-                MODE_NO_GPS = 1
-            else:
-                MODE_NO_GPS = 2
-            
-        return MODE_NO_GPS
-    
-    def init_external_objs(self):
-        ROOT = tk.Tk()
+        return success_gnd_gps
 
+    def check_if_drone_gps_connected(self):
+        """
+        Function for checking if gps is connected to the drone node. Requires that there is a SSH connection established
+
+        Returns:
+            success_drone_gps (bool): True if connected, False if not, None if no SSH connection
+        """
+        
+        # Double check
+        if self.remote_drone_conn is None:
+            success_drone_gps = None
+            print('[DEBUG]: No SSH connection to drone detected. The drone gps connection check can not be done.')
+            return
+        else:
+            1
+    
+    def check_status_all_devices(self, GND_ADDRESS='192.168.0.2'):
+        ROOT = tk.Tk()
         ROOT.withdraw()
         
-        #GND_ADDRESS = '192.168.0.2' # default address, but needs to be checked
         GND_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
         DRONE_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
         
@@ -212,26 +216,11 @@ class WidgetGallery(QDialog):
             return
         
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
-        SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_reached(DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
-        
-        if SUCCESS_GND_FPGA and SUCCES_DRONE_FPGA:
-            1
-        elif SUCCESS_GND_FPGA and SUCCESS_SSH:
-            1
-        elif SUCCESS_GND_FPGA and SUCCESS_PING_DRONE:
-            1
-        
-        MODE_NO_GIMBAL = self.check_if_gimbal_connected()        
-        MODE_NO_GPS = self.check_if_gnd_gps_connected()
-        
-        while(MODE_NO_GIMBAL == 2):
-            MODE_NO_GIMBAL = self.check_if_gimbal_connected()
-            time.sleep(0.5)
-                
-        while(MODE_NO_GPS == 2):
-            MODE_NO_GPS = self.check_if_gnd_gps_connected()
-            time.sleep(0.5)        
-        
+        SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_2_drone_reached(DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
+        SUCCES_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
+        SUCCESS_GND_GPS = self.check_if_gnd_gps_connected()
+    
+    def create_class_instances(self, MODE_NO_GIMBAL, MODE_NO_GPS, GND_ADDRESS):
         if MODE_NO_GIMBAL == 0 and MODE_NO_GPS == 0:        
             self.myhelpera2g = HelperA2GMeasurements('GROUND', GND_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=True, IsGPS=True, 
@@ -248,7 +237,21 @@ class WidgetGallery(QDialog):
             
             if len(disc_what) > 0:            
                 self.myhelpera2g.HelperA2GStopCom(DISC_WHAT=disc_what)
+
+    def start_threads(self):
         
+        self.periodical_gps_display_thread = RepeatTimer(1, self.perdiocal_gps_display_callback) 
+
+    def periodical_gps_display_callback(self):
+        # Get the last coordinates
+        coords, head_info = self.get_last_sbf_buffer_info(what='Both')
+            
+        if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
+            1
+        else:
+            lat_node, lon_node, height_node = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
+
+
     def write_to_log_terminal(self, newLine):
         '''
         New line to be written into the log terminal. The number of new lines it can handle is controlled
@@ -285,6 +288,45 @@ class WidgetGallery(QDialog):
         # Redirect output of myFunc to the QTextEdit widget
         sys.stdout = self.log_widget
     
+    def create_check_connections_panel(self):
+        self.checkConnPanel = QGroupBox('Connections checker')
+
+        gnd_gimbal_conn_label = QLabel('Ground gimbal:')
+        gnd_gps_conn_label = QLabel('Ground GPS:')
+        gnd_rfsoc_conn_label = QLabel('Ground RFSoC:')
+        network_exists_label = QLabel('Able to PING drone?:')
+        ssh_conn_gnd_2_drone_label = QLabel('SSH to drone:')
+        drone_rfsoc_conn_label = QLabel('Drone RFSoC:')
+        drone_gps_conn_label = QLabel('Drone GPS:')
+
+        self.gnd_gimbal_conn_label_modifiable = QLabel('')
+        self.gnd_gps_conn_label_modifiable = QLabel('')
+        self.gnd_rfsoc_conn_label_modifiable = QLabel('')
+        self.network_exists_label_modifiable = QLabel('')
+        self.ssh_conn_gnd_2_drone_label_modifiable = QLabel('')
+        self.drone_rfsoc_conn_label_modifiable = QLabel('')
+        self.drone_gps_conn_label_modifiable = QLabel('')
+
+        layout = QGridLayout()
+
+        layout.addWidget(gnd_gimbal_conn_label, 0, 0, 1, 1)
+        layout.addWidget(gnd_gps_conn_label, 1, 0, 1, 1)
+        layout.addWidget(gnd_rfsoc_conn_label, 2, 0, 1, 1)
+        layout.addWidget(network_exists_label, 3, 0, 1, 1)
+        layout.addWidget(ssh_conn_gnd_2_drone_label, 0, 2, 1, 1)
+        layout.addWidget(drone_rfsoc_conn_label, 1, 2, 1, 1)
+        layout.addWidget(drone_gps_conn_label, 2, 2, 1, 1)
+
+        layout.addWidget(self.gnd_gimbal_conn_label_modifiable, 0, 1, 1, 1)
+        layout.addWidget(self.gnd_gps_conn_label_modifiable, 1, 1, 1, 1)
+        layout.addWidget(self.gnd_rfsoc_conn_label_modifiable, 2, 1, 1, 1)
+        layout.addWidget(self.network_exists_label_modifiable, 3, 1, 1, 1)
+        layout.addWidget(self.ssh_conn_gnd_2_drone_label_modifiable, 0, 3, 1, 1)
+        layout.addWidget(self.drone_rfsoc_conn_label_modifiable, 1, 3, 1, 1)
+        layout.addWidget(self.drone_gps_conn_label_modifiable, 2, 3, 1, 1)
+
+        self.checkConnPanel.setLayout(layout)
+
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')
         
