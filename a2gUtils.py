@@ -103,6 +103,11 @@ def make_flight_graph_coordinates(flight_graph, number_stops_per_edge):
 
 class GPSVis(object):
     """
+        DEPRECATED CLASS MAINTENED FOR HISTORY [JUPYTER NOTEBOOK TESTS].
+        
+        Indirect way of showing gps coordinates as it maps coordinates
+        to pixels, based on the coordinates of the 4 vertexes of the bounding box map.
+        
         Class for GPS data visualization using pre-downloaded OSM map in image format.
     """
     def __init__(self, data_path=None, map_path=None, points=None):
@@ -375,35 +380,6 @@ class GpsOnMap(object):
             plt.show()
         else:
             self.canvas.draw()
-        
-    def animate(self, i):
-        """
-        Function to be passed to FuncAnimation
-
-        Args:
-            i (int): frame number
-        """
-        if i % 2:
-            self.air_pos.set_data(self.air_coord['LON'], self.air_coord['LAT'])
-        else:
-            fut_hub = {'LAT': 60.18650, 'LON': 24.81350}
-            self.air_pos.set_data(fut_hub['LON'], fut_hub['LAT'])
-
-    def show(self, frames=None, interval=100):
-        """
-        Executes the animation for the number of frames. It executes a function 
-        for the given number of frames.
-
-        Args:
-            frames (_type_, optional): _description_. Defaults to None.
-            interval (int, optional): _description_. Defaults to 100.
-        """
-        anim = FuncAnimation(self.fig, self.animate, frames=frames, interval=interval)
-        if self.canvas is None:
-            plt.show()
-        else:
-            self.canvas.draw()
-
 
 class AngleAnnotation(Arc):
     """

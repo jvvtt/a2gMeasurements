@@ -38,7 +38,8 @@ class WidgetGallery(QDialog):
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
 
-        self.create_GPS_panel()
+        self.create_check_connections_panel()
+        #self.create_GPS_panel()
         self.create_log_terminal()
         self.create_Gimbal_TX_panel()
         self.create_Gimbal_RX_panel()
@@ -49,16 +50,16 @@ class WidgetGallery(QDialog):
         self.create_pdp_plot_panel()
 
         mainLayout = QGridLayout()
-        mainLayout.addWidget(self.gimbalTXPanel, 0, 0)
-        mainLayout.addWidget(self.gimbalRXPanel, 0, 1)
-        mainLayout.addWidget(self.gpsPanel, 1, 0)
-        mainLayout.addWidget(self.planningMeasurementsPanel, 1, 1)
-        mainLayout.addWidget(self.fpgaSettingsPanel, 2, 0)
-        mainLayout.addWidget(self.beamsteeringSettingsPanel, 2, 1)
-        mainLayout.addWidget(self.pdpPlotPanel, 3, 0, 1, 2)        
-        mainLayout.addWidget(self.gps_vis_panel, 4, 0, 1, 2)
-        mainLayout.addWidget(self.log_widget, 5, 0, 1, 2)
-        
+        mainLayout.addWidget(self.checkConnPanel, 0, 0, 1 , 4)
+        mainLayout.addWidget(self.gimbalTXPanel, 1, 0, 1, 1)
+        mainLayout.addWidget(self.gimbalRXPanel, 1, 1, 1, 1)
+        mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 1, 1)
+        mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 1 , 1)
+        #mainLayout.addWidget(self.gpsPanel, 2, 0)
+        mainLayout.addWidget(self.gps_vis_panel, 2, 0, 3, 2)
+        mainLayout.addWidget(self.pdpPlotPanel, 2, 2, 3, 2)
+        mainLayout.addWidget(self.planningMeasurementsPanel, 5, 0, 1, 2)
+        mainLayout.addWidget(self.log_widget, 5, 2, 1, 2)
         
         self.write_to_log_terminal('This is an example text')
         self.write_to_log_terminal('This is a new line')
@@ -74,8 +75,10 @@ class WidgetGallery(QDialog):
         #self.init_external_objs()
     
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
-        success_ping_network = ping3.ping(drone_ip, timeout=7)
-        if success_ping_network is not None:
+        success_ping_network = ping3.ping(drone_ip, timeout=10)
+        
+        #if success_ping_network is not None:
+        if success_ping_network:
             success_ping_network = True
             
             try:
@@ -100,13 +103,9 @@ class WidgetGallery(QDialog):
                 success_air_node_ssh = True
                 success_drone_fpga = self.check_if_drone_fpga_connected()
         else:
-            # Try again with a longer timeout
-            success_ping_network = ping3.ping(drone_ip, timeout=20)
-            
-            if success_ping_network is not None:
-                success_ping_network = True
-            else:
-                success_ping_network = False
+            success_ping_network = False
+            success_air_node_ssh = None
+            success_drone_fpga = None
         
         return success_ping_network, success_air_node_ssh, success_drone_fpga
     
@@ -204,54 +203,82 @@ class WidgetGallery(QDialog):
         else:
             1
     
-    def check_status_all_devices(self, GND_ADDRESS='192.168.0.2'):
+    def get_ip_node_addresses(self):
         ROOT = tk.Tk()
         ROOT.withdraw()
         
-        GND_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
-        DRONE_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
+        self.GND_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
+        self.DRONE_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
         
-        if GND_ADDRESS is None or DRONE_ADDRESS is None:
+        if self.GND_ADDRESS is None or self.DRONE_ADDRESS is None:
             messagebox.showerror(title="MISSING CLIENT OR SERVER ADDRESSES", message="Both nodes IP addresses need to be specified. \nFor controlling the drone gps, for following mode of the ground gimbal and to do measurements in a predefined way, WIFI is required. \nIf no WIFI network is present, measurements have to be started manually at both stations and will be recorded continuously without differentiating if the drone is on ground or on the air. \nFor such case, modify the variable 'ID' in the script 'do_continuous_measurements_no_wifi.py' depending on which node the file will be executed. \nExecute first the script in the ground node and then in the drone node.")
-            return
+    
+    def check_status_all_devices(self):
         
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
-        SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_2_drone_reached(DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
-        SUCCES_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
+        SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_2_drone_reached(self.DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
+        SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
         SUCCESS_GND_GPS = self.check_if_gnd_gps_connected()
+        
+        self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))
+        self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
+        self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
+        self.network_exists_label_modifiable.setText(str(SUCCESS_PING_DRONE))
+        self.ssh_conn_gnd_2_drone_label_modifiable.setText(str(SUCCESS_SSH))
+        self.drone_rfsoc_conn_label_modifiable.setText(str(SUCCES_DRONE_FPGA))
+        #self.drone_gps_conn_label_modifiable.setText()
     
-    def create_class_instances(self, MODE_NO_GIMBAL, MODE_NO_GPS, GND_ADDRESS):
-        if MODE_NO_GIMBAL == 0 and MODE_NO_GPS == 0:        
-            self.myhelpera2g = HelperA2GMeasurements('GROUND', GND_ADDRESS, 
-                 DBG_LVL_0=False, DBG_LVL_1=False, IsGimbal=True, IsGPS=True, 
-                 GPS_Stream_Interval='sec1', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
+    def create_class_instances(self, IsGPS=False, IsGimbal=False, GPS_Stream_Interval='sec1'):
         
-            print(self.myhelpera2g.myGimbal.GIMBAL_CONN_SUCCES)
-            print(self.myhelpera2g.mySeptentrioGPS.GPS_CONN_SUCCESS)
-            
-            disc_what = []
-            if self.myhelpera2g.myGimbal.GIMBAL_CONN_SUCCES:
-                disc_what.append('GIMBAL')
-            if self.myhelpera2g.mySeptentrioGPS.GPS_CONN_SUCCESS:
-                disc_what.append('GPS')
-            
-            if len(disc_what) > 0:            
-                self.myhelpera2g.HelperA2GStopCom(DISC_WHAT=disc_what)
-
-    def start_threads(self):
+        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, 
+                                                 IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
+                                                 AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
         
-        self.periodical_gps_display_thread = RepeatTimer(1, self.perdiocal_gps_display_callback) 
+        print('[DEBUG]: Gimbal obj creation in GUI, ', self.myhelpera2g.myGimbal.GIMBAL_CONN_SUCCES)
+        print('[DEBUG]: GPS obj creation in GUI, ', self.myhelpera2g.mySeptentrioGPS.GPS_CONN_SUCCESS)
+            
+    def disconnect_devices(self):
+        """
+        Wrapper to HelperA2GStopCom.
+        
+        """
+        disc_what = []
+        if self.myhelpera2g.myGimbal.GIMBAL_CONN_SUCCES:
+            disc_what.append('GIMBAL')
+        if self.myhelpera2g.mySeptentrioGPS.GPS_CONN_SUCCESS:
+            disc_what.append('GPS')
+            
+        if len(disc_what) > 0:            
+            self.myhelpera2g.HelperA2GStopCom(DISC_WHAT=disc_what)
+    
+    def start_GUI_threads(self):
+        """
+        Start GUI related threads. This threads are related only to the display of information
+        on the GUI.
+        
+        """
+        self.update_time_gps = 1
+        self.periodical_gps_display_thread = RepeatTimer(self.update_time_gps, self.perdiocal_gps_display_callback) 
 
     def periodical_gps_display_callback(self):
-        # Get the last coordinates
+        
+        
+        # Display ground node coords
         coords, head_info = self.get_last_sbf_buffer_info(what='Both')
             
         if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
-            1
+            pass
         else:
-            lat_node, lon_node, height_node = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
-
-
+            lat_gnd_node, lon_gnd_node, height_node = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
+            self.mygpsonmap.show_air_moving(lat=lat_gnd_node, lon=lon_gnd_node) 
+        
+        # Display drone node coords
+        # The coordinates shown will be the coordinates of up to self.update_time_fps before
+        if hasattr(self.myhelpera2g, 'last_drone_coords_requested'):
+            self.mygpsonmap.show_air_moving(lat=self.myhelpera2g.last_drone_coords_requested['LAT'], lon=self.myhelpera2g.last_drone_coords_requested['LON'])
+            
+        self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS')
+            
     def write_to_log_terminal(self, newLine):
         '''
         New line to be written into the log terminal. The number of new lines it can handle is controlled
@@ -299,31 +326,30 @@ class WidgetGallery(QDialog):
         drone_rfsoc_conn_label = QLabel('Drone RFSoC:')
         drone_gps_conn_label = QLabel('Drone GPS:')
 
-        self.gnd_gimbal_conn_label_modifiable = QLabel('')
-        self.gnd_gps_conn_label_modifiable = QLabel('')
-        self.gnd_rfsoc_conn_label_modifiable = QLabel('')
-        self.network_exists_label_modifiable = QLabel('')
-        self.ssh_conn_gnd_2_drone_label_modifiable = QLabel('')
-        self.drone_rfsoc_conn_label_modifiable = QLabel('')
-        self.drone_gps_conn_label_modifiable = QLabel('')
+        self.gnd_gimbal_conn_label_modifiable = QLabel('--')
+        self.gnd_gps_conn_label_modifiable = QLabel('--')
+        self.gnd_rfsoc_conn_label_modifiable = QLabel('--')
+        self.network_exists_label_modifiable = QLabel('--')
+        self.ssh_conn_gnd_2_drone_label_modifiable = QLabel('--')
+        self.drone_rfsoc_conn_label_modifiable = QLabel('--')
+        self.drone_gps_conn_label_modifiable = QLabel('--')
 
         layout = QGridLayout()
 
         layout.addWidget(gnd_gimbal_conn_label, 0, 0, 1, 1)
-        layout.addWidget(gnd_gps_conn_label, 1, 0, 1, 1)
-        layout.addWidget(gnd_rfsoc_conn_label, 2, 0, 1, 1)
-        layout.addWidget(network_exists_label, 3, 0, 1, 1)
-        layout.addWidget(ssh_conn_gnd_2_drone_label, 0, 2, 1, 1)
-        layout.addWidget(drone_rfsoc_conn_label, 1, 2, 1, 1)
-        layout.addWidget(drone_gps_conn_label, 2, 2, 1, 1)
-
         layout.addWidget(self.gnd_gimbal_conn_label_modifiable, 0, 1, 1, 1)
-        layout.addWidget(self.gnd_gps_conn_label_modifiable, 1, 1, 1, 1)
-        layout.addWidget(self.gnd_rfsoc_conn_label_modifiable, 2, 1, 1, 1)
-        layout.addWidget(self.network_exists_label_modifiable, 3, 1, 1, 1)
-        layout.addWidget(self.ssh_conn_gnd_2_drone_label_modifiable, 0, 3, 1, 1)
+        layout.addWidget(gnd_gps_conn_label, 0, 2, 1, 1)
+        layout.addWidget(self.gnd_gps_conn_label_modifiable, 0, 3, 1, 1)
+        layout.addWidget(gnd_rfsoc_conn_label, 0, 4, 1, 1)
+        layout.addWidget(self.gnd_rfsoc_conn_label_modifiable, 0, 5, 1, 1)
+        layout.addWidget(network_exists_label, 0, 6, 1, 1)
+        layout.addWidget(self.network_exists_label_modifiable, 0, 7, 1, 1)
+        layout.addWidget(ssh_conn_gnd_2_drone_label, 1, 0, 1, 1)
+        layout.addWidget(self.ssh_conn_gnd_2_drone_label_modifiable, 1, 1, 1, 1)
+        layout.addWidget(drone_rfsoc_conn_label, 1, 2, 1, 1)
         layout.addWidget(self.drone_rfsoc_conn_label_modifiable, 1, 3, 1, 1)
-        layout.addWidget(self.drone_gps_conn_label_modifiable, 2, 3, 1, 1)
+        layout.addWidget(drone_gps_conn_label, 1, 4, 1, 1)       
+        layout.addWidget(self.drone_gps_conn_label_modifiable, 1, 5, 1, 1)
 
         self.checkConnPanel.setLayout(layout)
 
@@ -456,10 +482,10 @@ class WidgetGallery(QDialog):
     def create_GPS_visualization_panel(self):
         self.gps_vis_panel = QGroupBox('GPS visualization')
         # Create a Figure object
-        fig = Figure()
+        fig_gps = Figure()
 
         # Create a FigureCanvas widget
-        canvas = FigureCanvas(fig)
+        canvas = FigureCanvas(fig_gps)
 
         # Create a QVBoxLayout to hold the canvas
         layout = QVBoxLayout()
@@ -469,10 +495,15 @@ class WidgetGallery(QDialog):
         self.gps_vis_panel.setLayout(layout)
 
         # Create a subplot on the Figure
-        ax = fig.add_subplot(111)
+        ax_gps = fig_gps.add_subplot(111)
 
         hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
-        mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig, ax=ax, air_coord=hi_q)
+        
+        torbacka_point = {'LAT': 60.07850739357558, 'LON': 24.171551864664867}
+        #mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=hi_q)
+        mygpsonmap = GpsOnMap('torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
+        
+        self.mygpsonmap = mygpsonmap
         
     def create_GPS_panel(self):
         self.gpsPanel = QGroupBox('GPS Information')
@@ -518,12 +549,35 @@ class WidgetGallery(QDialog):
         
     def create_pdp_plot_panel(self):
         self.pdpPlotPanel = QGroupBox('PDP')
+        
+        fig_pdp = Figure()
+
+        # Create a FigureCanvas widget
+        canvas = FigureCanvas(fig_pdp)
+
+        # Create a QVBoxLayout to hold the canvas
+        layout = QVBoxLayout()
+        layout.addWidget(canvas)
+
+        # Set the layout of the group box
+        self.pdpPlotPanel.setLayout(layout)
+
+        # Create a subplot on the Figure
+        ax_pdp = fig_pdp.add_subplot(111)
+        
+        self.fig_pdp = fig_pdp
+        self.ax_pdp = ax_pdp
                 
 if __name__ == '__main__':
 #    appctxt = ApplicationContext()
     app = QApplication([])
     gallery = WidgetGallery()
     gallery.show()
-    #gallery.init_external_objs()
+    
+    gallery.get_ip_node_addresses()
+    gallery.check_status_all_devices()
+    gallery.create_class_instances(IsGPS=False, IsGimbal=False, GPS_Stream_Interval='sec1')
+    gallery.start_GUI_threads()
+    
     #sys.exit(appctxt.app.exec())
     sys.exit(app.exec())

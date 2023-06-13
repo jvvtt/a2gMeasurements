@@ -9,7 +9,10 @@ input('\nStart experiment')
 
 try:    
     while(True):
-        ground_a2g_helper.socket_send_cmd(type_cmd='GETGPS')
+
+        #  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  [UPDATE: NEW COMMAND IS FOLLOWGIMBAL] !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #ground_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
+        ground_a2g_helper.socket_send_cmd(type_cmd='GETGPS')  
     
         time.sleep(2)
 
