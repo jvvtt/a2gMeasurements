@@ -1759,7 +1759,14 @@ class HelperA2GMeasurements(object):
             type_frame (str, optional): 'cmd' or 'ans'. Defaults to 'cmd'.
             data (str, optional): data to be set with the 'cmd' (i.e. for the comand 'SETGIMBAL', data contains the gimbal position to be set).
                                   Or data to be sent in 'ans' frame. 
-            cmd (str, optional): List of commands includes: 'GETGPS', 'SETGIMBAL', 'STARTDRONERFSOC', 'STOPDRONERFSOC', 'FINISHDRONERFSOC'. Defaults to None.
+            cmd (str, optional): List of commands includes:
+                                'GETGPS', 
+                                'SETGIMBAL', 
+                                'STARTDRONERFSOC', 
+                                'STOPDRONERFSOC', 
+                                'FINISHDRONERFSOC',
+                                'FOLLOWGIMBAL'.
+                                Defaults to None.
             cmd_source_for_ans (str, optional): always provide which command you are replying to, in the answer frame.
             
         Returns:
@@ -1783,7 +1790,10 @@ class HelperA2GMeasurements(object):
 
         return json.dumps(frame)
 
-    def do_getgps_action(self):
+    def do_follow_mode_gimbal(self):
+        self.do_getgps_action(self, follow_mode_gimbal=True)
+    
+    def do_getgps_action(self, follow_mode_gimbal=False):
         """
         Function to execute when the received instruction in the a2g comm link is 'GETGPS'.
 
@@ -1810,6 +1820,9 @@ class HelperA2GMeasurements(object):
             elif data_to_send['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
                 # More verbose
                 return
+            
+            if follow_mode_gimbal:
+                data_to_send['FOLLOW_GIMBAL'] = True
             
             # data_to_send wont be any of the other error codes, because they are not set for 'what'=='Coordinates'
             else:            
@@ -1901,6 +1914,7 @@ class HelperA2GMeasurements(object):
 
                 y_drone = data['Y']
                 x_drone = data['X']
+                
                 datum_coordinates = data['Datum']
                 
                 if y_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
@@ -1911,9 +1925,11 @@ class HelperA2GMeasurements(object):
                 # Geocentric WGS84
                 if datum_coordinates == 0:
                     lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'])
+                    self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
                 # Geocentric ETRS89
                 elif datum_coordinates == 30:
                     lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'], EPSG_GEOCENTRIC=4346)
+                    self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
                 else:
                     print('\nERROR: Not known geocentric datum')
                     return
@@ -1929,10 +1945,13 @@ class HelperA2GMeasurements(object):
                 else:
                     print(f"[WARNING]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
                     
-                    if self.IsGimbal:
-                        self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set) # has to be absolute movement, cause the 0 is the heading value.
-                    else:
-                        print('\n[WARNING]: No gimbal available, so no rotation will happen')
+                    if 'FOLLOW_GIMBAL' in data: # The dictionary key has been created
+                        if data['FOLLOW_GIMBAL'] is not None: # The dictionary key is not empty
+                            if data['FOLLOW_GIMBAL']: # The corresponding value is True
+                                if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
+                                    self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set) # has to be absolute movement, cause the 0 is the heading value.
+                                else:
+                                    print('\n[WARNING]: No gimbal available, so no rotation will happen')
                 
     def parse_rx_msg(self, rx_msg):
         """
@@ -1948,6 +1967,8 @@ class HelperA2GMeasurements(object):
         if rx_msg['TYPE'] == 'ANS':
             self.process_answer(rx_msg)
         elif rx_msg['TYPE'] == 'CMD':
+            if rx_msg['CMD_SOURCE'] == 'FOLLOWGIMBAL':
+                self.do_follow_mode_gimbal()            
             if rx_msg['CMD_SOURCE'] == 'GETGPS':
                 self.do_getgps_action()
             elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
@@ -2168,7 +2189,8 @@ class HelperA2GMeasurements(object):
         Stops communications with all the devices or the specified ones in the variable 'DISC_WHAT
 
         Args:
-            DISC_WHAT (str or list, optional): specifies what to disconnect. Defaults to 'ALL'. Options are: 'SG', 'GIMBAL', 'GPS', 'ALL'
+            DISC_WHAT (str or list, optional): specifies what to disconnect. Defaults to 'ALL'. 
+                                               Options are: 'SG', 'GIMBAL', 'GPS', 'ALL'
         """
         try:   
             self.event_stop_thread_helper.set()
@@ -2458,6 +2480,8 @@ class RFSoCRemoteControlFromHost():
         """
         Function callback when the drone stops at the calculated stops based on the Flight Graph Coordinates and other inputs provided 
         in the Planning Measurements panel of the a2g App.
+        
+        No threading involved in this method
         """
         nbeams = 64
         nbytes = 2
