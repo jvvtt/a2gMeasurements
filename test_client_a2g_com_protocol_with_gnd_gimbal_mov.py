@@ -4,7 +4,7 @@ import time
 import threading
 
 
-SERVER_ADDRESS = '192.168.0.2'
+SERVER_ADDRESS = '192.168.0.3'
 drone_a2g_helper = HelperA2GMeasurements('DRONE', SERVER_ADDRESS, DBG_LVL_1=True, IsGPS=True)
 
 drone_a2g_helper.HelperStartA2GCom()

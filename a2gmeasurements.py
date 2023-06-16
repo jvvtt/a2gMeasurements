@@ -666,6 +666,8 @@ class GpsSignaling(object):
             serial_port (str, optional): serial port or virtual serial port name. 
         """
         
+        
+        self.serial_port = None
         # Look for the first Virtual Com in Septentrio receiver. It is assumed that it is available, 
         # meaning that it has been closed by user if was used before.        
         for (this_port, desc, _) in sorted(comports()):
