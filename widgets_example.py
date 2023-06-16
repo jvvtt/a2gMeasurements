@@ -97,8 +97,7 @@ class WidgetGallery(QDialog):
         mainLayout.addWidget(self.progressBar, 3, 0, 1, 2)
         mainLayout.setRowStretch(1, 1)
         mainLayout.setRowStretch(2, 1)
-        mainLayout.setColumnStretch(0, 1)
-        mainLayout.setColumnStretch(1, 1)
+        mainLayout.setColumnStretch(1, 0)
         self.setLayout(mainLayout)
 
         self.setWindowTitle("Styles")
