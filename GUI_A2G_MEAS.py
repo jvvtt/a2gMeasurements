@@ -1,3 +1,5 @@
+import re
+import subprocess
 import paramiko
 import ping3
 import time
@@ -41,8 +43,8 @@ class WidgetGallery(QDialog):
         self.create_check_connections_panel()
         #self.create_GPS_panel()
         self.create_log_terminal()
-        self.create_Gimbal_TX_panel()
-        self.create_Gimbal_RX_panel()
+        self.create_Gimbal_GND_panel()
+        self.create_Gimbal_AIR_panel()
         self.create_FPGA_settings_panel()
         self.create_Beamsteering_settings_panel()
         self.create_Planning_Measurements_panel()
@@ -91,14 +93,17 @@ class WidgetGallery(QDialog):
                 print("SSH Authentication failed. Please check your credentials.")
                 success_air_node_ssh = False
                 self.remote_drone_conn = None
+                success_drone_fpga = None
             except paramiko.SSHException as ssh_exception:
                 print(f"Unable to establish SSH connection: {ssh_exception}")
                 success_air_node_ssh = False
                 self.remote_drone_conn = None
+                success_drone_fpga = None
             except Exception as e:
                 print(f"An error occurred: {e}")
                 success_air_node_ssh = False
                 self.remote_drone_conn = None
+                success_drone_fpga = None
             else:
                 success_air_node_ssh = True
                 success_drone_fpga = self.check_if_drone_fpga_connected()
@@ -203,34 +208,52 @@ class WidgetGallery(QDialog):
         else:
             1
     
-    def get_ip_node_addresses(self):
-        ROOT = tk.Tk()
-        ROOT.withdraw()
-        
-        self.GND_ADDRESS = simpledialog.askstring(title="SERVER ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the ground node:")
-        self.DRONE_ADDRESS = simpledialog.askstring(title="CLIENT ADDRESS", prompt="After connecting both nodes to the router, check and enter IP address of the drone node:")
-        
-        if self.GND_ADDRESS is None or self.DRONE_ADDRESS is None:
-            messagebox.showerror(title="MISSING CLIENT OR SERVER ADDRESSES", message="Both nodes IP addresses need to be specified. \nFor controlling the drone gps, for following mode of the ground gimbal and to do measurements in a predefined way, WIFI is required. \nIf no WIFI network is present, measurements have to be started manually at both stations and will be recorded continuously without differentiating if the drone is on ground or on the air. \nFor such case, modify the variable 'ID' in the script 'do_continuous_measurements_no_wifi.py' depending on which node the file will be executed. \nExecute first the script in the ground node and then in the drone node.")
-    
+    def get_gnd_ip_node_addresses(self):
+
+        ifconfig_info = subprocess.Popen(["ifconfig"], stdout=subprocess.PIPE)
+        out, err = ifconfig_info.communicate()
+        stdout_str = out.decode()
+
+        # This is how the IP address should appear, as the GND-DRONE connection is wireless through an AP
+        stdout_str_split = stdout_str.split('wlan0: ')
+
+        pattern = r'inet\s+\d+.\d+.\d+.\d+'
+        gnd_ip_addr = re.findall(pattern, stdout_str_split[-1])
+        gnd_ip_addr = gnd_ip_addr[0].split('inet ')
+        gnd_ip_addr = gnd_ip_addr[-1]
+
+        self.GND_ADDRESS = gnd_ip_addr
+
     def check_status_all_devices(self):
         
+        pattern_ip_addresses = r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
         self.DRONE_ADDRESS = self.air_ip_addr_value_text_edit.text()
+        is_ip_addr = bool(re.match(pattern_ip_addresses, self.DRONE_ADDRESS))
+
+        # Input error checking
+        if self.DRONE_ADDRESS == '' or not is_ip_addr:
+            print('[DEBUG]: No DRONE or incorrect IP address supplied')
+            self.network_exists_label_modifiable.setText(str(None))
+            self.ssh_conn_gnd_2_drone_label_modifiable.setText(str(None))
+            self.drone_rfsoc_conn_label_modifiable.setText(str(None))
+        else:
+            SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_2_drone_reached(self.DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
+            self.network_exists_label_modifiable.setText(str(SUCCESS_PING_DRONE))
+            self.ssh_conn_gnd_2_drone_label_modifiable.setText(str(SUCCESS_SSH))
+            self.drone_rfsoc_conn_label_modifiable.setText(str(SUCCES_DRONE_FPGA))
+
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
-        SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_2_drone_reached(self.DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
         SUCCESS_GND_GPS = self.check_if_gnd_gps_connected()
         
+        self.get_gnd_ip_node_addresses()
         self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))
         self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
         self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
-        self.network_exists_label_modifiable.setText(str(SUCCESS_PING_DRONE))
-        self.ssh_conn_gnd_2_drone_label_modifiable.setText(str(SUCCESS_SSH))
-        self.drone_rfsoc_conn_label_modifiable.setText(str(SUCCES_DRONE_FPGA))
+        self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
         #self.drone_gps_conn_label_modifiable.setText()
     
     def create_class_instances(self, IsGPS=False, IsGimbal=False, GPS_Stream_Interval='sec1'):
-        self.GND_ADDRESS = self.gnd_ip_addr_value_text_edit.text()
         self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, 
                                                  IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
                                                  AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)            
@@ -325,7 +348,7 @@ class WidgetGallery(QDialog):
 
         gnd_ip_addr_label = QLabel('Ground IP:')
         air_ip_addr_label = QLabel('Drone IP:')
-        self.gnd_ip_addr_value_text_edit = QLineEdit('')
+        self.gnd_ip_addr_value_label = QLabel('')
         self.air_ip_addr_value_text_edit = QLineEdit('')
         self.check_connections_push_button = QPushButton('Check')
         self.check_connections_push_button.clicked.connect(self.check_status_all_devices)
@@ -341,7 +364,7 @@ class WidgetGallery(QDialog):
         layout = QGridLayout()
 
         layout.addWidget(gnd_ip_addr_label, 0, 0, 1, 1)
-        layout.addWidget(self.gnd_ip_addr_value_text_edit, 0, 1, 1, 1)
+        layout.addWidget(self.gnd_ip_addr_value_label, 0, 1, 1, 1)
         layout.addWidget(gnd_gimbal_conn_label, 0, 2, 1, 1)
         layout.addWidget(self.gnd_gimbal_conn_label_modifiable, 0, 3, 1, 1)
         layout.addWidget(gnd_gps_conn_label, 0, 4, 1, 1)
@@ -350,16 +373,16 @@ class WidgetGallery(QDialog):
         layout.addWidget(self.gnd_rfsoc_conn_label_modifiable, 0, 7, 1, 1)
         layout.addWidget(network_exists_label, 0, 8, 1, 1)
         layout.addWidget(self.network_exists_label_modifiable, 0, 9, 1, 1)
-        layout.addWidget(air_ip_addr_label, 1, 0, 1, 1)
-        layout.addWidget(self.air_ip_addr_value_text_edit, 1, 1, 1, 1)
-        layout.addWidget(ssh_conn_gnd_2_drone_label, 1, 2, 1, 1)
-        layout.addWidget(self.ssh_conn_gnd_2_drone_label_modifiable, 1, 3, 1, 1)
-        layout.addWidget(drone_rfsoc_conn_label, 1, 4, 1, 1)
-        layout.addWidget(self.drone_rfsoc_conn_label_modifiable, 1, 5, 1, 1)
-        layout.addWidget(drone_gps_conn_label, 1, 6, 1, 1)       
-        layout.addWidget(self.drone_gps_conn_label_modifiable, 1, 7, 1, 1)
-        layout.addWidget(self.check_connections_push_button, 1, 8, 1, 1)
-        layout.setColumnStretch(1, 0)
+        layout.addWidget(ssh_conn_gnd_2_drone_label, 0, 10, 1, 1)
+        layout.addWidget(self.ssh_conn_gnd_2_drone_label_modifiable, 0, 11, 1, 1)
+        layout.addWidget(drone_rfsoc_conn_label, 0, 12, 1, 1)
+        layout.addWidget(self.drone_rfsoc_conn_label_modifiable, 0, 13, 1, 1)
+        layout.addWidget(drone_gps_conn_label, 0, 14, 1, 1)       
+        layout.addWidget(self.drone_gps_conn_label_modifiable, 0, 15, 1, 1)
+        layout.addWidget(air_ip_addr_label, 1, 0, 1, 3)
+        layout.addWidget(self.air_ip_addr_value_text_edit, 1, 3, 1, 3)
+        layout.addWidget(self.check_connections_push_button, 1, 6, 1, 10)
+        
 
         self.checkConnPanel.setLayout(layout)
 
@@ -368,9 +391,12 @@ class WidgetGallery(QDialog):
         
     def create_Beamsteering_settings_panel(self):
         self.beamsteeringSettingsPanel = QGroupBox('Beamsteering settings')
+
+    def left_move_gnd_gimbal(self):
+        1
     
-    def create_Gimbal_TX_panel(self):
-        self.gimbalTXPanel = QGroupBox('Gimbal TX')
+    def create_Gimbal_GND_panel(self):
+        self.gimbalTXPanel = QGroupBox('GND Gimbal')
         
         yaw_label = QLabel('Yaw [D]:')
         pitch_label = QLabel('Pitch [D]:')
@@ -385,6 +411,7 @@ class WidgetGallery(QDialog):
         self.tx_step_manual_move_gimbal_text_edit = QLineEdit('')
         
         self.tx_gimbal_manual_move_push_button = QPushButton('Move')
+        #self.tx_gimbal_manual_move_push_button.clicked.connect(self.)
         self.tx_gimbal_move_left_push_button = QPushButton('<-')
         self.tx_gimbal_move_right_push_button = QPushButton('->')
         self.tx_gimbal_move_up_push_button = QPushButton('^')
@@ -408,8 +435,8 @@ class WidgetGallery(QDialog):
         
         self.gimbalTXPanel.setLayout(layout)
         
-    def create_Gimbal_RX_panel(self):
-        self.gimbalRXPanel = QGroupBox('Gimbal RX')
+    def create_Gimbal_AIR_panel(self):
+        self.gimbalRXPanel = QGroupBox('Drone Gimbal')
         
         yaw_label = QLabel('Yaw [D]:')
         pitch_label = QLabel('Pitch [D]:')
