@@ -77,6 +77,22 @@ class WidgetGallery(QDialog):
         #self.init_external_objs()
     
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
+        """
+        Checks ssh connection betwwen ground node (running the GUI) and the computer on the drone.
+
+        Error checking of the input parameters SHOULD BE DONE by the caller function.
+        
+        Args:
+            drone_ip (str): drone's IP address. SHOULD BE A PROPER IP ADDRESS.
+            username (str): username of the  computer on the drone.
+            password (str): password of the computer on the drone.
+
+        Returns:
+            success_ping_network (bool): True if drone node reachable.
+            success_air_node_ssh (bool): True if ssh connection established.
+            success_drone_fpga (bool): True if rfsoc on drone is detected.
+            
+        """
         success_ping_network = ping3.ping(drone_ip, timeout=10)
         
         #if success_ping_network is not None:
@@ -115,6 +131,18 @@ class WidgetGallery(QDialog):
         return success_ping_network, success_air_node_ssh, success_drone_fpga
     
     def check_if_drone_fpga_connected(self, drone_fpga_static_ip_addr='10.1.1.40'):
+        """
+        Checks if the rfsoc is detected on the drone. 
+        
+        Caller function SHOULD check first if there is a ssh connection.
+        
+        Args:
+            drone_fpga_static_ip_addr (str, optional): _description_. Defaults to '10.1.1.40'.
+
+        Returns:
+            success_drone_fpga (bool): True if the ping to the rfsoc IP address is replied.
+        """
+        
         # Execute the command and obtain the input, output, and error streams
         stdin, stdout, stderr = self.remote_drone_conn.exec_command('ping ' + drone_fpga_static_ip_addr)
 
@@ -208,24 +236,37 @@ class WidgetGallery(QDialog):
         else:
             1
     
-    def get_gnd_ip_node_addresses(self):
-
+    def get_gnd_ip_node_address(self):
+        """
+        Gets the IP address of the ground node.
+        
+        Caller function IS RESPONSIBLE for checking if there is a WIFI operating. 
+        
+        """
         ifconfig_info = subprocess.Popen(["ifconfig"], stdout=subprocess.PIPE)
         out, err = ifconfig_info.communicate()
         stdout_str = out.decode()
 
-        # This is how the IP address should appear, as the GND-DRONE connection is wireless through an AP
-        stdout_str_split = stdout_str.split('wlan0: ')
-
-        pattern = r'inet\s+\d+.\d+.\d+.\d+'
-        gnd_ip_addr = re.findall(pattern, stdout_str_split[-1])
-        gnd_ip_addr = gnd_ip_addr[0].split('inet ')
-        gnd_ip_addr = gnd_ip_addr[-1]
-
-        self.GND_ADDRESS = gnd_ip_addr
+        pattern = r'inet\s+\d+.\d+.\d+.\d+'        
+        
+        try:
+            # This is how the IP address should appear, as the GND-DRONE connection is wireless through an AP
+            stdout_str_split = stdout_str.split('wlan0: ')
+            
+            gnd_ip_addr = re.findall(pattern, stdout_str_split[-1])
+            gnd_ip_addr = gnd_ip_addr[0].split('inet ')
+            gnd_ip_addr = gnd_ip_addr[-1]
+        except Exception as e:
+            print("[DEBUG]: Error detecting the GND IP address ", e)
+        else:
+            self.GND_ADDRESS = gnd_ip_addr
 
     def check_status_all_devices(self):
+        """
+        Function callback when user presses the "Check" button.
         
+        Gets the connection status of all devices.
+        """
         pattern_ip_addresses = r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
         self.DRONE_ADDRESS = self.air_ip_addr_value_text_edit.text()
         is_ip_addr = bool(re.match(pattern_ip_addresses, self.DRONE_ADDRESS))
@@ -246,7 +287,7 @@ class WidgetGallery(QDialog):
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
         SUCCESS_GND_GPS = self.check_if_gnd_gps_connected()
         
-        self.get_gnd_ip_node_addresses()
+        self.get_gnd_ip_node_address()
         self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))
         self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
         self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
@@ -254,6 +295,14 @@ class WidgetGallery(QDialog):
         #self.drone_gps_conn_label_modifiable.setText()
     
     def create_class_instances(self, IsGPS=False, IsGimbal=False, GPS_Stream_Interval='sec1'):
+        """
+        Responsible for creating any objects (class instances) that will be used to connect to and control the devices,
+
+        Args:
+            IsGPS (bool, optional): _description_. Defaults to False.
+            IsGimbal (bool, optional): _description_. Defaults to False.
+            GPS_Stream_Interval (str, optional): _description_. Defaults to 'sec1'.
+        """
         self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, 
                                                  IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
                                                  AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)            
@@ -396,6 +445,10 @@ class WidgetGallery(QDialog):
         1
     
     def create_Gimbal_GND_panel(self):
+        """
+        Creates the panel to control the ground gimbal.
+        
+        """
         self.gimbalTXPanel = QGroupBox('GND Gimbal')
         
         yaw_label = QLabel('Yaw [D]:')
@@ -436,6 +489,10 @@ class WidgetGallery(QDialog):
         self.gimbalTXPanel.setLayout(layout)
         
     def create_Gimbal_AIR_panel(self):
+        """
+        Creates the panel where the air gimbal can be manually controlled.
+        
+        """
         self.gimbalRXPanel = QGroupBox('Drone Gimbal')
         
         yaw_label = QLabel('Yaw [D]:')
