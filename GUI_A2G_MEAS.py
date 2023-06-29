@@ -39,9 +39,9 @@ class WidgetGallery(QDialog):
         # Parameters of the GUI
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
+        self.remote_drone_conn = None
 
         self.create_check_connections_panel()
-        #self.create_GPS_panel()
         self.create_log_terminal()
         self.create_Gimbal_GND_panel()
         self.create_Gimbal_AIR_panel()
@@ -58,19 +58,12 @@ class WidgetGallery(QDialog):
         mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 1, 1)
         mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 1 , 1)
         #mainLayout.addWidget(self.gpsPanel, 2, 0)
-        mainLayout.addWidget(self.gps_vis_panel, 2, 0, 3, 2)
-        mainLayout.addWidget(self.pdpPlotPanel, 2, 2, 3, 2)
-        mainLayout.addWidget(self.planningMeasurementsPanel, 5, 0, 1, 2)
-        mainLayout.addWidget(self.log_widget, 5, 2, 1, 2)
+        mainLayout.addWidget(self.gps_vis_panel, 2, 0, 5, 2)
+        mainLayout.addWidget(self.pdpPlotPanel, 2, 2, 5, 2)
+        mainLayout.addWidget(self.planningMeasurementsPanel, 7, 0, 1, 2)
+        mainLayout.addWidget(self.log_widget, 7, 2, 1, 2)
         
-        self.write_to_log_terminal('This is an example text')
-        self.write_to_log_terminal('This is a new line')
-        self.write_to_log_terminal('what ever')
-        self.write_to_log_terminal('evasdgf')
-        self.write_to_log_terminal('sadgfndsaf')
-        self.write_to_log_terminal('dsgfmn')
-        self.write_to_log_terminal('what ,mndsfb')
-        self.write_to_log_terminal('sdafnb fd')        
+        self.write_to_log_terminal('Welcome to A2G Measurements Center!')
                 
         self.setLayout(mainLayout)
 
@@ -98,35 +91,43 @@ class WidgetGallery(QDialog):
         #if success_ping_network is not None:
         if success_ping_network:
             success_ping_network = True
-            
-            try:
-                remote_drone_conn = paramiko.SSHClient()
-                remote_drone_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                remote_drone_conn.connect(drone_ip, username=username, password=password)
+            print("[DEBUG]: DRONE-AP-GND Network is reachable")
+            if self.remote_drone_conn is None:
+                try:
+                    remote_drone_conn = paramiko.SSHClient()
+                    remote_drone_conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    remote_drone_conn.connect(drone_ip, username=username, password=password)
+                    print("[DEBUG]: SSH connection to DRONE is successful.")            
+                except paramiko.AuthenticationException:
+                    print("SSH Authentication failed. Please check your credentials.")
+                    success_air_node_ssh = False
+                    self.remote_drone_conn = None
+                    success_drone_fpga = None
+                    return success_ping_network, success_air_node_ssh, success_drone_fpga
+                except paramiko.SSHException as ssh_exception:
+                    print(f"Unable to establish SSH connection: {ssh_exception}")
+                    success_air_node_ssh = False
+                    self.remote_drone_conn = None
+                    success_drone_fpga = None
+                    return success_ping_network, success_air_node_ssh, success_drone_fpga
+                except Exception as e:
+                    print(f"An error occurred: {e}")
+                    success_air_node_ssh = False
+                    self.remote_drone_conn = None
+                    success_drone_fpga = None
+                    return success_ping_network, success_air_node_ssh, success_drone_fpga
+
                 self.remote_drone_conn = remote_drone_conn
-                print("[DEBUG]: SSH connection successful.")            
-            except paramiko.AuthenticationException:
-                print("SSH Authentication failed. Please check your credentials.")
-                success_air_node_ssh = False
-                self.remote_drone_conn = None
-                success_drone_fpga = None
-            except paramiko.SSHException as ssh_exception:
-                print(f"Unable to establish SSH connection: {ssh_exception}")
-                success_air_node_ssh = False
-                self.remote_drone_conn = None
-                success_drone_fpga = None
-            except Exception as e:
-                print(f"An error occurred: {e}")
-                success_air_node_ssh = False
-                self.remote_drone_conn = None
-                success_drone_fpga = None
-            else:
-                success_air_node_ssh = True
-                success_drone_fpga = self.check_if_drone_fpga_connected()
+
+            # Will execute either if 'try' statemente success or if self.remote_drone_conn is precisely None
+            success_air_node_ssh = True            
+            success_drone_fpga = self.check_if_drone_fpga_connected()
         else:
+            print("[DEBUG]: DRONE-AP-GND Network is NOT reachable")
             success_ping_network = False
             success_air_node_ssh = None
             success_drone_fpga = None
+            self.remote_drone_conn = None
         
         return success_ping_network, success_air_node_ssh, success_drone_fpga
     
@@ -152,7 +153,7 @@ class WidgetGallery(QDialog):
 
         # Print the output and error, if any
         if "Reply" in output:
-            print("[DEBUG]: RFSoC detected at drone node")
+            print("[DEBUG]: RFSoC detected at DRONE node")
             success_drone_fpga = True
         else:
             success_drone_fpga = False
@@ -174,10 +175,10 @@ class WidgetGallery(QDialog):
         """
         success_ping_gnd_fpga = ping3.ping(gnd_fpga_static_ip_addr, timeout=7)
         if success_ping_gnd_fpga is not None:
-            print("[DEBUG]: GND FPGA is detected in GND node")
+            print("[DEBUG]: RFSoC is detected at GND node")
             success_ping_gnd_fpga = True
         else:
-            print("[DEBUG]: GND FPGA is NOT detected in GND node")
+            print("[DEBUG]: RFSoC is NOT detected at GND node")
             success_ping_gnd_fpga = False
         
         return success_ping_gnd_fpga
@@ -215,10 +216,12 @@ class WidgetGallery(QDialog):
             tmp.append("Septentrio" in desc)
         if any(tmp):
             success_gnd_gps = True
+            print("[DEBUG]: GPS is detected at GND")
         else:
             success_gnd_gps = False
+            print("[DEBUG]: GPS is NOT detected at GND")
             
-        return success_gnd_gps
+        return success_gnd_gps        
 
     def check_if_drone_gps_connected(self):
         """
@@ -232,9 +235,28 @@ class WidgetGallery(QDialog):
         if self.remote_drone_conn is None:
             success_drone_gps = None
             print('[DEBUG]: No SSH connection to drone detected. The drone gps connection check can not be done.')
-            return
         else:
-            1
+            try:
+                stdin, stdout, stderr = self.remote_drone_conn.exec_command('PowerShell')
+                stdin.channel.send("Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match '^USB' } | Format-List\n")
+                stdin.channel.shutdown_write()
+                usb_list_str = stdout.read().decode('utf-8')
+
+                # Exit the PowerShell
+                stdin, stdout, stderr = self.remote_drone_conn.exec_command('exit')
+            except Exception as e:
+                print("[DEBUG]: Error encountered executing the GPS check commands on drone")
+                print("[DEBUG]: ", e)
+                success_drone_gps = None
+            else:
+                if 'Septentrio' in usb_list_str:
+                    success_drone_gps = True
+                    print("[DEBUG]: GPS is detected at DRONE")
+                else:
+                    success_drone_gps = False
+                    print("[DEBUG]: GPS is NOT detected at DRONE")                
+
+        return success_drone_gps
     
     def get_gnd_ip_node_address(self):
         """
@@ -278,10 +300,12 @@ class WidgetGallery(QDialog):
             self.ssh_conn_gnd_2_drone_label_modifiable.setText(str(None))
             self.drone_rfsoc_conn_label_modifiable.setText(str(None))
         else:
-            SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCES_DRONE_FPGA = self.check_if_ssh_2_drone_reached(self.DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
+            SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCESS_DRONE_FPGA = self.check_if_ssh_2_drone_reached(self.DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
+            SUCCESS_DRONE_GPS = self.check_if_drone_gps_connected()
             self.network_exists_label_modifiable.setText(str(SUCCESS_PING_DRONE))
             self.ssh_conn_gnd_2_drone_label_modifiable.setText(str(SUCCESS_SSH))
-            self.drone_rfsoc_conn_label_modifiable.setText(str(SUCCES_DRONE_FPGA))
+            self.drone_rfsoc_conn_label_modifiable.setText(str(SUCCESS_DRONE_FPGA))
+            self.drone_gps_conn_label_modifiable.setText(str(SUCCESS_DRONE_GPS))
 
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
@@ -305,7 +329,8 @@ class WidgetGallery(QDialog):
         """
         self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, 
                                                  IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
-                                                 AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)            
+                                                 AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)    
+                
     def disconnect_devices(self):
         """
         Wrapper to HelperA2GStopCom.
@@ -326,11 +351,15 @@ class WidgetGallery(QDialog):
         on the GUI.
         
         """
-        self.update_time_gps = 1
-        self.periodical_gps_display_thread = RepeatTimer(self.update_time_gps, self.periodical_gps_display_callback) 
+        self.update_vis_time_gps = 1
+        self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback) 
 
     def periodical_gps_display_callback(self):
-        
+        """
+        Periodically displays GPS position of both devices on the GPS Visualization panel.
+        The period is controlled by the propery "update_vis_time_gps" of this class.
+
+        """
         
         # Display ground node coords
         coords, head_info = self.get_last_sbf_buffer_info(what='Both')
@@ -372,10 +401,10 @@ class WidgetGallery(QDialog):
         self.log_widget.setPlainText(self.log_terminal_txt)
 
     def create_log_terminal(self):
-        '''
+        """
         Access the widget contents by using self.log_widget.setPlainText('')
-        
-        '''
+
+        """
         self.log_widget = CustomTextEdit(self)
         
         #self.log_widget = QTextEdit(self)
@@ -441,9 +470,134 @@ class WidgetGallery(QDialog):
     def create_Beamsteering_settings_panel(self):
         self.beamsteeringSettingsPanel = QGroupBox('Beamsteering settings')
 
-    def left_move_gnd_gimbal(self):
-        1
+    def move_button_gimbal_gnd_callback(self):
+        """
+        Move button callback from the Gimbal GND panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons
+        if the movement is absolute or relative.
+
+        VALUES ENTERED IN THE QLineEdits must be the ANGLE DESIRED. For example: for a yaw absolute movement to -20 deg and a pitch to 97, the user MUST select the absolute radio button
+        and enter -20 in the yaw text box and enter 97 in the pitch text box.
+
+        BOTH yaw AND pitch are required.
+
+        """
+        
+        if hasattr(self, 'myhelpera2g'):
+            if hasattr(self, 'myGimbal'):
+                yaw = self.tx_yaw_value_text_edit.text()
+                pitch = self.tx_pitch_value_text_edit.text()
+
+                if yaw is '' or pitch is '':
+                    print("[DEBUG]: No YAW or PITCH values provided. No gimbal movement will done.")
+                else:
+                    if self.tx_abs_radio_button.isChecked():
+                        ctrl_byte = 0x01
+                    if self.tx_rel_radio_button.isChecked():
+                        ctrl_byte = 0x00
+
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=int(float(yaw)*10), roll=0, pitch=int(float(pitch)*10), ctrl_byte=ctrl_byte)
+                    print(f"[DEBUG]: gimbal moved {yaw} degs in YAW and {pitch} in PITCH from application")        
+            else:
+                print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
+        else:
+            1
     
+    def left_button_gimbal_gnd_callback(self):
+        """
+        Left button callback from the Gimbal GND panel. 
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount
+        given in QLineEdit (textbox at the center of the 'software joystick' in the panel) with respect to the ACTUAL angles.
+
+        """
+        
+        if hasattr(self, 'myhelpera2g'):
+            if hasattr(self, 'myGimbal'):
+                movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
+
+                if movement_step is not '':
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=-int(float(movement_step)*10), roll=0, pitch=0, ctrl_byte=0x00)
+                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                else:
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
+                    print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
+
+            else:
+                print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
+        else:
+            1
+
+    def right_button_gimbal_gnd_callback(self):
+        """
+        Right button callback from the Gimbal GND panel. 
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount
+        given in QLineEdit (textbox at the center of the 'software joystick' in the panel) with respect to the ACTUAL angles.
+
+        """        
+
+        if hasattr(self, 'myhelpera2g'):
+            if hasattr(self, 'myGimbal'):
+                movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
+
+                if movement_step is not '':
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=int(float(movement_step)*10), roll=0, pitch=0, ctrl_byte=0x00)
+                    print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
+                else:
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
+                    print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
+
+            else:
+                print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
+        else:
+            1
+    
+    def up_button_gimbal_gnd_callback(self):
+        """
+        Up button callback from the Gimbal GND panel. 
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount
+        given in QLineEdit (textbox at the center of the 'software joystick' in the panel) with respect to the ACTUAL angles.
+
+        """
+
+        if hasattr(self, 'myhelpera2g'):
+            if hasattr(self, 'myGimbal'):
+                movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
+
+                if movement_step is not '':
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=int(float(movement_step)*10), ctrl_byte=0x00)
+                    print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
+                else:
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
+                    print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
+
+            else:
+                print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
+        else:
+            1
+
+    def down_button_gimbal_gnd_callback(self):
+        """
+        Down button callback from the Gimbal GND panel. 
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount
+        given in QLineEdit (textbox at the center of the 'software joystick' in the panel) with respect to the ACTUAL angles.
+
+        """
+
+        if hasattr(self, 'myhelpera2g'):
+            if hasattr(self, 'myGimbal'):
+                movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
+
+                if movement_step is not '':
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-int(float(movement_step)*10), ctrl_byte=0x00)
+                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                else:
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
+                    print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
+
+            else:
+                print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
+        else:
+            1
+
     def create_Gimbal_GND_panel(self):
         """
         Creates the panel to control the ground gimbal.
@@ -464,11 +618,15 @@ class WidgetGallery(QDialog):
         self.tx_step_manual_move_gimbal_text_edit = QLineEdit('')
         
         self.tx_gimbal_manual_move_push_button = QPushButton('Move')
-        #self.tx_gimbal_manual_move_push_button.clicked.connect(self.)
+        self.tx_gimbal_manual_move_push_button.clicked.connect(self.move_button_gimbal_gnd_callback)
         self.tx_gimbal_move_left_push_button = QPushButton('<-')
+        self.tx_gimbal_move_left_push_button.clicked.connect(self.left_button_gimbal_gnd_callback)
         self.tx_gimbal_move_right_push_button = QPushButton('->')
+        self.tx_gimbal_move_right_push_button.clicked.connect(self.right_button_gimbal_gnd_callback)
         self.tx_gimbal_move_up_push_button = QPushButton('^')
+        self.tx_gimbal_move_up_push_button.clicked.connect(self.up_button_gimbal_gnd_callback)
         self.tx_gimbal_move_down_push_button = QPushButton('v')
+        self.tx_gimbal_move_down_push_button.clicked.connect(self.down_button_gimbal_gnd_callback)
         
         layout = QGridLayout()
         layout.addWidget(self.tx_abs_radio_button, 0, 0, 1, 3)
@@ -582,26 +740,9 @@ class WidgetGallery(QDialog):
         canvas = FigureCanvas(fig_gps)
 
         # Create a QVBoxLayout to hold the canvas
-        layout = QVBoxLayout()
-        layout.addWidget(canvas)
+        #layout = QVBoxLayout()
+        
 
-        # Set the layout of the group box
-        self.gps_vis_panel.setLayout(layout)
-
-        # Create a subplot on the Figure
-        ax_gps = fig_gps.add_subplot(111)
-
-        hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
-        
-        torbacka_point = {'LAT': 60.07850739357558, 'LON': 24.171551864664867}
-        #mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=hi_q)
-        mygpsonmap = GpsOnMap('torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
-        
-        self.mygpsonmap = mygpsonmap
-        
-    def create_GPS_panel(self):
-        self.gpsPanel = QGroupBox('GPS Information')
-        
         tx_info_label = QLabel('TX')
         rx_info_label = QLabel('RX')
         
@@ -623,23 +764,35 @@ class WidgetGallery(QDialog):
         rx_z_value_label = QLabel('')
         
         layout = QGridLayout()
-        layout.addWidget(tx_info_label, 0, 0, 1, 5)
-        layout.addWidget(rx_info_label, 0, 5, 1, 5)
-        layout.addWidget(tx_x_label, 1, 0, 1, 1)
-        layout.addWidget(tx_z_label, 2, 0, 1, 1)
-        layout.addWidget(tx_y_label, 3, 0, 1, 1)
-        layout.addWidget(tx_x_value_label, 1, 1, 1, 4)
-        layout.addWidget(tx_y_value_label, 2, 1, 1, 4)
-        layout.addWidget(tx_z_value_label, 3, 1, 1, 4)
-        layout.addWidget(rx_x_label, 1, 5, 1, 1)
-        layout.addWidget(rx_z_label, 2, 5, 1, 1)
-        layout.addWidget(rx_y_label, 3, 5, 1, 1)
-        layout.addWidget(rx_x_value_label, 1, 6, 1, 4)
-        layout.addWidget(rx_y_value_label, 2, 6, 1, 4)
-        layout.addWidget(rx_z_value_label, 3, 6, 1, 4)
-        #layout.setRowStretch(3, 1)
+        layout.addWidget(canvas, 0, 0, 8, 10)
+        layout.addWidget(tx_info_label, 8, 0, 1, 5)
+        layout.addWidget(rx_info_label, 8, 5, 1, 5)
+        layout.addWidget(tx_x_label, 9, 0, 1, 1)
+        layout.addWidget(tx_z_label, 10, 0, 1, 1)
+        layout.addWidget(tx_y_label, 11, 0, 1, 1)
+        layout.addWidget(tx_x_value_label, 9, 1, 1, 4)
+        layout.addWidget(tx_y_value_label, 10, 1, 1, 4)
+        layout.addWidget(tx_z_value_label, 11, 1, 1, 4)
+        layout.addWidget(rx_x_label, 9, 5, 1, 1)
+        layout.addWidget(rx_z_label, 10, 5, 1, 1)
+        layout.addWidget(rx_y_label, 11, 5, 1, 1)
+        layout.addWidget(rx_x_value_label, 9, 6, 1, 4)
+        layout.addWidget(rx_y_value_label, 10, 6, 1, 4)
+        layout.addWidget(rx_z_value_label, 11, 6, 1, 4)
+
+        # Set the layout of the group box
+        self.gps_vis_panel.setLayout(layout)
+
+        # Create a subplot on the Figure
+        ax_gps = fig_gps.add_subplot(111)
+
+        hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
         
-        self.gpsPanel.setLayout(layout)
+        torbacka_point = {'LAT': 60.07850739357558, 'LON': 24.171551864664867}
+        #mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=hi_q)
+        mygpsonmap = GpsOnMap('torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
+        
+        self.mygpsonmap = mygpsonmap
         
     def create_pdp_plot_panel(self):
         self.pdpPlotPanel = QGroupBox('PDP')
@@ -674,4 +827,5 @@ if __name__ == '__main__':
     #gallery.start_GUI_threads()
     
     #sys.exit(appctxt.app.exec())
+    #app.exec_()
     sys.exit(app.exec())

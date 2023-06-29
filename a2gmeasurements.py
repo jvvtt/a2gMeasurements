@@ -266,11 +266,13 @@ class GimbalRS2(object):
         Set the gimbal position by providing the yaw, roll and pitch
 
         Args:
-            yaw (int): yaw value
-            roll (int): roll value
-            pitch (int): pitch value
-            ctrl_byte (hexadecimal, optional): _description_. Defaults to 0x01.
-            time_for_action (hexadecimal, optional): _description_. Defaults to 0x14.
+            yaw (int): yaw value. Integer value should be between -1800 and 1800
+            roll (int): roll value. Integer value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this)axis value.
+            pitch (int): pitch value. Integer value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this)axis value.
+            ctrl_byte (hexadecimal, optional): Absolute or relative movement. For absolute use 0x01, while for relative use 0x00. Defaults to 0x01.
+            time_for_action (hexadecimal, optional): Time it takes for the gimbal to move to desired position. Implicitly, this
+                                                     command controls the speed of gimbal. It is given in units of 0.1 s. For example: 
+                                                     a value of 0x14 is 20, which means that the gimbal will take 2s (20*0.1) to reach its destination. Defaults to 0x14.
 
         Returns:
             _type_: _description_
@@ -1450,6 +1452,7 @@ class myAnritsuSpectrumAnalyzer(object):
         """
         
         self.anritsu_con_socket.close()
+
 class HelperA2GMeasurements(object):
     def __init__(self, ID, SERVER_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, 
@@ -1524,102 +1527,7 @@ class HelperA2GMeasurements(object):
             self.inst.write('F0 ' + str(F0) + ' GH\n')
             self.inst.write('L0 ' + str(L0)+ ' DM\n')
             time.sleep(0.5)
-        
-    def ground_gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
-                                    lat_drone=None, lon_drone=None, height_drone=None, 
-                                    coord_type='latlon'):
-        """
-        DEPRECATED.
-        """
-
-        # Ground station
-        if self.IsGPS and self.ID == 'GROUND' and lat_ground is None  and lon_ground is None and height_ground is None and heading is None:
-            
-            time_distance_allowed = 2 # meters
-            
-            coords, head_info = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
-            
-            if coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
-                return self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL
-            elif coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ:
-                return self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ
-            else:
-                heading = head_info['Heading']
-                time_tag_heading = head_info['TOW']
-                
-                lat_ground = coords['Y']
-                lon_ground = coords['X']
-                height_ground = coords['Z']
-                time_tag_coords = coords['TOW']
-                datum_coordinates = coords['Datum']
-            
-            '''
-            Check if the time difference (ms) between the heading and the coordinates info is less
-            than the time it takes the node to move a predefined distance with the actual speed.
-            
-            
-            If the node is not moving (self.SPEED = 0) it means the heading info will be always the same
-            and the check is not required.
-            '''
-            if self.SPEED_NODE > 0:
-                if  abs(time_tag_coords - time_tag_heading) > (time_distance_allowed/self.SPEED_NODE)*1000:
-                    print('\n[WARNING]: for the time_distance_allowed the heading info of the grounde node does not correspond to the coordinates')
-                    return self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD, self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD, self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD
-            
-            # Z coordinate is geocentric and does not correspond to the actual height in meters: we need to transform to geodetic and take only the Z variable
-            # Geocentric WGS84
-            if datum_coordinates == 0:
-                _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, height_ground)
-            # Geocentric ETRS89
-            elif datum_coordinates == 30:
-                _, _, height_ground = geocentric2geodetic(lat_ground, lon_ground, height_ground, EPSG_GEOCENTRIC=4346)
-            else:
-                print('\n[ERROR]: Not known geocentric datum')
-                return self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM, self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM            
-            
-            # If retrieved coordinates and heading info, we know they are geocentric (SBF buffer)
-            coord_type = 'planar'
-        
-        if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
-            print("\n[ERROR]: Either ground or drone coordinates MUST be provided")
-            return self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY
-
-        if coord_type == 'latlon':
-            lat_drone_planar, lon_drone_planar = self.convert_DDMMS_to_planar(lon_drone, lat_drone, offset=None, epsg_in=4326, epsg_out=3901)
-            lat_ground_planar, lon_ground_planar = self.convert_DDMMS_to_planar(lon_ground, lat_ground, offset=None, epsg_in=4326, epsg_out=3901)
-
-        # Testing purposes
-        elif coord_type == 'planar':
-            lat_drone_planar = lat_drone
-            lon_drone_planar = lon_drone
-            lat_ground_planar = lat_ground
-            lon_ground_planar = lon_ground
-        
-        position_drone = np.array([lon_drone_planar, lat_drone_planar, height_drone])
-        position_ground = np.array([lon_ground_planar, lat_ground_planar, height_ground])
-                    
-        d_mobile_drone_2D = np.linalg.norm(position_drone[:-1] - position_ground[:-1])
-                        
-        pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)
-        pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
-                            
-        alpha = np.arctan2(lat_drone_planar - lat_ground_planar, lon_drone_planar - lon_ground_planar)
- 
-        # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
-        if heading > np.pi:
-            heading = heading - np.pi*2
-                    
-        yaw_to_set = (alpha - np.pi/2) + heading
-
-        if yaw_to_set > np.pi:
-            yaw_to_set = yaw_to_set - np.pi*2
-        elif yaw_to_set < -np.pi:
-            yaw_to_set = yaw_to_set + np.pi*2
-            
-        yaw_to_set = int(np.rad2deg(-yaw_to_set)*10)
-        
-        return yaw_to_set, pitch_to_set, alpha
-    
+           
     def gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
                                     lat_drone=None, lon_drone=None, height_drone=None):
         """
@@ -1718,40 +1626,6 @@ class HelperA2GMeasurements(object):
         yaw_to_set = int(yaw_to_set*10)
         
         return yaw_to_set, pitch_to_set
-    
-    def convert_DDMMS_to_planar(self, input_lon, input_lat, offset=None, epsg_in=4326, epsg_out=3067):
-            """
-            Converts from DDMMS coordinates to planar coordinates by using a specified projection.
-
-            Args:
-                input_lon (scalar): _description_
-                input_lat (scalar): _description_
-                offset (dictionary, optional): The coordinates of the (0, 0) coordinate in the planar system with meter units. Defaults to None.
-                epsg_in (int, optional): _description_. Defaults to 4326.
-                epsg_out (int, optional): _description_. Defaults to 3067. 
-                
-                Known EPSG codes:
-                3067 ---> EUREF-FIN geodetic datum (ETRS-TM35FIN)
-                4936 ---> ETRS89 Europe
-
-            Returns:
-                lat_planar, lon_planar (float): planar coordinates
-            """
-            
-            # setup your projections, assuming you're using WGS84 geographic
-            crs_wgs = proj.Proj(init='epsg:' + str(epsg_in))
-            crs_bng = proj.Proj(init='epsg:' + str(epsg_out))  # use the Finnish epsg code
-
-            # then cast your geographic coordinate pair to the projected system
-            lon_planar, lat_planar = proj.transform(crs_wgs, crs_bng, input_lon, input_lat)
-
-            # Remove offset
-            if offset is not None:
-                offset_lon_planar, offset_lat_planar = proj.transform(crs_wgs, crs_bng, offset['lon'], offset['lat'])
-                lon_planar = lon_planar - offset_lon_planar
-                lat_planar = lat_planar - offset_lat_planar
-
-            return lat_planar, lon_planar
     
     def build_a2g_frame(self, type_frame='cmd', data=None, cmd=None, cmd_source_for_ans=None):
         """
@@ -2402,6 +2276,7 @@ class RFSoCRemoteControlFromHost():
         self.filename_to_save = filename
         self.hest = []
         self.meas_time_tag = []
+        self.RFSoCSuccessMessage = "Successully executed"
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2410,47 +2285,56 @@ class RFSoCRemoteControlFromHost():
         self.radio_data = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_data.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.radio_data.connect((rfsoc_static_ip_address, radio_data_port))
+        
+    def send_cmd(self, cmd, cmd_arg):
+        """
+        Sends a comand to the RFSoC connected through ethernet to the host computer.
+
+        Args:
+            cmd (str): List of available of commands are: 'setModeSivers', 'setCarrierFrequencySivers', 'setGainTxSivers', 'setGainRxSivers
+            cmd_arg (str or float): command parameter. This the list of supported parameters for each command:
+                                    'setModeSivers'                   'RXen_0_TXen1', 'RXen1_TXen0', 'RXen0_TXen0'
+                                    'setCarrierFrequencySivers'        float number, i.e.: 57.51e9
+        """
+
+        if cmd == 'setModeSivers':
+            if cmd_arg == 'RXen0_TXen1' or cmd_arg == 'RXen1_TXen0' or cmd_arg == 'RXen0_TXen0':
+                self.radio_control.sendall(b"setModeSiver "+str.encode(str(cmd_arg)))
+            else:
+                print("[DEBUG]: Unknown Sivers mode")
+        elif cmd == 'setCarrierFrequencySivers':
+            self.radio_control.sendall(b"setCarrierFrequency "+str.encode(str(cmd_arg)))
+        elif cmd == 'setGainTxSivers':
+            tx_bb_gain = 0x3 # tx_ctrl bit 3 (BB Ibias set) = 0: 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB
+            # tx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB *
+            tx_bb_phase = 0x0 
+            tx_bb_iq_gain = 0x77 # this is the gain in BB, [0:3,I gain]: 0-6 dB, 16 steps, [4:7, Q gain]: 0-6 dB, 16 steps
+            tx_bfrf_gain = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps  
+
+            self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
+                                                        + str.encode(str(int(tx_bb_phase)) + " ") \
+                                                        + str.encode(str(int(tx_bb_iq_gain)) + " ") \
+                                                        + str.encode(str(int(tx_bfrf_gain))))
+        elif cmd == 'setGainRxSivers':
+            rx_gain_ctrl_bb1 = 0x77 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            rx_gain_ctrl_bb2 = 0x00 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            rx_gain_ctrl_bb3 = 0x99 # I[0:3]:[0-F]:0:6 dB, 16 steps, Q[0:3]:[0-F]:0:6 dB, 16 steps,
+            rx_gain_ctrl_bfrf = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps
+            self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
+                                                        + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
+                                                        + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
+                                                        + str.encode(str(int(rx_gain_ctrl_bfrf))))
+        else: 
+            print("[DEBUG]: Unknown command to send to RFSoC")
+            return
+        
+        data = self.radio_control.recv(1024)
+        data = data.decode('utf-8')
             
-    def set_mode(self, mode):
-        if mode == 'RXen0_TXen1' or mode == 'RXen1_TXen0' or mode == 'RXen0_TXen0':
-            self.radio_control.sendall(b"setModeSiver "+str.encode(str(mode)))
-            data = self. radio_control.recv(1024)
-            print(data)
-            return data
-
-    def set_frequency(self, fc):
-        self.radio_control.sendall(b"setCarrierFrequency "+str.encode(str(fc)))
-        data = self.radio_control.recv(1024)
-        print(data)
-        return data
-
-    def set_rx_gain(self):
-        rx_gain_ctrl_bb1 = 0x77 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-        rx_gain_ctrl_bb2 = 0x00 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-        rx_gain_ctrl_bb3 = 0x99 # I[0:3]:[0-F]:0:6 dB, 16 steps, Q[0:3]:[0-F]:0:6 dB, 16 steps,
-        rx_gain_ctrl_bfrf = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps
-        self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
-                                                    + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
-                                                    + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
-                                                    + str.encode(str(int(rx_gain_ctrl_bfrf))))
-        data = self.radio_control.recv(1024)
-        print(data)
-        return data
-
-    def set_tx_gain(self):
-        tx_bb_gain = 0x3 # tx_ctrl bit 3 (BB Ibias set) = 0: 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB
-        # tx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB *
-        tx_bb_phase = 0x0 
-        tx_bb_iq_gain = 0x77 # this is the gain in BB, [0:3,I gain]: 0-6 dB, 16 steps, [4:7, Q gain]: 0-6 dB, 16 steps
-        tx_bfrf_gain = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps  
-
-        self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
-                                                    + str.encode(str(int(tx_bb_phase)) + " ") \
-                                                    + str.encode(str(int(tx_bb_iq_gain)) + " ") \
-                                                    + str.encode(str(int(tx_bfrf_gain))))
-        data = self.radio_control.recv(1024)
-        print(data)
-        return data
+        if data == self.RFSoCSuccessMessage:
+            print("[DEBUG]: Command executed succesfully on Sivers")
+        else:
+            print("[DEBUG]: Command was not successfully executed on Sivers, ", data)
     
     def receive_data(self, stop_event):
         """
