@@ -1501,6 +1501,7 @@ class HelperA2GMeasurements(object):
         
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
+            self.myrfsoc.send_cmd()
         if IsGimbal:
             self.myGimbal = GimbalRS2()
             self.myGimbal.start_thread_gimbal()
@@ -2117,6 +2118,7 @@ class HelperA2GMeasurements(object):
             
             if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
                 self.inst.write('RF0\n')   
+
 class RepeatTimer(threading.Timer):  
     def run(self):  
         while not self.finished.wait(self.interval):  
@@ -2261,6 +2263,7 @@ class SBUSEncoder:
         self.update_channel(channel=5, value=0)
         time.sleep(mov_time)
         self.not_move_command()
+
 class RFSoCRemoteControlFromHost():
     """
     Class that implements methods handling commands to be sent from the host computer (either the ground node or the drone node) to the server program
@@ -2270,13 +2273,20 @@ class RFSoCRemoteControlFromHost():
     
     """
     
-    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDPs'):
+    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDPs', operating_freq=57.51e9):
+        self.operating_freq = operating_freq
         self.radio_control_port = radio_control_port
         self.radio_data_port = radio_data_port
         self.filename_to_save = filename
         self.hest = []
         self.meas_time_tag = []
-        self.RFSoCSuccessMessage = "Successully executed"
+        self.RFSoCSuccessExecutionAns = "Successully executed"
+        self.RFSoCSuccessAns = "Success"
+        self.n_receive_calls = 0
+        self.time_begin_receive_call = 0
+        self.time_finish_receive_call = 0
+        self.time_begin_receive_thread = 0
+        self.time_finish_receive_thread = 0
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2286,7 +2296,7 @@ class RFSoCRemoteControlFromHost():
         self.radio_data.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.radio_data.connect((rfsoc_static_ip_address, radio_data_port))
         
-    def send_cmd(self, cmd, cmd_arg):
+    def send_cmd(self, cmd, cmd_arg=None):
         """
         Sends a comand to the RFSoC connected through ethernet to the host computer.
 
@@ -2324,6 +2334,8 @@ class RFSoCRemoteControlFromHost():
                                                         + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bfrf))))
+        elif cmd == 'transmitSamples':
+            self.radio_control.sendall(b"transmitSamples")
         else: 
             print("[DEBUG]: Unknown command to send to RFSoC")
             return
@@ -2331,19 +2343,39 @@ class RFSoCRemoteControlFromHost():
         data = self.radio_control.recv(1024)
         data = data.decode('utf-8')
             
-        if data == self.RFSoCSuccessMessage:
-            print("[DEBUG]: Command executed succesfully on Sivers")
+        if data == self.RFSoCSuccessExecutionAns or data == self.RFSoCSuccessAns:
+            print("[DEBUG]: Command ", cmd, " executed succesfully on Sivers or RFSoC")
         else:
-            print("[DEBUG]: Command was not successfully executed on Sivers, ", data)
+            print("[DEBUG]: Command ", cmd, " was not successfully executed on Sivers or RFSoC. The following error appears: ", data)
     
-    def receive_data(self, stop_event):
+    def transmit_signal(self):
+        """
+        Wrapper for commands required to transmit signal from RFSoC.
+
+        Once THIS command is executed, the TX on the RFSoC is always transmitting.
+
+        """ 
+
+        self.send_cmd('transmitSamples')
+        self.send_cmd('setModeSivers', cmd_arg='RXen0_TXen1')
+        self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
+        self.send_cmd('setGainTxSivers')
+    
+    def receive_signal(self, stop_event):
         """
         Function callback for the measurement thread.
+
+        Executed whenever the kernel allocates time for this thread to be executed. (~20 ms)
 
         Args:
             stop_event (threading.Event()): flag that is set when to stop the thread.
         """
 
+        self.send_cmd('setModeSivers', cmd_arg='RXen1_TXen0')
+        self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
+        self.send_cmd('setGainRxSivers')
+
+        self.time_begin_receive_thread = time.time()
         while not stop_event.is_set():
             nbeams = 64
             nbytes = 2
@@ -2361,14 +2393,18 @@ class RFSoCRemoteControlFromHost():
                 
             self.hest.append(rxtd)
             self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
+            self.n_receive_calls = self.n_receive_calls + 1
+            self.time_finish_receive_call = time.time()
     
-    def receive_data_async(self):
+    def receive_signal_async(self):
         """
         Function callback when the drone stops at the calculated stops based on the Flight Graph Coordinates and other inputs provided 
         in the Planning Measurements panel of the a2g App.
         
         No threading involved in this method
         """
+        start_call = time.time()
+        
         nbeams = 64
         nbytes = 2
         nread = 1024
@@ -2382,7 +2418,9 @@ class RFSoCRemoteControlFromHost():
             data = np.frombuffer(buf, dtype=np.int16)
             rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
             rxtd = rxtd.reshape(nbeams, nread)
-                
+        
+        stop_call = time.time()
+        print("[DEBUG]: receive_data_async executed in ", stop_call-start_call, " s")
         self.hest.append(rxtd)
         self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
 
@@ -2404,6 +2442,9 @@ class RFSoCRemoteControlFromHost():
     def stop_thread_receive_meas_data(self):
         self.event_stop_thread_rfsoc.set()
         self.t_receive.join()
+        self.time_finish_receive_thread = time.time()
+        print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", (self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls)
+        self.n_receive_calls = 0
     
     def finish_measurement(self):
         

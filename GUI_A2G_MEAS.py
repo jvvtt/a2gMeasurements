@@ -58,8 +58,8 @@ class WidgetGallery(QDialog):
         mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 1, 1)
         mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 1 , 1)
         #mainLayout.addWidget(self.gpsPanel, 2, 0)
-        mainLayout.addWidget(self.gps_vis_panel, 2, 0, 5, 2)
-        mainLayout.addWidget(self.pdpPlotPanel, 2, 2, 5, 2)
+        mainLayout.addWidget(self.pdpPlotPanel, 2, 0, 5, 2)
+        mainLayout.addWidget(self.gps_vis_panel, 2, 2, 5, 2)
         mainLayout.addWidget(self.planningMeasurementsPanel, 7, 0, 1, 2)
         mainLayout.addWidget(self.log_widget, 7, 2, 1, 2)
         
@@ -327,10 +327,12 @@ class WidgetGallery(QDialog):
             IsGimbal (bool, optional): _description_. Defaults to False.
             GPS_Stream_Interval (str, optional): _description_. Defaults to 'sec1'.
         """
-        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, 
+
+        # Local GND station class
+        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsRFSoC=True,
                                                  IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
-                                                 AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)    
-                
+                                                 AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
+
     def disconnect_devices(self):
         """
         Wrapper to HelperA2GStopCom.
@@ -487,7 +489,7 @@ class WidgetGallery(QDialog):
                 yaw = self.tx_yaw_value_text_edit.text()
                 pitch = self.tx_pitch_value_text_edit.text()
 
-                if yaw is '' or pitch is '':
+                if yaw == '' or pitch == '':
                     print("[DEBUG]: No YAW or PITCH values provided. No gimbal movement will done.")
                 else:
                     if self.tx_abs_radio_button.isChecked():
@@ -514,7 +516,7 @@ class WidgetGallery(QDialog):
             if hasattr(self, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
-                if movement_step is not '':
+                if movement_step != '':
                     self.myhelpera2g.myGimbal.setPosControl(yaw=-int(float(movement_step)*10), roll=0, pitch=0, ctrl_byte=0x00)
                     print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 else:
@@ -538,7 +540,7 @@ class WidgetGallery(QDialog):
             if hasattr(self, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
-                if movement_step is not '':
+                if movement_step != '':
                     self.myhelpera2g.myGimbal.setPosControl(yaw=int(float(movement_step)*10), roll=0, pitch=0, ctrl_byte=0x00)
                     print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
                 else:
@@ -562,7 +564,7 @@ class WidgetGallery(QDialog):
             if hasattr(self, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
-                if movement_step is not '':
+                if movement_step != '':
                     self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=int(float(movement_step)*10), ctrl_byte=0x00)
                     print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
                 else:
@@ -586,7 +588,7 @@ class WidgetGallery(QDialog):
             if hasattr(self, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
-                if movement_step is not '':
+                if movement_step != '':
                     self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-int(float(movement_step)*10), ctrl_byte=0x00)
                     print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 else:
@@ -689,21 +691,35 @@ class WidgetGallery(QDialog):
         
         self.gimbalRXPanel.setLayout(layout)
     
+    def start_meas_button_callback(self):
+
+        # Experiment starts
+        self.myhelpera2g.myrfsoc.transmit_signal()
+        self.myhelpera2g.myrfsoc.socket_send_cmd(type_cmd='STARTDRONERFSOC')
+    
+    def stop_meas_button_callback(self):
+        self.myhelpera2g.myrfsoc.socket_send_cmd(type_cmd='STOPDRONERFSOC')
+    
+    def finish_meas_button_callback(self):
+        self.myhelpera2g.myrfsoc.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
+    
+    def manual_meas_radio_button_callback(self):
+        1#self.choose_what_time_is_specified_ComboBox.
+
     def create_Planning_Measurements_panel(self):
         self.planningMeasurementsPanel = QGroupBox('Planning measurements')
         
         self.start_meas_togglePushButton = QPushButton("START")
         self.start_meas_togglePushButton.setCheckable(True)
-        
-        #self.start_meas_togglePushButton.setChecked(True)
+        self.start_meas_togglePushButton.clicked.connect(self.start_meas_button_callback)
         
         self.stop_meas_togglePushButton = QPushButton("STOP")
         self.stop_meas_togglePushButton.setCheckable(True)
-        #self.stop_meas_togglePushButton.setChecked(True)
+        self.stop_meas_togglePushButton.clicked.connect(self.stop_meas_button_callback)
         
         self.finish_meas_togglePushButton = QPushButton("FINISH")
         self.finish_meas_togglePushButton.setCheckable(True)
-        #self.finish_meas_togglePushButton.setChecked(True)
+        self.finish_meas_togglePushButton.clicked.connect(self.finish_meas_button_callback)
         
         self.choose_what_time_is_specified_ComboBox = QComboBox()
         self.choose_what_time_is_specified_ComboBox.addItems(["Time per edge (TPE)", "Time per stop (TPS)", "Total measurement time (TMT)"])
