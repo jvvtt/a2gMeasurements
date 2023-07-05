@@ -2194,7 +2194,7 @@ class SBUSEncoder:
 
         return packet
         
-    def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.009):
+    def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.05): #period_packet=0.009
         """
         Serial port on Raspberry Pi 4 ground node is /dev/ttyAMA#
         
