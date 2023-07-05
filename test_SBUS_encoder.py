@@ -29,7 +29,7 @@ sbus = SBUSEncoder()
 serial_interface = input('\nType serial interface:')
 print(serial_interface)
 
-sbus.start_sbus(serial_interface=serial_interface, period_packet=0.007)
+sbus.start_sbus(serial_interface=serial_interface, period_packet=0.020)
 
 time.sleep(3)
 
