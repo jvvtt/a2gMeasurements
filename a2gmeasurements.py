@@ -2151,9 +2151,18 @@ class SBUSEncoder:
         #m, b = np.linalg.solve([[-100, 1], [100, 1]], [127, 1811])
         #m, b = np.linalg.solve([[-100, 1], [100, 1]], [237, 1864])
         #m, b = np.linalg.solve([[-100, 1], [100, 1]], [0, 2047])
-
+        
+        # Lowest speed experimentally found to counter drifting towards the right azimuth axis. 
+        self.LOW_SPEED_COUNTER_rud = 8.74601226993865933
+        
+        # Drift towards the LEFT in azimuth, due to the use of LOW_SPEED_COUNTER_rud as the base speed (instead of 0)
+        self.left_drifting_due_to_anti_drifiting = 10/75 # cm/s
+        
         self.m = m
         self.b = b
+        self.time_last_move_cmd = 0
+        self.cnt = 0
+        self.ENABLE_UPDATE_REST = False
     
     def set_channel(self, channel, data):
         self.channels[channel] = data & 0x07ff    
@@ -2194,7 +2203,7 @@ class SBUSEncoder:
 
         return packet
         
-    def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.05): #period_packet=0.009
+    def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.009): #period_packet=0.009
         """
         Serial port on Raspberry Pi 4 ground node is /dev/ttyAMA#
         
@@ -2207,17 +2216,19 @@ class SBUSEncoder:
         
         print('\n[DEBUG_0]: serial port connected')
 
-        ##We are now creating a thread timer and controling it  
+        # Timer thread to leep sending data to the channels. This mimics the RC for the FrsKy X8R
         self.timer_fcn = RepeatTimer(period_packet, self.send_sbus_msg)  
-        #self.timer_fcn = threading.Timer(0.07, self.send_sbus_msg)  
-        self.timer_fcn.start() #recalling run  
+        self.timer_fcn.start() 
         
         print('\n[DEBUG]: SBUS threading started')
 
     def stop_updating(self):
         self.timer_fcn.cancel()
+        self.serial_port.close()
     
     def send_sbus_msg(self):
+        if self.ENABLE_UPDATE_REST:
+            self.update_rest_state_channel()
         data = self.encode_data()
         #self.serial_port.write(data.tobytes())
         self.serial_port.write(bytes(data))
@@ -2234,6 +2245,14 @@ class SBUSEncoder:
         self.channels[channel-1] = int(self.m*value + self.b)
         #self.set_channel(channel, int(scale * 2047))
     
+    def update_rest_state_channel(self):
+        if self.cnt % 5 == 0:
+            self.update_channel(channel=4, value=0)
+        else:
+            self.update_channel(channel=4, value=self.LOW_SPEED_COUNTER_rud)
+        
+        self.cnt = self.cnt + 1
+    
     def not_move_command(self):
         '''
         Update the channel so that it does not continue moving
@@ -2243,7 +2262,8 @@ class SBUSEncoder:
         self.update_channel(channel=1, value=0)
         self.update_channel(channel=2, value=0)
         self.update_channel(channel=3, value=0)
-        self.update_channel(channel=4, value=0)
+        #self.update_channel(channel=4, value=0)
+        self.update_channel(channel=4, value=self.LOW_SPEED_COUNTER_rud)
         self.update_channel(channel=5, value=0)
         #time.sleep(0.1)
         
@@ -2255,7 +2275,7 @@ class SBUSEncoder:
             ele (float): should be between -100 , 100
             mov_time (float): time in seconds 
         """
-
+        self.ENABLE_UPDATE_REST = False
         self.update_channel(channel=1, value=0)
         self.update_channel(channel=2, value=ele)
         self.update_channel(channel=3, value=0)
@@ -2263,6 +2283,8 @@ class SBUSEncoder:
         self.update_channel(channel=5, value=0)
         time.sleep(mov_time)
         self.not_move_command()
+        self.ENABLE_UPDATE_REST = True
+        self.time_last_move_cmd = datetime.datetime.now().timestamp()
 
 class RFSoCRemoteControlFromHost():
     """
