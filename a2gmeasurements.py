@@ -2161,8 +2161,8 @@ class SBUSEncoder:
         self.m = m
         self.b = b
         self.time_last_move_cmd = 0
-        self.cnt = 0
-        self.ENABLE_UPDATE_REST = False
+        self.cnt = 1
+        self.ENABLE_UPDATE_REST = True
     
     def set_channel(self, channel, data):
         self.channels[channel] = data & 0x07ff    
