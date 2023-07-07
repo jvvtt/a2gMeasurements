@@ -10,12 +10,21 @@ def ctrl_H16_position(sbus):
     
     while(condition):
         ele =  input('ENTER elevation speed: ')
-        rud = input('ENTER pan speed: ')
-        mov_time = input('ENTER time: ')
+        if isinstance(ele, str):
+            ele = float(ele)
             
-        ele = float(ele)
-        rud = float(rud)
-        mov_time = float(mov_time)
+        else: 
+            return
+        mov_time = input('ENTER time: ')
+        if isinstance(mov_time, str):
+            mov_time = float(mov_time)    
+        else:
+            return
+        rud = input('ENTER pan speed: ')
+        if isinstance(rud, str):
+            rud = float(rud)
+        else:
+            return        
         
         sbus.move_gimbal(ele, rud, mov_time)
         
@@ -40,13 +49,19 @@ experiment_not_finish = True
 rud = 0
 while(experiment_not_finish):
     ele = input('ENTER elevation speed: ')
-    ele = float(ele)
+    if isinstance(ele, str):
+        ele = float(ele)
+    else:
+        break        
     
     condition = True
     while(condition):       
         print('\nACTUAL ELEVATION: ' + str(ele)) 
         mov_time = input('ENTER time: ')
-        mov_time = float(mov_time)
+        if isinstance(mov_time, str):
+            mov_time = float(mov_time)
+        else:
+            break
         
         sbus.move_gimbal(ele, rud, mov_time)
         
