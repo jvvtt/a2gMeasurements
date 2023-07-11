@@ -86,7 +86,11 @@ class WidgetGallery(QDialog):
             success_drone_fpga (bool): True if rfsoc on drone is detected.
             
         """
-        success_ping_network = ping3.ping(drone_ip, timeout=10)
+        try:
+            success_ping_network = ping3.ping(drone_ip, timeout=10)
+        except Exception as e:
+            print("[DEBUG]: Error in ping ", e)
+            success_ping_network = False
         
         #if success_ping_network is not None:
         if success_ping_network:
@@ -173,8 +177,15 @@ class WidgetGallery(QDialog):
         Returns:
             success_ping_gnd_fpga (bool): True if ping is successful, False otherwise.
         """
-        success_ping_gnd_fpga = ping3.ping(gnd_fpga_static_ip_addr, timeout=7)
-        if success_ping_gnd_fpga is not None:
+        try:
+            success_ping_gnd_fpga = ping3.ping(gnd_fpga_static_ip_addr, timeout=7)
+        except Exception as e:
+            print("[DEBUG]: Error in ping ", e)
+            print("[DEBUG]: RFSoC is NOT detected at GND node")
+            success_ping_gnd_fpga = False
+            return
+        
+        if success_ping_gnd_fpga is not None or success_ping_gnd_fpga:
             print("[DEBUG]: RFSoC is detected at GND node")
             success_ping_gnd_fpga = True
         else:
@@ -315,10 +326,32 @@ class WidgetGallery(QDialog):
         self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))
         self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
         self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
-        self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
+
+        if hasattr(self, 'GND_ADDRESS'):
+            self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
+        else:
+            self.GND_ADDRESS =  ''
         #self.drone_gps_conn_label_modifiable.setText()
-    
-    def create_class_instances(self, IsGPS=False, IsGimbal=False, GPS_Stream_Interval='sec1'):
+
+        # Since the app is calling asynchronoulsy functions (based on user-actions type of events) we create here classes and start threads and NOT in the __main__
+        if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
+        if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True, IsRFSoC=True)
+        if SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True)
+        if SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True, IsGPS=True)
+        if not SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
+            self.create_class_instances(IsGPS=True, IsRFSoC=True)
+        if not SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
+            self.create_class_instances(IsRFSoC=True)
+        if not SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
+            print("[DEBUG]: No GND device")
+        if not SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
+            self.create_class_instances(IsGPS=True)
+
+    def create_class_instances(self, IsGPS=False, IsGimbal=False, IsRFSoc=False, GPS_Stream_Interval='sec1'):
         """
         Responsible for creating any objects (class instances) that will be used to connect to and control the devices,
 
@@ -329,7 +362,8 @@ class WidgetGallery(QDialog):
         """
 
         # Local GND station class
-        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsRFSoC=True,
+
+        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsRFSoC=False,
                                                  IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
                                                  AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
 
@@ -355,6 +389,12 @@ class WidgetGallery(QDialog):
         """
         self.update_vis_time_gps = 1
         self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback) 
+
+        # Although thus function should be called when a HelperA2GMeasurements class instance has been created, better to do a double check
+        if hasattr(self, 'myhelpera2g'):
+            self.update_time_gimbal_follow = 1
+            self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
+            #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
 
     def periodical_gps_display_callback(self):
         """
@@ -472,6 +512,15 @@ class WidgetGallery(QDialog):
     def create_Beamsteering_settings_panel(self):
         self.beamsteeringSettingsPanel = QGroupBox('Beamsteering settings')
 
+    def checker_gimbal_input_range(self, angle):
+
+        incorrect_angle_value = False
+        if angle > 180 or angle < -180:
+            print("[DEBUG]: Angle value outside of range")
+            incorrect_angle_value = True
+        
+        return incorrect_angle_value
+
     def move_button_gimbal_gnd_callback(self):
         """
         Move button callback from the Gimbal GND panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons
@@ -485,7 +534,7 @@ class WidgetGallery(QDialog):
         """
         
         if hasattr(self, 'myhelpera2g'):
-            if hasattr(self, 'myGimbal'):
+            if hasattr(self.myhelpera2g, 'myGimbal'):
                 yaw = self.tx_yaw_value_text_edit.text()
                 pitch = self.tx_pitch_value_text_edit.text()
 
@@ -497,12 +546,19 @@ class WidgetGallery(QDialog):
                     if self.tx_rel_radio_button.isChecked():
                         ctrl_byte = 0x00
 
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=int(float(yaw)*10), roll=0, pitch=int(float(pitch)*10), ctrl_byte=ctrl_byte)
-                    print(f"[DEBUG]: gimbal moved {yaw} degs in YAW and {pitch} in PITCH from application")        
+                    try:
+                        yaw = int(float(yaw))
+                        pitch = int(float(pitch))
+                        incorrect_angle_value = self.checker_gimbal_input_range(yaw)
+                        incorrect_angle_value = self.checker_gimbal_input_range(pitch)
+                        self.myhelpera2g.myGimbal.setPosControl(yaw=yaw*10, roll=0, pitch=pitch*10, ctrl_byte=ctrl_byte)
+                        print(f"[DEBUG]: gimbal moved {yaw} degs in YAW and {pitch} in PITCH from application")
+                    except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong angle input, ", e)
             else:
                 print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
         else:
-            1
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
     def left_button_gimbal_gnd_callback(self):
         """
@@ -513,20 +569,28 @@ class WidgetGallery(QDialog):
         """
         
         if hasattr(self, 'myhelpera2g'):
-            if hasattr(self, 'myGimbal'):
+            if hasattr(self.myhelpera2g, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
                 if movement_step != '':
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=-int(float(movement_step)*10), roll=0, pitch=0, ctrl_byte=0x00)
-                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    try:
+                        tmp = int(float(movement_step))
+                        incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                        if tmp < 0:
+                            tmp = abs(tmp)
+                            print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        self.myhelpera2g.myGimbal.setPosControl(yaw=-tmp*10, roll=0, pitch=0, ctrl_byte=0x00)
+                        print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
                 else:
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=-100, roll=0, pitch=0, ctrl_byte=0x00)
                     print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
 
             else:
                 print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
         else:
-            1
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
 
     def right_button_gimbal_gnd_callback(self):
         """
@@ -537,12 +601,17 @@ class WidgetGallery(QDialog):
         """        
 
         if hasattr(self, 'myhelpera2g'):
-            if hasattr(self, 'myGimbal'):
+            if hasattr(self.myhelpera2g, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
                 if movement_step != '':
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=int(float(movement_step)*10), roll=0, pitch=0, ctrl_byte=0x00)
-                    print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
+                    tmp = int(float(movement_step))
+                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                    if tmp < 0:
+                        tmp = abs(tmp)
+                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=tmp*10, roll=0, pitch=0, ctrl_byte=0x00)
+                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 else:
                     self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
                     print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
@@ -550,7 +619,7 @@ class WidgetGallery(QDialog):
             else:
                 print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
         else:
-            1
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
     def up_button_gimbal_gnd_callback(self):
         """
@@ -561,20 +630,25 @@ class WidgetGallery(QDialog):
         """
 
         if hasattr(self, 'myhelpera2g'):
-            if hasattr(self, 'myGimbal'):
+            if hasattr(self.myhelpera2g, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
                 if movement_step != '':
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=int(float(movement_step)*10), ctrl_byte=0x00)
-                    print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
+                    tmp = int(float(movement_step))
+                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                    if tmp < 0:
+                        tmp = abs(tmp)
+                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=tmp*10, ctrl_byte=0x00)
+                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 else:
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=100, ctrl_byte=0x00)
                     print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
 
             else:
                 print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
         else:
-            1
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
 
     def down_button_gimbal_gnd_callback(self):
         """
@@ -585,20 +659,25 @@ class WidgetGallery(QDialog):
         """
 
         if hasattr(self, 'myhelpera2g'):
-            if hasattr(self, 'myGimbal'):
+            if hasattr(self.myhelpera2g, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
                 if movement_step != '':
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-int(float(movement_step)*10), ctrl_byte=0x00)
+                    tmp = int(float(movement_step))
+                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                    if tmp < 0:
+                        tmp = abs(tmp)
+                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-tmp*10, ctrl_byte=0x00)
                     print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 else:
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
+                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-100, ctrl_byte=0x00)
                     print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
 
             else:
                 print("[DEBUG]: No gimbal has been created at GND, so buttons will do nothing")
         else:
-            1
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
 
     def create_Gimbal_GND_panel(self):
         """
@@ -836,12 +915,10 @@ if __name__ == '__main__':
     app = QApplication([])
     gallery = WidgetGallery()
     gallery.show()
-    
-    #gallery.get_ip_node_addresses()
-    #gallery.check_status_all_devices()
-    #gallery.create_class_instances(IsGPS=False, IsGimbal=False, GPS_Stream_Interval='sec1')
+
     #gallery.start_GUI_threads()
     
     #sys.exit(appctxt.app.exec())
     #app.exec_()
+#    gallery.myhelpera2g.HelperA2GStopCom(DISC_WHAT='GIMBAL')
     sys.exit(app.exec())
