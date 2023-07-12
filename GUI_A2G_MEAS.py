@@ -333,6 +333,11 @@ class WidgetGallery(QDialog):
             self.GND_ADDRESS =  ''
         #self.drone_gps_conn_label_modifiable.setText()
 
+        # User presses more than once the "Check" button
+        if hasattr(self, 'myhelpera2g'):
+            self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
+            del self.myhelpera2g
+        
         # Since the app is calling asynchronoulsy functions (based on user-actions type of events) we create here classes and start threads and NOT in the __main__
         if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
@@ -351,7 +356,7 @@ class WidgetGallery(QDialog):
         if not SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
             self.create_class_instances(IsGPS=True)
 
-    def create_class_instances(self, IsGPS=False, IsGimbal=False, IsRFSoc=False, GPS_Stream_Interval='sec1'):
+    def create_class_instances(self, IsGPS=False, IsGimbal=False, IsRFSoC=False, GPS_Stream_Interval='sec1'):
         """
         Responsible for creating any objects (class instances) that will be used to connect to and control the devices,
 
@@ -363,8 +368,9 @@ class WidgetGallery(QDialog):
 
         # Local GND station class
 
-        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsRFSoC=False,
+        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsRFSoC=IsRFSoC,
                                                  IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
+                                                 rfsoc_static_ip_address='10.1.1.30',
                                                  AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
 
     def disconnect_devices(self):
