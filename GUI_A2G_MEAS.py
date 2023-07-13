@@ -338,6 +338,8 @@ class WidgetGallery(QDialog):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
             del self.myhelpera2g
         
+        time.sleep(0.5)
+        
         # Since the app is calling asynchronoulsy functions (based on user-actions type of events) we create here classes and start threads and NOT in the __main__
         if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
