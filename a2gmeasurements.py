@@ -2028,7 +2028,7 @@ class HelperA2GMeasurements(object):
         self.socket = s
         
         # This will block, so keep it low
-        self.socket.settimeout(15) 
+        self.socket.settimeout(60) 
         
         # CLIENT
         if self.ID == 'DRONE':

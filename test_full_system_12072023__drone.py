@@ -14,7 +14,7 @@ while(not is_ip_addr):
     GND_ADDRESS = input('Enter GND node IP address: ')
     is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))    
 
-drone_a2g_helper = HelperA2GMeasurements('DRONE', GND_ADDRESS, DBG_LVL_1=True, IsGPS=True, IsRFSoc=True, rfsoc_static_ip_address='10.1.1.40')
+drone_a2g_helper = HelperA2GMeasurements('DRONE', GND_ADDRESS, DBG_LVL_1=False, IsGPS=True, IsRFSoC=True, rfsoc_static_ip_address='10.1.1.40')
 drone_a2g_helper.HelperStartA2GCom()
 
 try:    
