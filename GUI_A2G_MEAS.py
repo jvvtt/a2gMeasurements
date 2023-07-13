@@ -338,6 +338,8 @@ class WidgetGallery(QDialog):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
             del self.myhelpera2g
         
+        time.sleep(0.5)
+        
         # Since the app is calling asynchronoulsy functions (based on user-actions type of events) we create here classes and start threads and NOT in the __main__
         if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
@@ -611,13 +613,16 @@ class WidgetGallery(QDialog):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
                 if movement_step != '':
-                    tmp = int(float(movement_step))
-                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
-                    if tmp < 0:
-                        tmp = abs(tmp)
-                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=tmp*10, roll=0, pitch=0, ctrl_byte=0x00)
-                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    try:
+                        tmp = int(float(movement_step))
+                        incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                        if tmp < 0:
+                            tmp = abs(tmp)
+                            print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        self.myhelpera2g.myGimbal.setPosControl(yaw=tmp*10, roll=0, pitch=0, ctrl_byte=0x00)
+                        print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
+                    except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
                 else:
                     self.myhelpera2g.myGimbal.setPosControl(yaw=100, roll=0, pitch=0, ctrl_byte=0x00)
                     print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
@@ -640,13 +645,16 @@ class WidgetGallery(QDialog):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
                 if movement_step != '':
-                    tmp = int(float(movement_step))
-                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
-                    if tmp < 0:
-                        tmp = abs(tmp)
-                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=tmp*10, ctrl_byte=0x00)
-                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    try:
+                        tmp = int(float(movement_step))
+                        incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                        if tmp < 0:
+                            tmp = abs(tmp)
+                            print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=tmp*10, ctrl_byte=0x00)
+                        print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
                 else:
                     self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=100, ctrl_byte=0x00)
                     print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
@@ -669,13 +677,16 @@ class WidgetGallery(QDialog):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
 
                 if movement_step != '':
-                    tmp = int(float(movement_step))
-                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
-                    if tmp < 0:
-                        tmp = abs(tmp)
-                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
-                    self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-tmp*10, ctrl_byte=0x00)
-                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    try:
+                        tmp = int(float(movement_step))
+                        incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                        if tmp < 0:
+                            tmp = abs(tmp)
+                            print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-tmp*10, ctrl_byte=0x00)
+                        print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
+                    except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
                 else:
                     self.myhelpera2g.myGimbal.setPosControl(yaw=0, roll=0, pitch=-100, ctrl_byte=0x00)
                     print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
