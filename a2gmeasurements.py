@@ -2289,6 +2289,20 @@ class SBUSEncoder:
         self.not_move_command()
         self.ENABLE_UPDATE_REST = True
         self.time_last_move_cmd = datetime.datetime.now().timestamp()
+    
+    def turn_off_motors(self):
+        self.update_channel(channel=1, value=0)
+        self.update_channel(channel=2, value=0)
+        self.update_channel(channel=3, value=0)
+        self.update_channel(channel=4, value=0)
+        self.update_channel(channel=5, value=100)
+    
+    def turn_on_motors(self):
+        # Turn on motors and set the gimbal to lock mode
+        self.update_channel(channel=5, value=0)
+        
+        # Turn on motors and set the gimbal to follow mode
+        #self.update_channel(channel=5, value=-100)
 
 class RFSoCRemoteControlFromHost():
     """
