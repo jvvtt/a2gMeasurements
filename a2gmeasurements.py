@@ -1457,7 +1457,7 @@ class HelperA2GMeasurements(object):
     def __init__(self, ID, SERVER_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, 
                  IsGimbal=False, IsGPS=False, IsSignalGenerator=False, IsRFSoC=False,
-                 rfsoc_static_ip_address='10.1.1.40', #uses the default ip_adress
+                 rfsoc_static_ip_address=None, #uses the default ip_adress
                  F0=None, L0=None,
                  SPEED=0,
                  GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
@@ -1493,6 +1493,7 @@ class HelperA2GMeasurements(object):
         self.DBG_LVL_1 = DBG_LVL_1
         self.IsGimbal = IsGimbal
         self.IsGPS = IsGPS
+        self.IsRFSoC = IsRFSoC
         self.IsSignalGenerator = IsSignalGenerator
         self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD = -7.5e3 
         self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM = -8.5e3
@@ -2118,7 +2119,7 @@ class HelperA2GMeasurements(object):
             if self.IsSignalGenerator and (DISC_WHAT=='ALL' or DISC_WHAT == 'SG'): 
                 self.inst.write('RF0\n')   
             
-            if self.IsRFSoc and (DISC_WHAT=='ALL' or DISC_WHAT == 'RFSOC'):
+            if self.IsRFSoC and (DISC_WHAT=='ALL' or DISC_WHAT == 'RFSOC'):
                 self.myrfsoc.radio_control.close()
                 self.myrfsoc.radio_data.close()
 
