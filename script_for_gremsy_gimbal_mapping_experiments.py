@@ -15,7 +15,7 @@ def distance_3_sensitivity(delta_a_i, a0, alphas, betas, gammas, N):
     print(" b' : ", b_prime)
 
 # Refer to Excel document with the experiment setup
-a = [2, 1.977, 1.952, 1.931, 1.914, 1.901, 1.895, 1.892, 1.894, 1.903, 1.917, 1.935, 1.957]
+a = [1.985, 1.955, 1.93, 1.91, 1.895, 1.884, 1.878, 1.879, 1.882, 1.892, 1.906, 1.926, 1.949]
 b = [0.1]*(len(a)-1)
 N = len(b)
 
@@ -31,9 +31,9 @@ alphas = np.arccos(alphas)
 betas = np.arccos(betas)
 gammas = np.arccos(gammas)
 
-print('ALPHAS: ', np.rad2deg(alphas))
-print('BETAS: ', np.rad2deg(betas))
-print('GAMMAS: ', np.rad2deg(gammas))
+for i in range(len(alphas)):
+    print('Idx: ', i+1, ', ALPHAS: ', np.rad2deg(alphas[i]), ', BETAS: ', np.rad2deg(betas[i]), ', GAMMAS: ', np.rad2deg(gammas[i]))
+
 print('CHECK TRIANGLE ANGLE SUM: ', np.rad2deg(alphas+betas+gammas))
 
-distance_3_sensitivity(30, a[0], alphas, betas, gammas, N)
+distance_3_sensitivity(150, a[0], alphas, betas, gammas, N)
