@@ -17,12 +17,11 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import sys
-from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, RFSoCRemoteControlFromHost, RepeatTimer
+from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, RFSoCRemoteControlFromHost, RepeatTimer, GimbalGremsyH16, SBUSEncoder
 from a2gUtils import GpsOnMap, geocentric2geodetic, geodetic2geocentric
 
 import tkinter as tk
 from tkinter import simpledialog, messagebox
-
 
 class CustomTextEdit(QTextEdit):
     def write(self, text):
@@ -138,7 +137,6 @@ class WidgetGallery(QDialog):
     def check_if_drone_fpga_connected(self, drone_fpga_static_ip_addr='10.1.1.40'):
         """
         Checks if the rfsoc is detected on the drone. 
-        
         Caller function SHOULD check first if there is a ssh connection.
         
         Args:
@@ -194,6 +192,33 @@ class WidgetGallery(QDialog):
         
         return success_ping_gnd_fpga
     
+    def check_if_drone_gimbal_connected(self):
+        if self.remote_drone_conn is None:
+            success_drone_gimbal = None
+            print('[DEBUG]: No SSH connection to drone detected. The drone gps connection check can not be done.')
+        else:
+            try:
+                stdin, stdout, stderr = self.remote_drone_conn.exec_command('PowerShell')
+                stdin.channel.send("Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match '^USB' } | Format-List\n")
+                stdin.channel.shutdown_write()
+                usb_list_str = stdout.read().decode('utf-8')
+
+                # Exit the PowerShell
+                stdin, stdout, stderr = self.remote_drone_conn.exec_command('exit')
+            except Exception as e:
+                print("[DEBUG]: Error encountered executing the Gimbal check commands on drone")
+                print("[DEBUG]: ", e)
+                success_drone_gimbal = None
+            else:
+                if 'USB Serial Converter' in usb_list_str:
+                    success_drone_gimbal = True
+                    print("[DEBUG]: Gremsy Gimbal is detected at DRONE")
+                else:
+                    success_drone_gimbal = False
+                    print("[DEBUG]: Gremsy Gimbal is NOT detected at DRONE")                
+
+        return success_drone_gimbal
+
     def check_if_gnd_gimbal_connected(self):
         """
         Function for checking if gimbal RS2 is connected on ground node.
@@ -313,10 +338,12 @@ class WidgetGallery(QDialog):
         else:
             SUCCESS_PING_DRONE, SUCCESS_SSH, SUCCESS_DRONE_FPGA = self.check_if_ssh_2_drone_reached(self.DRONE_ADDRESS, "manifold-uav-vtt", "mfold2208")
             SUCCESS_DRONE_GPS = self.check_if_drone_gps_connected()
+            SUCCES_DRONE_GIMBAL = self.check_if_drone_gimbal_connected()
             self.network_exists_label_modifiable.setText(str(SUCCESS_PING_DRONE))
             self.ssh_conn_gnd_2_drone_label_modifiable.setText(str(SUCCESS_SSH))
             self.drone_rfsoc_conn_label_modifiable.setText(str(SUCCESS_DRONE_FPGA))
             self.drone_gps_conn_label_modifiable.setText(str(SUCCESS_DRONE_GPS))
+            self.drone_gimbal_conn_label_modifiable.setText(str(SUCCES_DRONE_GIMBAL))
 
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
@@ -473,6 +500,7 @@ class WidgetGallery(QDialog):
         ssh_conn_gnd_2_drone_label = QLabel('SSH to drone:')
         drone_rfsoc_conn_label = QLabel('Drone RFSoC:')
         drone_gps_conn_label = QLabel('Drone GPS:')
+        drone_gimbal_conn_label = QLabel('Drone Gimbal:')
 
         gnd_ip_addr_label = QLabel('Ground IP:')
         air_ip_addr_label = QLabel('Drone IP:')
@@ -488,6 +516,7 @@ class WidgetGallery(QDialog):
         self.ssh_conn_gnd_2_drone_label_modifiable = QLabel('--')
         self.drone_rfsoc_conn_label_modifiable = QLabel('--')
         self.drone_gps_conn_label_modifiable = QLabel('--')
+        self.drone_gimbal_conn_label_modifiable = QLabel('--')
 
         layout = QGridLayout()
 
@@ -509,9 +538,10 @@ class WidgetGallery(QDialog):
         layout.addWidget(self.drone_gps_conn_label_modifiable, 0, 15, 1, 1)
         layout.addWidget(air_ip_addr_label, 1, 0, 1, 3)
         layout.addWidget(self.air_ip_addr_value_text_edit, 1, 3, 1, 3)
-        layout.addWidget(self.check_connections_push_button, 1, 6, 1, 10)
+        layout.addWidget(drone_gimbal_conn_label, 1, 6, 1, 2)
+        layout.addWidget(self.drone_gimbal_conn_label_modifiable, 1, 8, 1, 2)        
+        layout.addWidget(self.check_connections_push_button, 1, 10, 1, 6)
         
-
         self.checkConnPanel.setLayout(layout)
 
     def create_FPGA_settings_panel(self):
@@ -575,7 +605,6 @@ class WidgetGallery(QDialog):
         given in QLineEdit (textbox at the center of the 'software joystick' in the panel) with respect to the ACTUAL angles.
 
         """
-        
         if hasattr(self, 'myhelpera2g'):
             if hasattr(self.myhelpera2g, 'myGimbal'):
                 movement_step = self.tx_step_manual_move_gimbal_text_edit.text()
@@ -696,6 +725,81 @@ class WidgetGallery(QDialog):
         else:
             print("[DEBUG]: No HelperA2GMeasurements class instance is available")
 
+    def move_button_gimbal_drone_callback(self):
+        1
+    
+    def left_button_gimbal_drone_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
+            if movement_step != '':
+                try:
+                    tmp = int(float(movement_step))
+                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                    if tmp < 0:
+                        tmp = abs(tmp)
+                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        
+                    data = {'YAW': -tmp, 'PITCH': 0}
+                    self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
+            else:
+                data = {'YAW': -10, 'PITCH': 0}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
+    
+    def right_button_gimbal_drone_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
+            if movement_step != '':
+                try:
+                    tmp = int(float(movement_step))
+                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                    if tmp < 0:
+                        tmp = abs(tmp)
+                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        
+                    data = {'YAW': tmp, 'PITCH': 0}
+                    self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
+            else:
+                data = {'YAW': 10, 'PITCH': 0}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
+    
+    def up_button_gimbal_drone_callback(self):
+        1
+    
+    def down_button_gimbal_drone_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
+            if movement_step != '':
+                try:
+                    tmp = int(float(movement_step))
+                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                    if tmp < 0:
+                        tmp = abs(tmp)
+                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        
+                    data = {'YAW': 0, 'PITCH': -tmp}
+                    self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
+            else:
+                data = {'YAW': 0, 'PITCH': -tmp}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
+    
     def create_Gimbal_GND_panel(self):
         """
         Creates the panel to control the ground gimbal.
@@ -765,9 +869,12 @@ class WidgetGallery(QDialog):
         
         self.rx_gimbal_manual_move_push_button = QPushButton('Move')
         self.rx_gimbal_move_left_push_button = QPushButton('<-')
+        self.rx_gimbal_move_left_push_button.clicked.connect(self.left_button_gimbal_drone_callback)
         self.rx_gimbal_move_right_push_button = QPushButton('->')
+        self.rx_gimbal_move_right_push_button.clicked.connect(self.right_button_gimbal_drone_callback)
         self.rx_gimbal_move_up_push_button = QPushButton('^')
         self.rx_gimbal_move_down_push_button = QPushButton('v')
+        self.rx_gimbal_move_down_push_button.clicked.connect(self.down_button_gimbal_drone_callback)
         
         layout = QGridLayout()
         layout.addWidget(self.rx_abs_radio_button, 0, 0, 1, 3)
@@ -791,13 +898,13 @@ class WidgetGallery(QDialog):
 
         # Experiment starts
         self.myhelpera2g.myrfsoc.transmit_signal()
-        self.myhelpera2g.myrfsoc.socket_send_cmd(type_cmd='STARTDRONERFSOC')
+        self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC')
     
     def stop_meas_button_callback(self):
-        self.myhelpera2g.myrfsoc.socket_send_cmd(type_cmd='STOPDRONERFSOC')
+        self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
     
     def finish_meas_button_callback(self):
-        self.myhelpera2g.myrfsoc.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
+        self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
     
     def manual_meas_radio_button_callback(self):
         1#self.choose_what_time_is_specified_ComboBox.

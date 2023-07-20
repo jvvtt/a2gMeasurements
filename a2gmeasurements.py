@@ -1,3 +1,4 @@
+from sklearn.linear_model import LinearRegression
 import logging
 from itertools import groupby
 from operator import itemgetter
@@ -26,6 +27,8 @@ from a2gUtils import geocentric2geodetic, geodetic2geocentric
 from pyproj import Transformer, Geod
 from multiprocessing.shared_memory import SharedMemory
 from PyQt5.QtCore import pyqtSignal
+import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 
 """
 Author: Julian D. Villegas G.
@@ -1465,12 +1468,13 @@ class HelperA2GMeasurements(object):
         GROUND station is the server and AIR station is the client.
 
         Args:
-            ID (_type_): _description_
+            ID (str): 'DRONE' or 'GND'
             SERVER_ADDRESS (str): the IP address of the server (the ground station)
             DBG_LVL_0 (bool): provides DEBUG support at the lowest level (i.e printing incoming messages)
             DBG_LVL_1 (bool): provides DEBUG support at the medium level (i.e printing exceptions)
-            IsGimbal (bool): An RS2 Gimbal is going to be connected.
-            IsGPS (bool): A Septentrio GPS is going to be connected.
+            IsGimbal (bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A GIMBAL IS CONNECTED.
+            IsGPS (bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A GPS IS CONNECTED.
+            IsRFSoC(bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A RFSOC IS CONNECTED.
             SPEED (float): the speed of the node. If the node is GROUND it should be 0 (gnd node does not move) as it is by default.
             GPS_Stream_Interval (str): check the GPS manual for the list of strings available. This is used to set the regularity at which 
                                        the gps receiver asks its gps coordinates.
@@ -1503,9 +1507,14 @@ class HelperA2GMeasurements(object):
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
         if IsGimbal:
-            self.myGimbal = GimbalRS2()
-            self.myGimbal.start_thread_gimbal()
-            time.sleep(0.5)
+            if self.ID == 'GND':
+                self.myGimbal = GimbalRS2()
+                self.myGimbal.start_thread_gimbal()
+                time.sleep(0.5)
+            elif self.ID == 'DRONE':
+                self.myGimbal = GimbalGremsyH16()
+                self.myGimbal.start_conn()
+                
         if IsGPS:
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
             self.mySeptentrioGPS.serial_connect()
@@ -1723,7 +1732,8 @@ class HelperA2GMeasurements(object):
         Function to execute when the received instruction in the a2g comm link is 'SETGIMBAL'.
 
         Args:
-            msg_data (): string array with the yaw and pitch angle to be moved.                             
+            msg_data (dict): The dictionary is expected to contain the following keys:
+                             'YAW'
         """
 
         if self.IsGimbal:
@@ -1735,11 +1745,16 @@ class HelperA2GMeasurements(object):
                 print('\n[ERROR]: no YAW or PITCH provided')
                 return
             else:
-                if float(msg_data['YAW']) > 1800 or float(msg_data['PITCH']) > 1800 or float(msg_data['YAW']) < -1800 or float(msg_data['PITCH']) < -1800:
+                if float(msg_data['YAW']) > 1800 or float(msg_data['PITCH']) > 400 or float(msg_data['YAW']) < -1800 or float(msg_data['PITCH']) < -600:
                     print('\n[ERROR]: Yaw or pitch angles are outside of range')
                     return
                 else:
-                    self.myGimbal.setPosControl(yaw=int(msg_data['YAW']), roll=0, pitch=int(msg_data['PITCH']))
+                    if self.ID == 'GND':
+                        # Cast to int values as a double check, but values are send as numbers and not as strings.
+                        self.myGimbal.setPosControl(yaw=int(msg_data['YAW']), roll=0, pitch=int(msg_data['PITCH']))
+                    if self.ID == 'DRONE':
+                        # Cast to float values as a double check, but values are send as numbers and not as strings.
+                        self.myGimbal.setPosControl(yaw=float(msg_data['YAW']), pitch=float(msg_data['PITCH']))
         else:
             print('\n[WARNING]: Action to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
@@ -2128,6 +2143,246 @@ class RepeatTimer(threading.Timer):
         while not self.finished.wait(self.interval):  
             self.function(*self.args,**self.kwargs)
 
+class GimbalGremsyH16:
+    """
+    In azimuth and elevation, the speed is controlled by a value between [-100, 100].
+    In both cases, the speed range > 0 is not simetrical w.r.t the speed range < 0. 
+    This means, for example, -15 doesn't move the gimbal the same angle (at opposite direction) as 15, considering for both speeds the smae time was used.
+    
+    """
+    def __init__(self, speed_time_azimuth_table=None, speed_time_elevation_table=None):
+        """
+            speed_time_azimuth_table (ndarray): n x 3. First column is speed, second column is time, third column is azimuth. 
+            speed_time_elevation_table (ndarray): n x 3. First column is speed, second column is time, third column is elevation. 
+        
+        """               
+        if speed_time_azimuth_table is not None:
+            self.speed_time_azimuth_table = speed_time_azimuth_table
+            self.speed_time_elevation_table = speed_time_elevation_table
+        else:
+            self.load_measured_data_july_2023()
+
+        # Assume linear fit:
+        # For a longer range of speeds than the used in the default data, it is very likely that the fit won't be linear
+        self.build_linear_fit()    
+    
+    def build_linear_fit(self):
+        """
+        Fit a plane to the (speed, time, angle) table
+        
+        """
+        is_positive_azimuth = self.speed_time_azimuth_table > 0
+        is_positive_elevation = self.speed_time_elevation_table > 0
+        
+        X = self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 0:2]
+        y = np.rad2deg(self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 2])
+        self.az_speed_pos_regresor = LinearRegression().fit(X, y)
+        self.score_az_speed_pos_regresor = self.az_speed_pos_regresor.score(X, y)
+        print("[DEBUG]: POSITIVE SPEEDS (LEFT), AZIMUTH, R^2 Score Linear Reg: ", self.score_az_speed_pos_regresor)
+        
+        X = self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 0:2]
+        y = np.rad2deg(self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 2])
+        self.az_speed_neg_regresor = LinearRegression().fit(X, y)
+        self.score_az_speed_neg_regresor = self.az_speed_neg_regresor.score(X, y)
+        print("[DEBUG]: NEGATIVE SPEEDS (RIGHT), AZIMUTH, R^2 Score Linear Reg: ", self.score_az_speed_neg_regresor)
+        
+        X = self.speed_time_elevation_table[~is_positive_elevation[:, 0], 0:2]
+        y = np.rad2deg(self.speed_time_elevation_table[~is_positive_elevation[:, 0], 2])
+        self.el_speed_neg_regresor = LinearRegression().fit(X, y)
+        self.score_el_speed_neg_regresor = self.el_speed_neg_regresor.score(X, y)
+        print("[DEBUG]: NEGATIVE SPEEDS (DOWN), ELEVATION, R^2 Score Linear Reg: ", self.score_el_speed_neg_regresor)
+    
+    def load_measured_drifts(self):
+        """
+        First column is time [s] and second column is angle computed from (a_{i}, a_{i+1}, b_{i}) distances
+        
+        """ 
+        drift_with_low_speed_counter = [[137, self.gremsy_angle(2, 1.97, 10)],
+                                        [144, self.gremsy_angle(1.97, 1.94, 10)],
+                                        [145, self.gremsy_angle(1.94, 1.927, 10)],
+                                        [156, self.gremsy_angle(1.927, 1.911, 10)],
+                                        [164, self.gremsy_angle(1.911, 1.898, 10)],
+                                        [148, self.gremsy_angle(1.898, 1.892, 10)],
+                                        [164, self.gremsy_angle(1.892, 1.89, 10)],
+                                        [176, self.gremsy_angle(1.89, 1.894, 10)],
+                                        [185, self.gremsy_angle(1.894, 1.9, 10)],
+                                        [159, self.gremsy_angle(1.9, 1.914, 10)],
+                                        [159, self.gremsy_angle(1.914, 1.932, 10)],
+                                        [146, self.gremsy_angle(1.932, 1.954, 10)]]
+        
+        drift_without_low_speed_counter = [[28.91, self.gremsy_angle(2, 1.971, 10)],
+                                           [28.43, self.gremsy_angle(1.971, 1.95, 10)],
+                                           [28.46, self.gremsy_angle(1.95, 1.923, 10)],
+                                           [30.14, self.gremsy_angle(1.923, 1.9, 10)],
+                                           [29.76, self.gremsy_angle(1.9, 1.888, 10)],
+                                           [29.36, self.gremsy_angle(1.888, 1.884, 10)],
+                                           [31.41, self.gremsy_angle(1.884, 1.872, 10)],
+                                           [31.3, self.gremsy_angle(1.872, 1.881, 10)],
+                                           [28.77, self.gremsy_angle(1.881, 1.89, 10)],
+                                           [31.56, self.gremsy_angle(1.89, 1.912, 10)],
+                                           [29.15, self.gremsy_angle(1.912, 1.935, 10)]]
+        
+        self.avg_drift_with_low_speed_counter = np.array(drift_with_low_speed_counter).mean(axis=0) # 2D array 
+        self.avg_drift_without_low_speed_counter = np.array(drift_without_low_speed_counter).mean(axis=0) # 2D array
+    
+    def load_measured_data_july_2023(self):
+        """
+        This table contains as columns the speed [-100, 100], time [s], and the (near) azimuth angle computed 
+        from the 3 distances (a_{i}, a_{i+1}, b_{i}). The distances were measured
+        
+        """        
+        speed_time_azimuth_table = [[15, 6, self.gremsy_angle(1.903, 1.949, 0.87)], 
+                        [15, 7, self.gremsy_angle(1.955, 1.926, 1)],
+                        [15, 8, self.gremsy_angle(2.071, 1.897, 1.19)],
+                        [15, 9, self.gremsy_angle(2.023, 1.949, 1.315)],
+                        [16, 5, self.gremsy_angle(1.879, 2.078, 0.875)],
+                        [16, 6, self.gremsy_angle(1.883, 2.069, 1.025)],
+                        [16, 7, self.gremsy_angle(1.897, 2.219, 1.26)],
+                        [14, 7, self.gremsy_angle(1.886, 1.994, 0.86)],
+                        [14, 8, self.gremsy_angle(1.881, 2.069, 1)],
+                        [14, 9, self.gremsy_angle(1.888, 2.086, 1.134)],
+                        [-14, 4, self.gremsy_angle(1.922, 2.047, 1.255)],
+                        [-14, 5, self.gremsy_angle(1.961, 2.117, 1.59)],
+                        [-14, 6, self.gremsy_angle(2.106, 2.089, 1.93)],
+                        [-13, 4, self.gremsy_angle(2.034, 1.909, 1.165)],
+                        [-13, 5, self.gremsy_angle(2.025, 1.985, 1.44)],
+                        [-13, 6, self.gremsy_angle(2.183, 1.98, 1.79)]]
+        self.speed_time_azimuth_table = np.array(speed_time_azimuth_table)
+            
+        speed_time_elevation_table = [[-5, 1, self.gremsy_angle(1.884, 1.882, 0.1)],
+                                            [-5, 2, self.gremsy_angle(1.881, 1.889, 0.175)],
+                                            [-5, 3, self.gremsy_angle(1.89, 1.934, 0.272)],
+                                            [-5, 4, self.gremsy_angle(1.889, 1.891, 0.345)]]
+        self.speed_time_elevation_table = np.array(speed_time_elevation_table)        
+    
+    def gremsy_angle(self, distance_1, distance_2, distance_3):
+        """
+        Computes the angle between the sides of the triangle given by distance_1 and distance_2. 
+        The opposite side to the angle computed is the one defined by distance_3.
+
+        Args:
+            distance_1 (float): _description_
+            distance_2 (float): _description_
+            distance_3 (float): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        tmp = (distance_1**2 + distance_2**2 - distance_3**2)/(2*distance_1*distance_2)
+        return np.arccos(tmp)
+    
+    def plot_linear_reg_on_near_domain(self):
+        """
+        Generates a figure with 3 subplots, both with measured values (default measured values or new values measured 
+        for more (speed, time) tuples given as a parameter to the class)
+        and with linear regression models applied to the measured values.
+        1. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> azimuth
+        2. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> azimuth
+        3. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> elevation
+        
+        """
+        
+        is_positive_azimuth = self.speed_time_azimuth_table > 0
+        is_positive_elevation = self.speed_time_elevation_table > 0       
+        
+        fig = make_subplots(rows=1, cols=3, specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
+                            subplot_titles=("Pos. Speed - Azimuth", "Neg. Speed - Azimuth", "Neg. Speed - Elevation"))
+        #fig = go.Figure()
+        
+        X, Y = np.meshgrid(np.linspace(10, 20, num=11), np.linspace(5, 9, num=5))
+        XY = np.c_[X.flatten(), Y.flatten()]
+        Z = self.az_speed_pos_regresor.predict(XY)        
+
+        fig.add_trace(go.Scatter3d(mode='markers', x=XY[:, 0], y=XY[:, 1], z=Z, marker=dict(color='blue', size=5,), name='Extrapolated', showlegend=True), row=1, col=1)
+        fig.add_trace(go.Scatter3d(mode='markers', x=self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 0], y=self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 1],
+                z=np.rad2deg(self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=1, col=1)
+
+        X, Y = np.meshgrid(np.linspace(-20, -10, num=11), np.linspace(4, 6, num=3))
+        XY = np.c_[X.flatten(), Y.flatten()]
+        Z = self.az_speed_neg_regresor.predict(XY)
+        
+        fig.add_trace(go.Scatter3d(mode='markers', x=XY[:, 0], y=XY[:, 1], z=Z, marker=dict(color='blue', size=5,), name='Extrapolated', showlegend=True), row=1, col=2)
+        fig.add_trace(go.Scatter3d(mode='markers', x=self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 0], y=self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 1],
+                z=np.rad2deg(self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=1, col=2)
+        
+        X, Y = np.meshgrid(np.linspace(-10, -5, num=6), np.linspace(1, 4, num=4))
+        XY = np.c_[X.flatten(), Y.flatten()]
+        Z = self.el_speed_neg_regresor.predict(XY)
+        
+        fig.add_trace(go.Scatter3d(mode='markers', x=XY[:, 0], y=XY[:, 1], z=Z, marker=dict(color='blue', size=5,), name='Extrapolated', showlegend=True), row=1, col=3)
+        fig.add_trace(go.Scatter3d(mode='markers', x=self.speed_time_elevation_table[~is_positive_elevation[:, 0], 0], y=self.speed_time_elevation_table[~is_positive_elevation[:, 0], 1],
+                z=np.rad2deg(self.speed_time_elevation_table[~is_positive_elevation[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=1, col=3)
+        
+        fig.update_scenes(xaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black",title='Speed',),
+                        yaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Time [s]', ),
+                        zaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Angle [s]'),
+                        row=1, col=1,)
+        fig.update_scenes(xaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black",title='Speed',),
+                        yaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Time [s]', ),
+                        zaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Angle [s]'),
+                        row=1, col=2,)
+        fig.update_scenes(xaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black",title='Speed',),
+                        yaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Time [s]', ),
+                        zaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Angle [s]'),
+                        row=1, col=3,)
+        
+        fig.update_layout(autosize=False, width=1400, height=800, margin=dict(l=50, r=50, t=50, b=50),)
+        fig.show()
+    
+    def start_conn(self):
+        self.sbus = SBUSEncoder()
+        self.sbus.start_sbus(serial_interface='COM20', period_packet=0.015)
+    
+    def setPosControl(self, yaw, pitch):
+        """
+        Set yaw and pitch
+
+        Args:
+            yaw (float): Angle in degrees. Valid range between [-180, 180]
+            pitch (float): Angle in degrees. Valid range between [, ]
+        """
+        
+        # Choose speed for yaw movement
+        if yaw > 0:
+            speed_yaw = -11
+            
+            # Linear regresion model for angle dependence. If different, change this line
+            time_yaw_2_move = (yaw - self.az_speed_neg_regresor.coef_[0]*speed_yaw - self.az_speed_neg_regresor.intercept_)/self.az_speed_neg_regresor.coef_[1]
+        else:
+            speed_yaw = 15
+            
+            # Linear regresion model for angle dependence. If differente, change this line
+            time_yaw_2_move = (yaw - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
+            
+        # Choose speed for pitch movement
+        if pitch > 0:
+            print("[DEBUG]: Only negative pitch values are allowed")
+            return
+        else:
+            speed_pitch = -5
+            time_pitch_2_move = (pitch - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
+        
+        if (time_yaw_2_move > 0) and (time_pitch_2_move > 0):
+            print("[DEBUG]: Gremsy H16 moves in yaw first: TIME to complete movement: ", time_yaw_2_move)
+            self.sbus.move_gimbal(0, speed_yaw, time_yaw_2_move)
+            print("[DEBUG]: Gremsy H16 moves in elevation second: TIME to complete movement: ", time_pitch_2_move)
+            self.sbus.move_gimbal(speed_pitch, 0, time_pitch_2_move)
+        elif (time_yaw_2_move > 0) and (time_pitch_2_move <= 0):
+            print("[DEBUG]: Gremsy H16 moves in yaw: TIME to complete movement: ", time_yaw_2_move)
+            self.sbus.move_gimbal(0, speed_yaw, time_yaw_2_move)
+        elif (time_yaw_2_move <= 0) and (time_pitch_2_move > 0):
+            print("[DEBUG]: Gremsy H16 moves in elevation: TIME to complete movement: ", time_pitch_2_move)
+            self.sbus.move_gimbal(speed_pitch, 0, time_pitch_2_move)
+        elif (time_yaw_2_move <= 0) and (time_pitch_2_move <= 0):
+            print("[DEBUG]: Gremsy H16 will not move")
+            return
+    
+    def close_conn(self):
+        """
+        Wrapper to stop_updating from SBUSEncoder
+        """
+        self.sbus.stop_updating()
+                
 class SBUSEncoder:
     """
     Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
@@ -2139,7 +2394,6 @@ class SBUSEncoder:
     Channel 5 is assumed to be mode (lock, follow, off)
     
     """
-    
     def __init__(self):
         #self.channels = [1024] * 16
         self.channels = np.ones(16, dtype=np.uint16)*1024
