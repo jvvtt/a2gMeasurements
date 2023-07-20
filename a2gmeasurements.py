@@ -2348,19 +2348,23 @@ class GimbalGremsyH16:
             
             # Linear regresion model for angle dependence. If different, change this line
             time_yaw_2_move = (yaw - self.az_speed_neg_regresor.coef_[0]*speed_yaw - self.az_speed_neg_regresor.intercept_)/self.az_speed_neg_regresor.coef_[1]
-        else:
+        elif yaw < 0:
             speed_yaw = 15
             
             # Linear regresion model for angle dependence. If differente, change this line
-            time_yaw_2_move = (yaw - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
+            time_yaw_2_move = (np.abs(yaw) - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
+        elif yaw == 0:
+            time_yaw_2_move = 0
             
         # Choose speed for pitch movement
         if pitch > 0:
             print("[DEBUG]: Only negative pitch values are allowed")
             return
-        else:
+        elif pitch < 0:
             speed_pitch = -5
-            time_pitch_2_move = (pitch - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
+            time_pitch_2_move = (np.abs(pitch) - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
+        elif pitch == 0:
+            time_pitch_2_move = 0
         
         if (time_yaw_2_move > 0) and (time_pitch_2_move > 0):
             print("[DEBUG]: Gremsy H16 moves in yaw first: TIME to complete movement: ", time_yaw_2_move)
@@ -2382,7 +2386,20 @@ class GimbalGremsyH16:
         Wrapper to stop_updating from SBUSEncoder
         """
         self.sbus.stop_updating()
-                
+    
+    def control_power_motors(self, power='on'):
+        """
+        Wrapper to turn_off_motors and turn_on_motors
+
+        Returns:
+            power (str): 'on' or 'off
+        """
+        if power == 'on':
+            self.sbus.turn_on_motors()
+        elif power == 'off':
+            self.sbus.turn_off_motors()
+        
+        
 class SBUSEncoder:
     """
     Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
