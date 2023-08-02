@@ -1463,7 +1463,7 @@ class HelperA2GMeasurements(object):
                  rfsoc_static_ip_address=None, #uses the default ip_adress
                  F0=None, L0=None,
                  SPEED=0,
-                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
+                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.001):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -1884,6 +1884,9 @@ class HelperA2GMeasurements(object):
         Args:
             stop_event (Event thread): event thread used to stop the callback
         """
+
+        # Polling policy for detecting if there has been any message sent.
+        # As th thread is scheduled often in the order of ms, this implementation will raise an exception (if nothing is send) quite often
         while not stop_event.is_set():
             try:
                 # Send everything in a json serialized packet
@@ -2088,9 +2091,11 @@ class HelperA2GMeasurements(object):
             self.event_stop_thread_helper.set()
              
             if self.ID == 'DRONE':
-                self.socket.close()
+                if hasattr(self, 'socket'):
+                    self.socket.close()
             elif self.ID == 'GROUND':
-                self.a2g_conn.close()
+                if hasattr(self, 'a2g_conn'):
+                    self.a2g_conn.close()
         except:
             print('\n[DEBUG]: ERROR closing connection: probably NO SOCKET created')         
         
@@ -2720,7 +2725,7 @@ class RFSoCRemoteControlFromHost():
         nbytes = 2
         nread = 1024
         self.radio_control.sendall(b"receiveSamples")
-        nbytes = nbeams * nbytes * nread * 2
+        nbytes = nbeams * nbytes * nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
         buf = bytearray()
 
         while len(buf) < nbytes:
