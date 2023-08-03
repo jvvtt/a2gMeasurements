@@ -2042,11 +2042,16 @@ class HelperA2GMeasurements(object):
         Args:
             PORT (int, optional): _description_. Defaults to 12000.
         """
+        socket_poll_cnt = 1
+        
+        # If we know for sure that there will be a client request for connection, we can keep this number low
+        MAX_NUM_SOCKET_POLLS = 100
+        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket = s
         
-        # This will block, so keep it low
-        self.socket.settimeout(60) 
+        # We need to use a timeout, because otherwise socket.accept() will block the GUI
+        self.socket.settimeout(5) 
         
         # CLIENT
         if self.ID == 'DRONE':
@@ -2063,8 +2068,16 @@ class HelperA2GMeasurements(object):
             # Listen for incoming connections
             self.socket.listen()
 
-            # BLOCKS UNTIL ESTABLISHING A CONNECTION
-            a2g_connection, client_address = self.socket.accept()
+            # There is no need of a loop because
+            while(socket_poll_cnt < MAX_NUM_SOCKET_POLLS):
+                try: 
+                    # Blocks until timeout
+                    a2g_connection, client_address = self.socket.accept()
+                except Exception as es:
+                    print("[DEBUG]: No client has been seen there. Poll again for a connection. POLL NUMBER: ", socket_poll_cnt)
+                    socket_poll_cnt += 1
+                else:
+                    break    
             
             if self.DBG_LVL_1:
                 print('CONNECTION ESTABLISHED with CLIENT ', client_address)
@@ -2751,7 +2764,7 @@ class RFSoCRemoteControlFromHost():
         """
         
         self.event_stop_thread_rfsoc = threading.Event()
-        self.t_receive = threading.Thread(target=self.receive_data(), args=(self.event_stop_thread_rfsoc))
+        self.t_receive = threading.Thread(target=self.receive_signal(), args=(self.event_stop_thread_rfsoc))
         self.t_receive.start()
         time.sleep(0.5)
     
