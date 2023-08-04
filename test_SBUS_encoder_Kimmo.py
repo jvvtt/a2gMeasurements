@@ -9,25 +9,38 @@ def ctrl_H16_position(sbus):
     condition = True
     
     while(condition):
-        ele =  input('ENTER elevation speed: ')
-        if isinstance(ele, str):
-            ele = float(ele)
-            
-        else: 
-            return
-        mov_time = input('ENTER time: ')
-        if isinstance(mov_time, str):
-            mov_time = float(mov_time)    
-        else:
-            return
-        rud = input('ENTER pan speed: ')
-        if isinstance(rud, str):
-            rud = float(rud)
-        else:
-            return        
+        try:
+            ele =  input('ENTER elevation speed: ')
+            if isinstance(ele, str):
+                ele = float(ele)
+                
+            else: 
+                return
+        except ValueError:
+            print("Invalid value, setting to zero")
+            ele = 0
         
+        try:
+            mov_time = input('ENTER time: ')
+            if isinstance(mov_time, str):
+                mov_time = float(mov_time)    
+            else:
+                return
+        except ValueError:
+            print("Invalid value, setting to zero")
+            mov_time = 0
+        
+        try:
+            rud = input('ENTER pan speed: ')
+            if isinstance(rud, str):
+                rud = float(rud)
+            else:
+                return        
+        except ValueError:
+            print("Invalid value, setting to zero")
+            rud = 0
         sbus.move_gimbal(ele, rud, mov_time)
-            
+        
         finish = input('Has it finished?: ')
         
         if finish == 'YES' or finish == 'Yes' or finish == 'yes' or finish == 'Y' or finish == 'y':
