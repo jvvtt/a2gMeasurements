@@ -35,6 +35,8 @@ class WidgetGallery(QDialog):
     def __init__(self, parent=None):
         super(WidgetGallery, self).__init__(parent)
 
+        self.setWindowTitle("A2G Measurements Center")
+
         # Parameters of the GUI
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
@@ -381,7 +383,8 @@ class WidgetGallery(QDialog):
         if not SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
             self.create_class_instances(IsRFSoC=True)
         if not SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
-            print("[DEBUG]: No GND device")
+            self.create_class_instances()
+            print("[DEBUG]: No GND devices")
         if not SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
             self.create_class_instances(IsGPS=True)
 
@@ -401,21 +404,8 @@ class WidgetGallery(QDialog):
                                                  IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
                                                  rfsoc_static_ip_address='10.1.1.30',
                                                  AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
+        self.myhelpera2g.HelperStartA2GCom()
 
-    def disconnect_devices(self):
-        """
-        Wrapper to HelperA2GStopCom.
-        
-        """
-        disc_what = []
-        if self.myhelpera2g.myGimbal.GIMBAL_CONN_SUCCES:
-            disc_what.append('GIMBAL')
-        if self.myhelpera2g.mySeptentrioGPS.GPS_CONN_SUCCESS:
-            disc_what.append('GPS')
-            
-        if len(disc_what) > 0:            
-            self.myhelpera2g.HelperA2GStopCom(DISC_WHAT=disc_what)
-    
     def start_GUI_threads(self):
         """
         Start GUI related threads. This threads are related only to the display of information
@@ -1033,7 +1023,18 @@ class WidgetGallery(QDialog):
         
         self.fig_pdp = fig_pdp
         self.ax_pdp = ax_pdp
-                
+    
+    def closeEvent(self, event):
+        if hasattr(self, 'myhelpera2g'):
+            self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
+    
+    def eventFilter(self, source, event):
+        if event.type()== event.Close:
+            self. closeEvent(event)
+            return True
+        
+        return super().eventFilter(source,event)
+
 if __name__ == '__main__':
 #    appctxt = ApplicationContext()
     app = QApplication([])

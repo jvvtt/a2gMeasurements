@@ -1463,7 +1463,7 @@ class HelperA2GMeasurements(object):
                  rfsoc_static_ip_address=None, #uses the default ip_adress
                  F0=None, L0=None,
                  SPEED=0,
-                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
+                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.001):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -1884,6 +1884,9 @@ class HelperA2GMeasurements(object):
         Args:
             stop_event (Event thread): event thread used to stop the callback
         """
+
+        # Polling policy for detecting if there has been any message sent.
+        # As th thread is scheduled often in the order of ms, this implementation will raise an exception (if nothing is send) quite often
         while not stop_event.is_set():
             try:
                 # Send everything in a json serialized packet
@@ -2039,11 +2042,16 @@ class HelperA2GMeasurements(object):
         Args:
             PORT (int, optional): _description_. Defaults to 12000.
         """
+        socket_poll_cnt = 1
+        
+        # If we know for sure that there will be a client request for connection, we can keep this number low
+        MAX_NUM_SOCKET_POLLS = 100
+        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket = s
         
-        # This will block, so keep it low
-        self.socket.settimeout(60) 
+        # We need to use a timeout, because otherwise socket.accept() will block the GUI
+        self.socket.settimeout(5) 
         
         # CLIENT
         if self.ID == 'DRONE':
@@ -2060,8 +2068,16 @@ class HelperA2GMeasurements(object):
             # Listen for incoming connections
             self.socket.listen()
 
-            # BLOCKS UNTIL ESTABLISHING A CONNECTION
-            a2g_connection, client_address = self.socket.accept()
+            # There is no need of a loop because
+            while(socket_poll_cnt < MAX_NUM_SOCKET_POLLS):
+                try: 
+                    # Blocks until timeout
+                    a2g_connection, client_address = self.socket.accept()
+                except Exception as es:
+                    print("[DEBUG]: No client has been seen there. Poll again for a connection. POLL NUMBER: ", socket_poll_cnt)
+                    socket_poll_cnt += 1
+                else:
+                    break    
             
             if self.DBG_LVL_1:
                 print('CONNECTION ESTABLISHED with CLIENT ', client_address)
@@ -2088,9 +2104,11 @@ class HelperA2GMeasurements(object):
             self.event_stop_thread_helper.set()
              
             if self.ID == 'DRONE':
-                self.socket.close()
+                if hasattr(self, 'socket'):
+                    self.socket.close()
             elif self.ID == 'GROUND':
-                self.a2g_conn.close()
+                if hasattr(self, 'a2g_conn'):
+                    self.a2g_conn.close()
         except:
             print('\n[DEBUG]: ERROR closing connection: probably NO SOCKET created')         
         
@@ -2720,7 +2738,7 @@ class RFSoCRemoteControlFromHost():
         nbytes = 2
         nread = 1024
         self.radio_control.sendall(b"receiveSamples")
-        nbytes = nbeams * nbytes * nread * 2
+        nbytes = nbeams * nbytes * nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
         buf = bytearray()
 
         while len(buf) < nbytes:
@@ -2746,7 +2764,7 @@ class RFSoCRemoteControlFromHost():
         """
         
         self.event_stop_thread_rfsoc = threading.Event()
-        self.t_receive = threading.Thread(target=self.receive_data(), args=(self.event_stop_thread_rfsoc))
+        self.t_receive = threading.Thread(target=self.receive_signal(), args=(self.event_stop_thread_rfsoc))
         self.t_receive.start()
         time.sleep(0.5)
     
