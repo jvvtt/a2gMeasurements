@@ -2417,7 +2417,6 @@ class GimbalGremsyH16:
         elif power == 'off':
             self.sbus.turn_off_motors()
         
-        
 class SBUSEncoder:
     """
     Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
