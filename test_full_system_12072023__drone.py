@@ -48,7 +48,7 @@ while(not_created_class_instance):
         print("[DEBUG]: There is some error creating the a2gmeasurements class instance")
         print("[DEBUG]: ERROR: ", e)
         print("[DEBUG]: Check that device flag values for IsGPS, IsRFSoC, IsGimbal correspond to what is connected to the Manifold")
-    finally:
+    else:
         not_created_class_instance = False
 
 while(not_finish_tcp_connection_attempt):
@@ -60,12 +60,12 @@ while(not_finish_tcp_connection_attempt):
         input("Press ENTER to try to establish the connection again")
         unsuccessful_drone2gnd_connection_attempt_cnt = unsuccessful_drone2gnd_connection_attempt_cnt + 1
     else:
-        if unsuccessful_drone2gnd_connection_attempt_cnt == 100:
-            print("[DEBUG]: Number of connection attempts is high (100). Closing the program")
-            break
-    finally:
         print("[DEBUG]: Connection established with GND")
         not_finish_tcp_connection_attempt = False
+    finally:
+        if unsuccessful_drone2gnd_connection_attempt_cnt == 100:
+            print("[DEBUG]: Number of connection attempts is high (100). Closing the program")
+            break        
 
 if not_finish_tcp_connection_attempt == False:
     while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):
