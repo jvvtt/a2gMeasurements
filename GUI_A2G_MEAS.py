@@ -54,21 +54,21 @@ class WidgetGallery(QDialog):
 
         mainLayout = QGridLayout()
         mainLayout.addWidget(self.checkConnPanel, 0, 0, 1 , 4)
-        mainLayout.addWidget(self.gimbalTXPanel, 1, 0, 1, 1)
-        mainLayout.addWidget(self.gimbalRXPanel, 1, 1, 1, 1)
-        mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 1, 1)
-        mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 1 , 1)
+        mainLayout.addWidget(self.gimbalTXPanel, 1, 0, 3, 1)
+        mainLayout.addWidget(self.gimbalRXPanel, 1, 1, 3, 1)
+        mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 3, 1)
+        mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 3, 1)
         #mainLayout.addWidget(self.gpsPanel, 2, 0)
-        mainLayout.addWidget(self.pdpPlotPanel, 2, 0, 5, 2)
-        mainLayout.addWidget(self.gps_vis_panel, 2, 2, 5, 2)
-        mainLayout.addWidget(self.planningMeasurementsPanel, 7, 0, 1, 2)
-        mainLayout.addWidget(self.log_widget, 7, 2, 1, 2)
+        mainLayout.addWidget(self.pdpPlotPanel, 4, 0, 7, 2)
+        mainLayout.addWidget(self.gps_vis_panel, 4, 2, 7, 2)
+        mainLayout.addWidget(self.planningMeasurementsPanel, 11, 0, 2, 2)
+        mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
         
         self.write_to_log_terminal('Welcome to A2G Measurements Center!')
                 
         self.setLayout(mainLayout)
 
-        #self.init_external_objs()
+        self.showMaximized()
     
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
         """
@@ -360,7 +360,6 @@ class WidgetGallery(QDialog):
             self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
         else:
             self.GND_ADDRESS =  ''
-        #self.drone_gps_conn_label_modifiable.setText()
 
         # User presses more than once the "Check" button
         if hasattr(self, 'myhelpera2g'):
@@ -369,7 +368,7 @@ class WidgetGallery(QDialog):
         
         time.sleep(0.5)
         
-        # Since the app is calling asynchronoulsy functions (based on user-actions type of events) we create here classes and start threads and NOT in the __main__
+        # Since the app is asynchronoulsy calling functions (based on user-actions type of events) we create here classes and start threads and NOT in the __main__
         if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
         if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
@@ -398,12 +397,8 @@ class WidgetGallery(QDialog):
             GPS_Stream_Interval (str, optional): _description_. Defaults to 'sec1'.
         """
 
-        # Local GND station class
-
-        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False, IsRFSoC=IsRFSoC,
-                                                 IsGimbal=IsGimbal, IsGPS=IsGPS, GPS_Stream_Interval=GPS_Stream_Interval, 
-                                                 rfsoc_static_ip_address='10.1.1.30',
-                                                 AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01)
+        # As this app is executed at the ground device...
+        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, IsRFSoC=IsRFSoC, IsGimbal=IsGimbal, IsGPS=IsGPS, rfsoc_static_ip_address='10.1.1.30', GPS_Stream_Interval=GPS_Stream_Interval, DBG_LVL_0=False, DBG_LVL_1=False)
         self.myhelpera2g.HelperStartA2GCom()
 
     def start_GUI_threads(self):
@@ -497,7 +492,11 @@ class WidgetGallery(QDialog):
         self.gnd_ip_addr_value_label = QLabel('')
         self.air_ip_addr_value_text_edit = QLineEdit('')
         self.check_connections_push_button = QPushButton('Check')
+        self.connect_to_drone = QPushButton('Connect drone')
+        self.disconnect_from_drone = QPushButton('Disconnect drone')
         self.check_connections_push_button.clicked.connect(self.check_status_all_devices)
+        self.connect_to_drone.clicked.connect(self.connect_drone_callback)
+        self.disconnect_from_drone.clicked.connect(self.disconnect_drone_callback)
 
         self.gnd_gimbal_conn_label_modifiable = QLabel('--')
         self.gnd_gps_conn_label_modifiable = QLabel('--')
@@ -526,13 +525,21 @@ class WidgetGallery(QDialog):
         layout.addWidget(self.drone_rfsoc_conn_label_modifiable, 0, 13, 1, 1)
         layout.addWidget(drone_gps_conn_label, 0, 14, 1, 1)       
         layout.addWidget(self.drone_gps_conn_label_modifiable, 0, 15, 1, 1)
-        layout.addWidget(air_ip_addr_label, 1, 0, 1, 3)
-        layout.addWidget(self.air_ip_addr_value_text_edit, 1, 3, 1, 3)
-        layout.addWidget(drone_gimbal_conn_label, 1, 6, 1, 2)
-        layout.addWidget(self.drone_gimbal_conn_label_modifiable, 1, 8, 1, 2)        
-        layout.addWidget(self.check_connections_push_button, 1, 10, 1, 6)
+        layout.addWidget(air_ip_addr_label, 1, 0, 1, 1)
+        layout.addWidget(self.air_ip_addr_value_text_edit, 1, 1, 1, 2)
+        layout.addWidget(drone_gimbal_conn_label, 1, 3, 1, 1)
+        layout.addWidget(self.drone_gimbal_conn_label_modifiable, 1, 4, 1, 1) 
+        layout.addWidget(self.check_connections_push_button, 1, 5, 1, 4)
+        layout.addWidget(self.connect_to_drone, 1, 9, 1, 4)
+        layout.addWidget(self.disconnect_from_drone, 1, 13, 1, 3)
         
         self.checkConnPanel.setLayout(layout)
+
+    def connect_drone_callback(self):
+        1
+    
+    def disconnect_drone_callback(self):
+        1
 
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')

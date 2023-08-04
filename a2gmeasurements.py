@@ -1910,7 +1910,7 @@ class HelperA2GMeasurements(object):
             except Exception as e:
                 # Handle the assumed connection lost
                 if self.rxEmptySockCounter > self.MAX_NUM_RX_EMPTY_SOCKETS:
-                    print('\n[WARNING]:SOCKETS HAVE BEEN EMPTY FOR LONG TIME. DRONE MUST COME CLOSER')
+                    print('\n[WARNING]:SOCKETS HAVE BEEN EMPTY FOR LONG TIME. DRONE MUST COME CLOSER ', e)
                     self.rxEmptySockCounter = 0
                         
                 self.rxEmptySockCounter = self.rxEmptySockCounter + 1
@@ -2137,6 +2137,10 @@ class HelperA2GMeasurements(object):
         
                 if self.IsSignalGenerator and (i == 'SG'):
                     self.inst.write('RF0\n')   
+                    
+                if self.IsRFSoC and (i == 'RFSOC'):
+                    self.myrfsoc.radio_control.close()
+                    self.myrfsoc.radio_data.close()
         else: # backwards compatibility
             if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
                 self.myGimbal.stop_thread_gimbal()
