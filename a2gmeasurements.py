@@ -2617,6 +2617,7 @@ class RFSoCRemoteControlFromHost():
         self.filename_to_save = filename
         self.hest = []
         self.meas_time_tag = []
+        self.meas_stops = []
         self.RFSoCSuccessExecutionAns = "Successully executed"
         self.RFSoCSuccessAns = "Success"
         self.n_receive_calls = 0
@@ -2697,41 +2698,11 @@ class RFSoCRemoteControlFromHost():
         self.send_cmd('setModeSivers', cmd_arg='RXen0_TXen1')
         self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
         self.send_cmd('setGainTxSivers')
-    
-    def receive_signal(self, stop_event):
-        """
-        Function callback for the measurement thread.
-
-        Executed whenever the kernel allocates time for this thread to be executed. (~20 ms)
-
-        Args:
-            stop_event (threading.Event()): flag that is set when to stop the thread.
-        """
-
+        
+    def set_rx_rf(self):
         self.send_cmd('setModeSivers', cmd_arg='RXen1_TXen0')
         self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
         self.send_cmd('setGainRxSivers')
-
-        self.time_begin_receive_thread = time.time()
-        while not stop_event.is_set():
-            nbeams = 64
-            nbytes = 2
-            nread = 1024
-            self.radio_control.sendall(b"receiveSamples")
-            nbytes = nbeams * nbytes * nread * 2
-            buf = bytearray()
-
-            while len(buf) < nbytes:
-                data = self.radio_data.recv(nbytes)
-                buf.extend(data)
-                data = np.frombuffer(buf, dtype=np.int16)
-                rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
-                rxtd = rxtd.reshape(nbeams, nread)
-                
-            self.hest.append(rxtd)
-            self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
-            self.n_receive_calls = self.n_receive_calls + 1
-            self.time_finish_receive_call = time.time()
     
     def receive_signal_async(self):
         """
@@ -2740,8 +2711,7 @@ class RFSoCRemoteControlFromHost():
         
         No threading involved in this method
         """
-        start_call = time.time()
-        
+                
         nbeams = 64
         nbytes = 2
         nread = 1024
@@ -2752,14 +2722,13 @@ class RFSoCRemoteControlFromHost():
         while len(buf) < nbytes:
             data = self.radio_data.recv(nbytes)
             buf.extend(data)
-            data = np.frombuffer(buf, dtype=np.int16)
-            rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
-            rxtd = rxtd.reshape(nbeams, nread)
+        data = np.frombuffer(buf, dtype=np.int16)
+        rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
+        rxtd = rxtd.reshape(nbeams, nread)
         
-        stop_call = time.time()
-        print("[DEBUG]: receive_data_async executed in ", stop_call-start_call, " s")
         self.hest.append(rxtd)
         self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
+        self.n_receive_calls = self.n_receive_calls + 1
 
     def start_thread_receive_meas_data(self):
         """
@@ -2771,37 +2740,41 @@ class RFSoCRemoteControlFromHost():
         'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
         
-        self.event_stop_thread_rfsoc = threading.Event()
-        self.t_receive = threading.Thread(target=self.receive_signal(), args=(self.event_stop_thread_rfsoc))
-        self.t_receive.start()
-        time.sleep(0.5)
+        self.timer_rx_irf = RepeatTimer(0.05, self.receive_signal_async)
+        self.set_rx_rf()
+        time.sleep(0.1)
+        self.time_begin_receive_thread = time.time()
+        self.timer_rx_irf.start()
+        
         print("[DEBUG]: receive_signal thread STARTED")
     
     def stop_thread_receive_meas_data(self):
-        self.event_stop_thread_rfsoc.set()
-        self.t_receive.join()
+        #self.event_stop_thread_rfsoc.set()
+        #self.t_receive.join()
+        self.timer_rx_irf.cancel()
         self.time_finish_receive_thread = time.time()
         print("[DEBUG]: receive_signal thread STOPPED")
-        print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", (self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls)
+        print("[DEBUG]: Received calls: ", self.n_receive_calls)
+        print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", ((self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls))
         self.n_receive_calls = 0
         
-        self.hest = []
-        self.meas_time_tag = []
-    
+        self.meas_stops.append(datetime.datetime.utcnow().timetuple()[3:6])
+        
     def finish_measurement(self):
         
         # Check if the thread is finished and if not stop it
-        if self.t_receive.is_alive():
-            self.stop_thread_receive_meas_data()
+        #if self.t_receive.is_alive():
+        #    self.stop_thread_receive_meas_data()
         
         datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
-    
-        hest = np.array(self.hest)
-        
+
+        hest = np.stack(self.hest, axis=0)
+        meas_time_tags = np.array(self.meas_time_tag)
+                
         with open(datestr + self.filename_to_save + '.npy', 'wb') as f:
             np.save(f, hest)
         with open(datestr + self.filename_to_save + '-TIMETAGS' + '.npy', 'wb') as f:
-            np.save(f, self.meas_time_tag)
+            np.save(f, meas_time_tags)
         
         print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
         print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
