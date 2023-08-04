@@ -37,7 +37,7 @@ def check_devices():
     return GND_ADDRESS, gps_used, gimbal_used, rfsoc_used
 
 not_created_class_instance = True
-not_error_tcp_connection_drone_gnd = True
+not_finish_tcp_connection_attempt = True
 unsuccessful_drone2gnd_connection_attempt_cnt = 0
 
 while(not_created_class_instance):
@@ -51,7 +51,7 @@ while(not_created_class_instance):
     finally:
         not_created_class_instance = False
 
-while(not_error_tcp_connection_drone_gnd):
+while(not_finish_tcp_connection_attempt):
     try:
         drone_a2g_helper.HelperStartA2GCom()
     except Exception as e:
@@ -64,9 +64,10 @@ while(not_error_tcp_connection_drone_gnd):
             print("[DEBUG]: Number of connection attempts is high (100). Closing the program")
             break
     finally:
-        not_error_tcp_connection_drone_gnd = False
+        print("[DEBUG]: Connection established with GND")
+        not_finish_tcp_connection_attempt = False
 
-if not_error_tcp_connection_drone_gnd:
+if not_finish_tcp_connection_attempt == False:
     while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):
         time.sleep(1)
         

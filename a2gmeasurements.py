@@ -1767,8 +1767,8 @@ class HelperA2GMeasurements(object):
         
         """
         if self.ID == 'DRONE': # double check that we are in the drone
+            print("[DEBUG]: Received REQUEST to START measurement")
             self.myrfsoc.start_thread_receive_meas_data()
-            self.CONN_MUST_OVER_FLAG = True
     
     def do_stop_meas_drone_rfsoc(self):
         """
@@ -1778,10 +1778,12 @@ class HelperA2GMeasurements(object):
         
         """
         if self.ID == 'DRONE': # double check that we are in the drone
+            print("[DEBUG]: Received REQUEST to STOP measurement")
             self.myrfsoc.stop_thread_receive_meas_data()
         
     def do_finish_meas_drone_rfsoc(self):
         if self.ID == 'DRONE': # double check that we are in the drone
+            print("[DEBUG]: Received REQUEST to FINISH measurement")
             self.myrfsoc.finish_measurement()
             self.CONN_MUST_OVER_FLAG = True
     
@@ -2769,27 +2771,33 @@ class RFSoCRemoteControlFromHost():
         self.t_receive = threading.Thread(target=self.receive_signal(), args=(self.event_stop_thread_rfsoc))
         self.t_receive.start()
         time.sleep(0.5)
+        print("[DEBUG]: receive_signal thread STARTED")
     
     def stop_thread_receive_meas_data(self):
         self.event_stop_thread_rfsoc.set()
         self.t_receive.join()
         self.time_finish_receive_thread = time.time()
+        print("[DEBUG]: receive_signal thread STOPPED")
         print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", (self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls)
         self.n_receive_calls = 0
+        
+        self.hest = []
+        self.meas_time_tag = []
     
     def finish_measurement(self):
         
         # Check if the thread is finished and if not stop it
         if self.t_receive.is_alive():
-            self.stop_thread_receive_meas_data()        
+            self.stop_thread_receive_meas_data()
         
         datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
     
         hest = np.array(self.hest)
+        
         with open(datestr + self.filename_to_save + '.npy', 'wb') as f:
             np.save(f, hest)
         with open(datestr + self.filename_to_save + '-TIMETAGS' + '.npy', 'wb') as f:
             np.save(f, self.meas_time_tag)
         
-        self.hest = []
-        self.meas_time_tag = []
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
