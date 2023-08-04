@@ -889,12 +889,15 @@ class WidgetGallery(QDialog):
         # Experiment starts
         self.myhelpera2g.myrfsoc.transmit_signal()
         self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC')
+        print("[DEBUG]: SENT REQUEST to START measurement")
     
     def stop_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
+        print("[DEBUG]: SENT REQUEST to STOP measurement")
     
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
+        print("[DEBUG]: SENT REQUEST to FINISH measurement")
     
     def manual_meas_radio_button_callback(self):
         1#self.choose_what_time_is_specified_ComboBox.
