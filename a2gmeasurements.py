@@ -1503,6 +1503,7 @@ class HelperA2GMeasurements(object):
         self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM = -8.5e3
         self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY = -9.5e3
         self.SPEED_NODE = SPEED # m/s
+        self.CONN_MUST_OVER_FLAG = False # Usefull for drone side, as its script will poll for looking if this is True
         
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
@@ -1767,6 +1768,7 @@ class HelperA2GMeasurements(object):
         """
         if self.ID == 'DRONE': # double check that we are in the drone
             self.myrfsoc.start_thread_receive_meas_data()
+            self.CONN_MUST_OVER_FLAG = True
     
     def do_stop_meas_drone_rfsoc(self):
         """
@@ -1781,6 +1783,7 @@ class HelperA2GMeasurements(object):
     def do_finish_meas_drone_rfsoc(self):
         if self.ID == 'DRONE': # double check that we are in the drone
             self.myrfsoc.finish_measurement()
+            self.CONN_MUST_OVER_FLAG = True
     
     def process_answer(self, msg):
         """
@@ -2068,7 +2071,7 @@ class HelperA2GMeasurements(object):
             # Listen for incoming connections
             self.socket.listen()
 
-            # There is no need of a loop because
+            # There is no need for an endless loop
             while(socket_poll_cnt < MAX_NUM_SOCKET_POLLS):
                 try: 
                     # Blocks until timeout
@@ -2790,4 +2793,3 @@ class RFSoCRemoteControlFromHost():
         
         self.hest = []
         self.meas_time_tag = []
-    
