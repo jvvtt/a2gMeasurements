@@ -2228,7 +2228,7 @@ class GimbalGremsyH16:
     def load_measured_data_july_2023(self):
         """
         This table contains as columns the speed [-100, 100], time [s], and the (near) azimuth angle computed 
-        from the 3 distances (a_{i}, a_{i+1}, b_{i}). The distances were measured
+        from the 3 distances (a_{i}, a_{i+1}, b_{i}). The distances were measured by Julian D. Villegas G.
         
         """        
         speed_time_azimuth_table = [[15, 6, self.gremsy_angle(1.903, 1.949, 0.87)], 
@@ -2254,6 +2254,93 @@ class GimbalGremsyH16:
                                             [-5, 3, self.gremsy_angle(1.89, 1.934, 0.272)],
                                             [-5, 4, self.gremsy_angle(1.889, 1.891, 0.345)]]
         self.speed_time_elevation_table = np.array(speed_time_elevation_table)        
+    
+    def load_measured_data__2023(self):
+        """
+        This table contains as columns the speed [-100, 100], time [s], and the (near) azimuth angle computed 
+        from the 3 distances (a_{i}, a_{i+1}, b_{i}). The distances were measured by Kimmo Mäkelä.
+        
+        """        
+        speed_time_azimuth_table = [[15, 6, self.gremsy_angle(1.903, 1.949, 0.87)], 
+                        [15, 7, self.gremsy_angle(1.955, 1.926, 1)],
+                        [15, 8, self.gremsy_angle(2.071, 1.897, 1.19)],
+                        [15, 9, self.gremsy_angle(2.023, 1.949, 1.315)],
+                        [16, 5, self.gremsy_angle(1.879, 2.078, 0.875)],
+                        [16, 6, self.gremsy_angle(1.883, 2.069, 1.025)],
+                        [16, 7, self.gremsy_angle(1.897, 2.219, 1.26)],
+                        [14, 7, self.gremsy_angle(1.886, 1.994, 0.86)],
+                        [14, 8, self.gremsy_angle(1.881, 2.069, 1)],
+                        [14, 9, self.gremsy_angle(1.888, 2.086, 1.134)],
+                        [-14, 4, self.gremsy_angle(1.922, 2.047, 1.255)],
+                        [-14, 5, self.gremsy_angle(1.961, 2.117, 1.59)],
+                        [-14, 6, self.gremsy_angle(2.106, 2.089, 1.93)],
+                        [-13, 4, self.gremsy_angle(2.034, 1.909, 1.165)],
+                        [-13, 5, self.gremsy_angle(2.025, 1.985, 1.44)],
+                        [-13, 6, self.gremsy_angle(2.183, 1.98, 1.79)]]
+        self.speed_time_azimuth_table = np.array(speed_time_azimuth_table)
+            
+        speed_time_elevation_table = [[10, 3, self.gremsy_angle(1.526, 1.529, 0.07)],
+                                        [10, 4, self.gremsy_angle(1.526, 1.531, 0.096)],
+                                        [10, 5, self.gremsy_angle(1.526, 1.532, 0.11)],
+                                        [10, 6, self.gremsy_angle(1.526, 1.533, 0.122)],
+                                        [10, 7, self.gremsy_angle(1.526, 1.537, 0.16)],
+                                        [10, 8, self.gremsy_angle(1.526, 1.540, 0.183)],
+                                        [11, 3, self.gremsy_angle(1.526, 1.543, 0.124)],
+                                        [11, 4, self.gremsy_angle(1.526, 1.548, 0.163)],
+                                        [11, 5, self.gremsy_angle(1.526, 1.542, 0.199)],
+                                        [11, 6, self.gremsy_angle(1.526, 1.554, 0.239)],
+                                        [11, 7, self.gremsy_angle(1.526, 1.548, 0.279)],
+                                        [12, 3, self.gremsy_angle(1.526, 1.538, 0.168)],
+                                        [12, 4, self.gremsy_angle(1.526, 1.545, 0.227)],
+                                        [12, 5, self.gremsy_angle(1.526, 1.555, 0.283)],
+                                        [12, 6, self.gremsy_angle(1.526, 1.568, 0.343)],
+                                        [12, 7, self.gremsy_angle(1.526, 1.580, 0.4)],
+                                        [13, 3, self.gremsy_angle(1.526, 1.548, 0.244)],
+                                        [13, 4, self.gremsy_angle(1.526, 1.56, 0.311)],
+                                        [13, 5, self.gremsy_angle(1.526, 1.578, 0.395)],
+                                        [13, 6, self.gremsy_angle(1.526, 1.598, 0.448)],
+                                        [13, 7, self.gremsy_angle(1.526, 1.656, 0.64)],
+                                        [14, 2, self.gremsy_angle(1.526, 1.542, 0.184)],
+                                        [14, 3, self.gremsy_angle(1.526, 1.558, 0.286)],
+                                        [14, 4, self.gremsy_angle(1.526, 1.578, 0.378)],
+                                        [14, 5, self.gremsy_angle(1.526, 1.603, 0.474)],
+                                        [14, 6, self.gremsy_angle(1.526, 1.635, 0.574)],
+                                        [15, 1, self.gremsy_angle(1.526, 1.531, 0.11)],
+                                        [15, 2, self.gremsy_angle(1.526, 1.542, 0.209)],
+                                        [15, 3, self.gremsy_angle(1.526, 1.565, 0.334)],
+                                        [15, 4, self.gremsy_angle(1.526, 1.594, 0.448)],
+                                        [15, 5, self.gremsy_angle(1.526, 1.63, 0.567)],
+                                        [16, 1, self.gremsy_angle(1.526, 1.533, 0.125)],
+                                        [16, 2, self.gremsy_angle(1.526, 1.549, 0.253)],
+                                        [16, 3, self.gremsy_angle(1.526, 1.575, 0.378)],
+                                        [16, 4, self.gremsy_angle(1.526, 1.614, 0.519)],
+                                        [16, 5, self.gremsy_angle(1.526, 1.666, 0.665)],
+                                        [17, 1, self.gremsy_angle(1.526, 1.535, 0.147)],
+                                        [17, 2, self.gremsy_angle(1.526, 1.557, 0.291)],
+                                        [17, 3, self.gremsy_angle(1.526, 1.59, 0.435)],
+                                        [17, 4, self.gremsy_angle(1.526, 1.642, 0.6)],
+                                        [17, 5, self.gremsy_angle(1.526, 1.708, 0.766)],
+                                        [18, 1, self.gremsy_angle(1.526, 1.537, 0.164)],
+                                        [18, 2, self.gremsy_angle(1.526, 1.563, 0.328)],
+                                        [18, 3, self.gremsy_angle(1.526, 1.608, 0.502)],
+                                        [18, 4, self.gremsy_angle(1.526, 1.676, 0.693)],
+                                        [18, 5, self.gremsy_angle(1.526, 1.761, 0.884)],
+                                        [19, 0.5, self.gremsy_angle(1.526, 1.529, 0.088)],
+                                        [19, 1, self.gremsy_angle(1.526, 1.538, 0.176)],
+                                        [19, 2, self.gremsy_angle(1.526, 1.571, 0.363)],
+                                        [19, 3, self.gremsy_angle(1.526, 1.626, 0.558)],
+                                        [19, 4, self.gremsy_angle(1.526, 1.707, 0.766)],
+                                        [20, 0.5, self.gremsy_angle(1.526, 1.53, 0.1)],
+                                        [20, 1, self.gremsy_angle(1.526, 1.541, 0.2)],
+                                        [20, 2, self.gremsy_angle(1.526, 1.579, 0.395)],
+                                        [20, 3, self.gremsy_angle(1.526, 1.648, 0.616)],
+                                        [20, 4, self.gremsy_angle(1.526, 1.742, 0.845)],
+                                        [-5, 3, self.gremsy_angle(1.769, 1.652, 0.1)],
+                                        [-5, 6, self.gremsy_angle(1.769, 1.58, 0.1)],
+                                        [-5, 7, self.gremsy_angle(1.769, 1.562, 0.1)],
+                                        [-5, 8, self.gremsy_angle(1.769, 1.548, 0.1)],
+                                        [-5, 10, self.gremsy_angle(1.769, 1.537, 0.1)],]
+        self.speed_time_elevation_table = np.array(speed_time_elevation_table)
     
     def gremsy_angle(self, distance_1, distance_2, distance_3):
         """
