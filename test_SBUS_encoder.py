@@ -27,7 +27,7 @@ def ctrl_H16_position(sbus):
             return        
         
         sbus.move_gimbal(ele, rud, mov_time)
-        
+            
         finish = input('Has it finished?: ')
         
         if finish == 'YES' or finish == 'Yes' or finish == 'yes' or finish == 'Y' or finish == 'y':
