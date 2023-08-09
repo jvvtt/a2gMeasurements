@@ -1463,7 +1463,7 @@ class HelperA2GMeasurements(object):
                  rfsoc_static_ip_address=None, #uses the default ip_adress
                  F0=None, L0=None,
                  SPEED=0,
-                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.01):
+                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.001):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -1503,6 +1503,7 @@ class HelperA2GMeasurements(object):
         self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM = -8.5e3
         self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY = -9.5e3
         self.SPEED_NODE = SPEED # m/s
+        self.CONN_MUST_OVER_FLAG = False # Usefull for drone side, as its script will poll for looking if this is True
         
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
@@ -1766,6 +1767,7 @@ class HelperA2GMeasurements(object):
         
         """
         if self.ID == 'DRONE': # double check that we are in the drone
+            print("[DEBUG]: Received REQUEST to START measurement")
             self.myrfsoc.start_thread_receive_meas_data()
     
     def do_stop_meas_drone_rfsoc(self):
@@ -1776,11 +1778,14 @@ class HelperA2GMeasurements(object):
         
         """
         if self.ID == 'DRONE': # double check that we are in the drone
+            print("[DEBUG]: Received REQUEST to STOP measurement")
             self.myrfsoc.stop_thread_receive_meas_data()
         
     def do_finish_meas_drone_rfsoc(self):
         if self.ID == 'DRONE': # double check that we are in the drone
+            print("[DEBUG]: Received REQUEST to FINISH measurement")
             self.myrfsoc.finish_measurement()
+            self.CONN_MUST_OVER_FLAG = True
     
     def process_answer(self, msg):
         """
@@ -1884,6 +1889,9 @@ class HelperA2GMeasurements(object):
         Args:
             stop_event (Event thread): event thread used to stop the callback
         """
+
+        # Polling policy for detecting if there has been any message sent.
+        # As th thread is scheduled often in the order of ms, this implementation will raise an exception (if nothing is send) quite often
         while not stop_event.is_set():
             try:
                 # Send everything in a json serialized packet
@@ -1902,7 +1910,7 @@ class HelperA2GMeasurements(object):
             except Exception as e:
                 # Handle the assumed connection lost
                 if self.rxEmptySockCounter > self.MAX_NUM_RX_EMPTY_SOCKETS:
-                    print('\n[WARNING]:SOCKETS HAVE BEEN EMPTY FOR LONG TIME. DRONE MUST COME CLOSER')
+                    print('\n[WARNING]:SOCKETS HAVE BEEN EMPTY FOR LONG TIME. DRONE MUST COME CLOSER ', e)
                     self.rxEmptySockCounter = 0
                         
                 self.rxEmptySockCounter = self.rxEmptySockCounter + 1
@@ -2039,11 +2047,16 @@ class HelperA2GMeasurements(object):
         Args:
             PORT (int, optional): _description_. Defaults to 12000.
         """
+        socket_poll_cnt = 1
+        
+        # If we know for sure that there will be a client request for connection, we can keep this number low
+        MAX_NUM_SOCKET_POLLS = 100
+        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket = s
         
-        # This will block, so keep it low
-        self.socket.settimeout(60) 
+        # We need to use a timeout, because otherwise socket.accept() will block the GUI
+        self.socket.settimeout(5) 
         
         # CLIENT
         if self.ID == 'DRONE':
@@ -2060,8 +2073,16 @@ class HelperA2GMeasurements(object):
             # Listen for incoming connections
             self.socket.listen()
 
-            # BLOCKS UNTIL ESTABLISHING A CONNECTION
-            a2g_connection, client_address = self.socket.accept()
+            # There is no need for an endless loop
+            while(socket_poll_cnt < MAX_NUM_SOCKET_POLLS):
+                try: 
+                    # Blocks until timeout
+                    a2g_connection, client_address = self.socket.accept()
+                except Exception as es:
+                    print("[DEBUG]: No client has been seen there. Poll again for a connection. POLL NUMBER: ", socket_poll_cnt)
+                    socket_poll_cnt += 1
+                else:
+                    break    
             
             if self.DBG_LVL_1:
                 print('CONNECTION ESTABLISHED with CLIENT ', client_address)
@@ -2088,9 +2109,11 @@ class HelperA2GMeasurements(object):
             self.event_stop_thread_helper.set()
              
             if self.ID == 'DRONE':
-                self.socket.close()
+                if hasattr(self, 'socket'):
+                    self.socket.close()
             elif self.ID == 'GROUND':
-                self.a2g_conn.close()
+                if hasattr(self, 'a2g_conn'):
+                    self.a2g_conn.close()
         except:
             print('\n[DEBUG]: ERROR closing connection: probably NO SOCKET created')         
         
@@ -2114,6 +2137,10 @@ class HelperA2GMeasurements(object):
         
                 if self.IsSignalGenerator and (i == 'SG'):
                     self.inst.write('RF0\n')   
+                    
+                if self.IsRFSoC and (i == 'RFSOC'):
+                    self.myrfsoc.radio_control.close()
+                    self.myrfsoc.radio_data.close()
         else: # backwards compatibility
             if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
                 self.myGimbal.stop_thread_gimbal()
@@ -2435,19 +2462,23 @@ class GimbalGremsyH16:
             
             # Linear regresion model for angle dependence. If different, change this line
             time_yaw_2_move = (yaw - self.az_speed_neg_regresor.coef_[0]*speed_yaw - self.az_speed_neg_regresor.intercept_)/self.az_speed_neg_regresor.coef_[1]
-        else:
+        elif yaw < 0:
             speed_yaw = 15
             
             # Linear regresion model for angle dependence. If differente, change this line
-            time_yaw_2_move = (yaw - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
+            time_yaw_2_move = (np.abs(yaw) - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
+        elif yaw == 0:
+            time_yaw_2_move = 0
             
         # Choose speed for pitch movement
         if pitch > 0:
             print("[DEBUG]: Only negative pitch values are allowed")
             return
-        else:
+        elif pitch < 0:
             speed_pitch = -5
-            time_pitch_2_move = (pitch - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
+            time_pitch_2_move = (np.abs(pitch) - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
+        elif pitch == 0:
+            time_pitch_2_move = 0
         
         if (time_yaw_2_move > 0) and (time_pitch_2_move > 0):
             print("[DEBUG]: Gremsy H16 moves in yaw first: TIME to complete movement: ", time_yaw_2_move)
@@ -2469,7 +2500,19 @@ class GimbalGremsyH16:
         Wrapper to stop_updating from SBUSEncoder
         """
         self.sbus.stop_updating()
-                
+    
+    def control_power_motors(self, power='on'):
+        """
+        Wrapper to turn_off_motors and turn_on_motors
+
+        Returns:
+            power (str): 'on' or 'off
+        """
+        if power == 'on':
+            self.sbus.turn_on_motors()
+        elif power == 'off':
+            self.sbus.turn_off_motors()
+        
 class SBUSEncoder:
     """
     Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
@@ -2661,6 +2704,7 @@ class RFSoCRemoteControlFromHost():
         self.filename_to_save = filename
         self.hest = []
         self.meas_time_tag = []
+        self.meas_stops = []
         self.RFSoCSuccessExecutionAns = "Successully executed"
         self.RFSoCSuccessAns = "Success"
         self.n_receive_calls = 0
@@ -2741,41 +2785,11 @@ class RFSoCRemoteControlFromHost():
         self.send_cmd('setModeSivers', cmd_arg='RXen0_TXen1')
         self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
         self.send_cmd('setGainTxSivers')
-    
-    def receive_signal(self, stop_event):
-        """
-        Function callback for the measurement thread.
-
-        Executed whenever the kernel allocates time for this thread to be executed. (~20 ms)
-
-        Args:
-            stop_event (threading.Event()): flag that is set when to stop the thread.
-        """
-
+        
+    def set_rx_rf(self):
         self.send_cmd('setModeSivers', cmd_arg='RXen1_TXen0')
         self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
         self.send_cmd('setGainRxSivers')
-
-        self.time_begin_receive_thread = time.time()
-        while not stop_event.is_set():
-            nbeams = 64
-            nbytes = 2
-            nread = 1024
-            self.radio_control.sendall(b"receiveSamples")
-            nbytes = nbeams * nbytes * nread * 2
-            buf = bytearray()
-
-            while len(buf) < nbytes:
-                data = self.radio_data.recv(nbytes)
-                buf.extend(data)
-                data = np.frombuffer(buf, dtype=np.int16)
-                rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
-                rxtd = rxtd.reshape(nbeams, nread)
-                
-            self.hest.append(rxtd)
-            self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
-            self.n_receive_calls = self.n_receive_calls + 1
-            self.time_finish_receive_call = time.time()
     
     def receive_signal_async(self):
         """
@@ -2784,26 +2798,24 @@ class RFSoCRemoteControlFromHost():
         
         No threading involved in this method
         """
-        start_call = time.time()
-        
+                
         nbeams = 64
         nbytes = 2
         nread = 1024
         self.radio_control.sendall(b"receiveSamples")
-        nbytes = nbeams * nbytes * nread * 2
+        nbytes = nbeams * nbytes * nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
         buf = bytearray()
 
         while len(buf) < nbytes:
             data = self.radio_data.recv(nbytes)
             buf.extend(data)
-            data = np.frombuffer(buf, dtype=np.int16)
-            rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
-            rxtd = rxtd.reshape(nbeams, nread)
+        data = np.frombuffer(buf, dtype=np.int16)
+        rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
+        rxtd = rxtd.reshape(nbeams, nread)
         
-        stop_call = time.time()
-        print("[DEBUG]: receive_data_async executed in ", stop_call-start_call, " s")
         self.hest.append(rxtd)
         self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
+        self.n_receive_calls = self.n_receive_calls + 1
 
     def start_thread_receive_meas_data(self):
         """
@@ -2815,32 +2827,41 @@ class RFSoCRemoteControlFromHost():
         'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
         
-        self.event_stop_thread_rfsoc = threading.Event()
-        self.t_receive = threading.Thread(target=self.receive_data(), args=(self.event_stop_thread_rfsoc))
-        self.t_receive.start()
-        time.sleep(0.5)
+        self.timer_rx_irf = RepeatTimer(0.05, self.receive_signal_async)
+        self.set_rx_rf()
+        time.sleep(0.1)
+        self.time_begin_receive_thread = time.time()
+        self.timer_rx_irf.start()
+        
+        print("[DEBUG]: receive_signal thread STARTED")
     
     def stop_thread_receive_meas_data(self):
-        self.event_stop_thread_rfsoc.set()
-        self.t_receive.join()
+        #self.event_stop_thread_rfsoc.set()
+        #self.t_receive.join()
+        self.timer_rx_irf.cancel()
         self.time_finish_receive_thread = time.time()
-        print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", (self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls)
+        print("[DEBUG]: receive_signal thread STOPPED")
+        print("[DEBUG]: Received calls: ", self.n_receive_calls)
+        print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", ((self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls))
         self.n_receive_calls = 0
-    
+        
+        self.meas_stops.append(datetime.datetime.utcnow().timetuple()[3:6])
+        
     def finish_measurement(self):
         
         # Check if the thread is finished and if not stop it
-        if self.t_receive.is_alive():
-            self.stop_thread_receive_meas_data()        
+        #if self.t_receive.is_alive():
+        #    self.stop_thread_receive_meas_data()
         
         datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
-    
-        hest = np.array(self.hest)
+
+        hest = np.stack(self.hest, axis=0)
+        meas_time_tags = np.array(self.meas_time_tag)
+                
         with open(datestr + self.filename_to_save + '.npy', 'wb') as f:
             np.save(f, hest)
         with open(datestr + self.filename_to_save + '-TIMETAGS' + '.npy', 'wb') as f:
-            np.save(f, self.meas_time_tag)
+            np.save(f, meas_time_tags)
         
-        self.hest = []
-        self.meas_time_tag = []
-    
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
