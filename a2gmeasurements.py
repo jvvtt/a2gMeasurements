@@ -2837,6 +2837,9 @@ class RFSoCRemoteControlFromHost():
         self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
         self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
         self.irfs_per_second = 10 # THIS MUST BE FOUND IN BETTER A WAY
+        self.MAX_BUFFER_SIZE_BYTES = 1024*1024*10 # MB
+        self.saved_file_cnt = 1
+        self.idx_last_irf_sent_on_actual_hest = 0
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2875,15 +2878,15 @@ class RFSoCRemoteControlFromHost():
             # [4:7, Q gain]: 0-6 dB, 16 steps
             tx_bb_iq_gain = 0x77 
             
-            if cmd_arg > 15 or cmd_arg < 0:
-                print("[DEBUG]: Error value for the TX Gain after RF Mixer")
-                print("[DEBUG]: Range values for the TX Gain After RF Mixer are [0 - 15] dB")
-                return
-            else:            
+            #if cmd_arg > 15 or cmd_arg < 0:
+            #    print("[DEBUG]: Error value for the TX Gain after RF Mixer")
+            #    print("[DEBUG]: Range values for the TX Gain After RF Mixer are [0 - 15] dB")
+            #    return
+            #else:            
                 # Gain after RF mixer:
                 # [0:3, RF gain]: 0-15 dB, 16 steps 
                 # [4:7, BF gain]: 0-15 dB, 16 steps  
-                tx_bfrf_gain = 0xFF 
+            tx_bfrf_gain = 0x77
 
             self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
                                                         + str.encode(str(int(tx_bb_phase)) + " ") \
@@ -2970,17 +2973,29 @@ class RFSoCRemoteControlFromHost():
         self.n_receive_calls = self.n_receive_calls + 1
 
     def background_thread_for_pdp_vis(self):
-        data_to_send = []
         
-        for irf_t in self.hest:
-            mag_irf_t = np.abs(irf_t)
-            pow_mag_irf_t = np.sum(mag_irf_t, axis=1)
-            aux = pow_mag_irf_t.astype(np.int32)
-            aux[:, self.beam_idx_for_vis]
-            data_to_send.append(pow_mag_irf_t.astype(np.int32))
+        data_to_send = np.stack(self.hest[self.idx_last_irf_sent_on_actual_hest:], axis=0)
+        data_to_send = np.abs(data_to_send)
+        data_to_send = np.sum(data_to_send, axis=2)
+        data_to_send = np.mean(data_to_send, axis=0)
+        data_to_send = data_to_send.astype(np.int32)
+
+        self.idx_last_irf_sent_on_actual_hest = len(self.hest)
     
     def save_hest_buffer(self):
-        1
+        datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
+                
+        with open(datestr + self.filename_to_save + str(self.saved_file_cnt) + '.npy', 'wb') as f:
+            np.save(f, np.stack(self.hest, axis=0))
+        with open(datestr + self.filename_to_save + '-TIMETAGS' + str(self.saved_file_cnt) + '.npy', 'wb') as f:
+            np.save(f, np.array(self.meas_time_tag))
+        
+        self.hest = []
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + str(self.saved_file_cnt) + '.npy')
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + str(self.saved_file_cnt) + '.npy')
+        
+        self.saved_file_cnt = self.saved_file_cnt + 1
+        self.idx_last_irf_sent_on_actual_hest = 0
 
     def start_thread_receive_meas_data(self):
         """
@@ -2992,8 +3007,9 @@ class RFSoCRemoteControlFromHost():
         'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
 
-        self.timer_rx_irf = RepeatTimer(0.15, self.receive_signal_async)
-        self.timer_save_big_hest_buf = RepeatTimer(2, self.save_hest_buffer)
+        calling_time_for_save_irfs = self.MAX_BUFFER_SIZE_BYTES /(self.bytes_per_irf*self.irfs_per_second)
+        self.timer_rx_irf = RepeatTimer(0.2, self.receive_signal_async)
+        self.timer_save_big_hest_buf = RepeatTimer(calling_time_for_save_irfs, self.save_hest_buffer)
         self.set_rx_rf()
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
@@ -3005,13 +3021,14 @@ class RFSoCRemoteControlFromHost():
         #self.event_stop_thread_rfsoc.set()
         #self.t_receive.join()
         self.timer_rx_irf.cancel()
+        self.timer_save_big_hest_buf.cancel()
         self.time_finish_receive_thread = time.time()
         print("[DEBUG]: receive_signal_async thread STOPPED")
         print("[DEBUG]: Received calls: ", self.n_receive_calls)
         print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", ((self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls))
-        self.n_receive_calls = 0
         
         self.meas_stops.append(datetime.datetime.utcnow().timetuple()[3:6])
+        self.n_receive_calls = 0
         
     def finish_measurement(self):
         
@@ -3031,3 +3048,7 @@ class RFSoCRemoteControlFromHost():
         
         print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
         print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
+
+        self.idx_last_irf_sent_on_actual_hest = 0
+        self.saved_file_cnt = 0
+        self.hest = []
