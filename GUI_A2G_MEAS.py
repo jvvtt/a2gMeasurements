@@ -537,33 +537,39 @@ class WidgetGallery(QDialog):
     def connect_drone_callback(self):
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
-            print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")
+            self.start_meas_togglePushButton.setEnabled(True)
+            print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")                        
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsRFSoC=True)
             print("[DEBUG]: Class created at GND with Gimbal and RFSoC")
+            self.start_meas_togglePushButton.setEnabled(True)
         if self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True)
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with Gimbal")
         if self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True)
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with Gimbal and GPS")
         if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGPS=True, IsRFSoC=True)
+            self.start_meas_togglePushButton.setEnabled(True)
             print("[DEBUG]: Class created at GND with GPS and RFSoC")
         if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsRFSoC=True)
-            print("[DEBUG]: Class created at GND with RFSoC ")
+            self.start_meas_togglePushButton.setEnabled(True)
+            print("[DEBUG]: Class created at GND with RFSoC")
         if not self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances()
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with NO devices")
         if not self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGPS=True)
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with GPS")
         
-        self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
-        
         self.connect_to_drone.setEnabled(False)
         self.disconnect_from_drone.setEnabled(True)
         
@@ -797,7 +803,7 @@ class WidgetGallery(QDialog):
                         
                     data = {'YAW': tmp, 'PITCH': 0}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
-                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
@@ -926,6 +932,7 @@ class WidgetGallery(QDialog):
         self.rx_gimbal_move_right_push_button = QPushButton('->')
         self.rx_gimbal_move_right_push_button.clicked.connect(self.right_button_gimbal_drone_callback)
         self.rx_gimbal_move_up_push_button = QPushButton('^')
+        self.rx_gimbal_move_up_push_button.clicked.connect(self.up_button_gimbal_drone_callback)
         self.rx_gimbal_move_down_push_button = QPushButton('v')
         self.rx_gimbal_move_down_push_button.clicked.connect(self.down_button_gimbal_drone_callback)
         
@@ -1111,11 +1118,12 @@ class WidgetGallery(QDialog):
     
     def closeEvent(self, event):
         if hasattr(self, 'myhelpera2g'):
+            self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
-    
+            
     def eventFilter(self, source, event):
         if event.type()== event.Close:
-            self. closeEvent(event)
+            self.closeEvent(event)
             return True
         
         return super().eventFilter(source,event)
