@@ -1,3 +1,4 @@
+import platform
 import re
 import subprocess
 import paramiko
@@ -41,6 +42,15 @@ class WidgetGallery(QDialog):
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
         self.remote_drone_conn = None
+        
+        self.SUCCESS_PING_DRONE = False
+        self.SUCCESS_SSH = False
+        self.SUCCESS_DRONE_FPGA = False
+        self.SUCCESS_DRONE_GPS = False
+        self.SUCCES_DRONE_GIMBAL = False
+        self.SUCCESS_GND_FPGA = False
+        self.SUCCESS_GND_GIMBAL = False
+        self.SUCCESS_GND_GPS = False
 
         self.create_check_connections_panel()
         self.create_log_terminal()
@@ -303,7 +313,10 @@ class WidgetGallery(QDialog):
         Caller function IS RESPONSIBLE for checking if there is a WIFI operating. 
         
         """
-        ifconfig_info = subprocess.Popen(["ifconfig"], stdout=subprocess.PIPE)
+        if platform.system() == "Windows":
+            ifconfig_info = subprocess.Popen(["ipconfig"], stdout=subprocess.PIPE)
+        else:
+            ifconfig_info = subprocess.Popen(["ifconfig"], stdout=subprocess.PIPE)
         out, err = ifconfig_info.communicate()
         stdout_str = out.decode()
 
@@ -346,6 +359,11 @@ class WidgetGallery(QDialog):
             self.drone_rfsoc_conn_label_modifiable.setText(str(SUCCESS_DRONE_FPGA))
             self.drone_gps_conn_label_modifiable.setText(str(SUCCESS_DRONE_GPS))
             self.drone_gimbal_conn_label_modifiable.setText(str(SUCCES_DRONE_GIMBAL))
+            self.SUCCESS_PING_DRONE = SUCCESS_PING_DRONE
+            self.SUCCESS_SSH = SUCCESS_SSH
+            self.SUCCESS_DRONE_FPGA = SUCCESS_DRONE_FPGA
+            self.SUCCESS_DRONE_GPS = SUCCESS_DRONE_GPS
+            self.SUCCES_DRONE_GIMBAL = SUCCES_DRONE_GIMBAL
 
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
@@ -355,38 +373,16 @@ class WidgetGallery(QDialog):
         self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))
         self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
         self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
-
+        
         if hasattr(self, 'GND_ADDRESS'):
             self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
         else:
             self.GND_ADDRESS =  ''
-
-        # User presses more than once the "Check" button
-        if hasattr(self, 'myhelpera2g'):
-            self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
-            del self.myhelpera2g
         
-        time.sleep(0.5)
+        self.SUCCESS_GND_FPGA = SUCCESS_GND_FPGA
+        self.SUCCESS_GND_GIMBAL = SUCCESS_GND_GIMBAL
+        self.SUCCESS_GND_GPS = SUCCESS_GND_GPS
         
-        # Since the app is asynchronoulsy calling functions (based on user-actions type of events) we create here classes and start threads and NOT in the __main__
-        if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
-            self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
-        if SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
-            self.create_class_instances(IsGimbal=True, IsRFSoC=True)
-        if SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
-            self.create_class_instances(IsGimbal=True)
-        if SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
-            self.create_class_instances(IsGimbal=True, IsGPS=True)
-        if not SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
-            self.create_class_instances(IsGPS=True, IsRFSoC=True)
-        if not SUCCESS_GND_GIMBAL and SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
-            self.create_class_instances(IsRFSoC=True)
-        if not SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and not SUCCESS_GND_GPS:
-            self.create_class_instances()
-            print("[DEBUG]: No GND devices")
-        if not SUCCESS_GND_GIMBAL and not SUCCESS_GND_FPGA and SUCCESS_GND_GPS:
-            self.create_class_instances(IsGPS=True)
-
     def create_class_instances(self, IsGPS=False, IsGimbal=False, IsRFSoC=False, GPS_Stream_Interval='sec1'):
         """
         Responsible for creating any objects (class instances) that will be used to connect to and control the devices,
@@ -407,24 +403,28 @@ class WidgetGallery(QDialog):
         on the GUI.
         
         """
-        self.update_vis_time_gps = 1
-        self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback) 
-
         # Although thus function should be called when a HelperA2GMeasurements class instance has been created, better to do a double check
         if hasattr(self, 'myhelpera2g'):
+            self.update_vis_time_gps = 1
+            self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
             self.update_time_gimbal_follow = 1
             self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
             #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
 
+            self.update_vis_time_pdp = 0.5
+            self.periodical_pdp_display_thread = RepeatTimer(self.update_vis_time_pdp, self.periodical_pdp_display_callback)
+        
+    def periodical_pdp_display_callback(self):
+        1
+        
     def periodical_gps_display_callback(self):
         """
         Periodically displays GPS position of both devices on the GPS Visualization panel.
         The period is controlled by the propery "update_vis_time_gps" of this class.
 
-        """
-        
-        # Display ground node coords
-        coords, head_info = self.get_last_sbf_buffer_info(what='Both')
+        """        
+        # Display GND node coords
+        coords, head_info = self.myhelpera2g.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
             
         if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
             pass
@@ -436,8 +436,6 @@ class WidgetGallery(QDialog):
         # The coordinates shown will be the coordinates of up to self.update_time_fps before
         if hasattr(self.myhelpera2g, 'last_drone_coords_requested'):
             self.mygpsonmap.show_air_moving(lat=self.myhelpera2g.last_drone_coords_requested['LAT'], lon=self.myhelpera2g.last_drone_coords_requested['LON'])
-            
-        self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS')
             
     def write_to_log_terminal(self, newLine):
         '''
@@ -476,7 +474,7 @@ class WidgetGallery(QDialog):
         sys.stdout = self.log_widget
     
     def create_check_connections_panel(self):
-        self.checkConnPanel = QGroupBox('Connections checker')
+        self.checkConnPanel = QGroupBox('Connections')
 
         gnd_gimbal_conn_label = QLabel('Ground gimbal:')
         gnd_gps_conn_label = QLabel('Ground GPS:')
@@ -495,6 +493,7 @@ class WidgetGallery(QDialog):
         self.connect_to_drone = QPushButton('Connect drone')
         self.disconnect_from_drone = QPushButton('Disconnect drone')
         self.check_connections_push_button.clicked.connect(self.check_status_all_devices)
+        self.disconnect_from_drone.setEnabled(False)
         self.connect_to_drone.clicked.connect(self.connect_drone_callback)
         self.disconnect_from_drone.clicked.connect(self.disconnect_drone_callback)
 
@@ -536,10 +535,47 @@ class WidgetGallery(QDialog):
         self.checkConnPanel.setLayout(layout)
 
     def connect_drone_callback(self):
-        1
-    
+        if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
+            print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")
+        if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True, IsRFSoC=True)
+            print("[DEBUG]: Class created at GND with Gimbal and RFSoC")
+        if self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True)
+            print("[DEBUG]: Class created at GND with Gimbal")
+        if self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
+            self.create_class_instances(IsGimbal=True, IsGPS=True)
+            print("[DEBUG]: Class created at GND with Gimbal and GPS")
+        if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
+            self.create_class_instances(IsGPS=True, IsRFSoC=True)
+            print("[DEBUG]: Class created at GND with GPS and RFSoC")
+        if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
+            self.create_class_instances(IsRFSoC=True)
+            print("[DEBUG]: Class created at GND with RFSoC ")
+        if not self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
+            self.create_class_instances()
+            print("[DEBUG]: Class created at GND with NO devices")
+        if not self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
+            self.create_class_instances(IsGPS=True)
+            print("[DEBUG]: Class created at GND with GPS")
+        
+        self.start_meas_togglePushButton.setEnabled(True)
+        self.stop_meas_togglePushButton.setEnabled(False)
+        self.finish_meas_togglePushButton.setEnabled(False)
+        
+        self.connect_to_drone.setEnabled(False)
+        self.disconnect_from_drone.setEnabled(True)
+        
     def disconnect_drone_callback(self):
-        1
+        self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
+        del self.myhelpera2g        
+        
+        self.start_meas_togglePushButton.setEnabled(False)
+        self.stop_meas_togglePushButton.setEnabled(False)
+        self.finish_meas_togglePushButton.setEnabled(False)
+        self.connect_to_drone.setEnabled(True)
+        self.disconnect_from_drone.setEnabled(False)
 
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')
@@ -772,7 +808,27 @@ class WidgetGallery(QDialog):
             print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
     def up_button_gimbal_drone_callback(self):
-        1
+        if hasattr(self, 'myhelpera2g'):
+            movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
+            if movement_step != '':
+                try:
+                    tmp = int(float(movement_step))
+                    incorrect_angle_value = self.checker_gimbal_input_range(tmp)
+                    if tmp < 0:
+                        tmp = abs(tmp)
+                        print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
+                        
+                    data = {'YAW': 0, 'PITCH': tmp}
+                    self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                    print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
+                except Exception as e:
+                        print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
+            else:
+                data = {'YAW': 0, 'PITCH': 10}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
     def down_button_gimbal_drone_callback(self):
         if hasattr(self, 'myhelpera2g'):
@@ -791,7 +847,7 @@ class WidgetGallery(QDialog):
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
-                data = {'YAW': 0, 'PITCH': -tmp}
+                data = {'YAW': 0, 'PITCH': -10}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
         else:
@@ -897,31 +953,48 @@ class WidgetGallery(QDialog):
         self.myhelpera2g.myrfsoc.transmit_signal()
         self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC')
         print("[DEBUG]: SENT REQUEST to START measurement")
+        self.start_meas_togglePushButton.setEnabled(False)
+        self.stop_meas_togglePushButton.setEnabled(True)
+        self.finish_meas_togglePushButton.setEnabled(False)
     
     def stop_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
         print("[DEBUG]: SENT REQUEST to STOP measurement")
+        self.start_meas_togglePushButton.setEnabled(True)
+        self.stop_meas_togglePushButton.setEnabled(False)
+        self.finish_meas_togglePushButton.setEnabled(True)
     
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
         print("[DEBUG]: SENT REQUEST to FINISH measurement")
+        self.start_meas_togglePushButton.setEnabled(True)
+        self.stop_meas_togglePushButton.setEnabled(False)
+        self.finish_meas_togglePushButton.setEnabled(False)
     
     def manual_meas_radio_button_callback(self):
-        1#self.choose_what_time_is_specified_ComboBox.
+        self.choose_what_time_is_specified_ComboBox.setEnabled(False)
+        self.time_value_text_edit.setEnabled(False)
+        
+    def auto_meas_radio_button_callback(self):
+        self.choose_what_time_is_specified_ComboBox.setEnabled(True)
+        self.time_value_text_edit.setEnabled(True)
 
     def create_Planning_Measurements_panel(self):
         self.planningMeasurementsPanel = QGroupBox('Planning measurements')
         
         self.start_meas_togglePushButton = QPushButton("START")
-        self.start_meas_togglePushButton.setCheckable(True)
+        #self.start_meas_togglePushButton.setCheckable(True)
+        self.start_meas_togglePushButton.setEnabled(False)
         self.start_meas_togglePushButton.clicked.connect(self.start_meas_button_callback)
         
         self.stop_meas_togglePushButton = QPushButton("STOP")
-        self.stop_meas_togglePushButton.setCheckable(True)
+        #self.stop_meas_togglePushButton.setCheckable(True)
+        self.stop_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.clicked.connect(self.stop_meas_button_callback)
         
         self.finish_meas_togglePushButton = QPushButton("FINISH")
-        self.finish_meas_togglePushButton.setCheckable(True)
+        #self.finish_meas_togglePushButton.setCheckable(True)
+        self.finish_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.clicked.connect(self.finish_meas_button_callback)
         
         self.choose_what_time_is_specified_ComboBox = QComboBox()
@@ -930,8 +1003,10 @@ class WidgetGallery(QDialog):
         self.time_value_text_edit = QLineEdit('')
         
         self.how_trigger_measurements_radio_button_man = QRadioButton("Manual")
+        self.how_trigger_measurements_radio_button_man.clicked.connect(self.manual_meas_radio_button_callback)
         self.how_trigger_measurements_radio_button_auto = QRadioButton("Automatic") 
-        self.how_trigger_measurements_radio_button_man.setChecked(True)
+        self.how_trigger_measurements_radio_button_auto.clicked.connect(self.auto_meas_radio_button_callback)
+        self.how_trigger_measurements_radio_button_auto.setChecked(True)
         
         choose_what_type_time_label = QLabel('Choose parameter:')
         value_parameter_label = QLabel('Value:')

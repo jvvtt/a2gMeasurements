@@ -1652,7 +1652,8 @@ class HelperA2GMeasurements(object):
                                 'STARTDRONERFSOC', 
                                 'STOPDRONERFSOC', 
                                 'FINISHDRONERFSOC',
-                                'FOLLOWGIMBAL'.
+                                'FOLLOWGIMBAL',
+                                'SETIRF'.
                                 Defaults to None.
             cmd_source_for_ans (str, optional): always provide which command you are replying to, in the answer frame.
             
@@ -1787,6 +1788,9 @@ class HelperA2GMeasurements(object):
             self.myrfsoc.finish_measurement()
             self.CONN_MUST_OVER_FLAG = True
     
+    def do_set_irf_action(self):
+        1
+    
     def process_answer(self, msg):
         """
         This function is in charge of processing the answer message received. So far, the only message that requires
@@ -1846,7 +1850,9 @@ class HelperA2GMeasurements(object):
                         if data['FOLLOW_GIMBAL'] is not None: # The dictionary key is not empty
                             if data['FOLLOW_GIMBAL']: # The corresponding value is True
                                 if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
-                                    self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set) # has to be absolute movement, cause the 0 is the heading value.
+                                    
+                                    # Has to be absolute movement, cause the 0 is the heading value.
+                                    self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set) 
                                 else:
                                     print('\n[WARNING]: No gimbal available, so no rotation will happen')
                 
@@ -1876,11 +1882,13 @@ class HelperA2GMeasurements(object):
                 self.do_stop_meas_drone_rfsoc()
             elif rx_msg['CMD_SOURCE'] == 'FINISHDRONERFSOC': # unidirectional command: from gnd node to drone node
                 self.do_finish_meas_drone_rfsoc()
+            elif rx_msg['CMD_SOURCE'] == 'SETIRF': # unidirectional command: from drone node to gnd node
+                self.do_set_irf_action()
             elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
                 if self.ID == 'GROUND':
-                    print('\nReceived msg from ' + self.CLIENT_ADDRESS[0] + ' is: ' + rx_msg['DATA'])
+                    print('Received msg from ' + self.CLIENT_ADDRESS[0] + ' is: ' + rx_msg['DATA'])
                 elif self.ID == 'DRONE':
-                    print('\nReceived msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
+                    print('Received msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
     
     def socket_receive(self, stop_event):
         """
@@ -1930,11 +1938,9 @@ class HelperA2GMeasurements(object):
         """
         Wrapper to send a command through the socket between ground and drone connection (or viceversa).
         
-        If 'type_cmd' is 'SETGIMBAL', the 'data' argument SHOULD BE a dictionary as follows:
+        *If 'type_cmd' is 'SETGIMBAL', the 'data' argument SHOULD BE a dictionary as follows:
         
-        {'YAW': yaw_value, 'PITCH', pitch_value}
-        
-        where yaw_value and pitch_value are integers (between -1800, 1800).
+        {'YAW': yaw_value, 'PITCH', pitch_value}, where yaw_value and pitch_value are integers (between -1800, 1800).
 
         Args:
             type_cmd (_type_, optional): _description_. Defaults to None.
@@ -2187,7 +2193,8 @@ class GimbalGremsyH16:
             self.speed_time_azimuth_table = speed_time_azimuth_table
             self.speed_time_elevation_table = speed_time_elevation_table
         else:
-            self.load_measured_data_july_2023()
+            #self.load_measured_data_july_2023()
+            self.load_measured_data_august_2023()
 
         # Assume linear fit:
         # For a longer range of speeds than the used in the default data, it is very likely that the fit won't be linear
@@ -2218,7 +2225,13 @@ class GimbalGremsyH16:
         self.el_speed_neg_regresor = LinearRegression().fit(X, y)
         self.score_el_speed_neg_regresor = self.el_speed_neg_regresor.score(X, y)
         print("[DEBUG]: NEGATIVE SPEEDS (DOWN), ELEVATION, R^2 Score Linear Reg: ", self.score_el_speed_neg_regresor)
-    
+
+        X = self.speed_time_elevation_table[is_positive_elevation[:, 0], 0:2]
+        y = np.rad2deg(self.speed_time_elevation_table[is_positive_elevation[:, 0], 2])
+        self.el_speed_pos_regresor = LinearRegression().fit(X, y)
+        self.score_el_speed_pos_regresor = self.el_speed_pos_regresor.score(X, y)
+        print("[DEBUG]: POSITIVE SPEEDS (UP), ELEVATION, R^2 Score Linear Reg: ", self.score_el_speed_neg_regresor)   
+        
     def load_measured_drifts(self):
         """
         First column is time [s] and second column is angle computed from (a_{i}, a_{i+1}, b_{i}) distances
@@ -2282,7 +2295,7 @@ class GimbalGremsyH16:
                                             [-5, 4, self.gremsy_angle(1.889, 1.891, 0.345)]]
         self.speed_time_elevation_table = np.array(speed_time_elevation_table)        
     
-    def load_measured_data__2023(self):
+    def load_measured_data_august_2023(self):
         """
         This table contains as columns the speed [-100, 100], time [s], and the (near) azimuth angle computed 
         from the 3 distances (a_{i}, a_{i+1}, b_{i}). The distances were measured by Kimmo Mäkelä.
@@ -2303,7 +2316,25 @@ class GimbalGremsyH16:
                         [-14, 6, self.gremsy_angle(2.106, 2.089, 1.93)],
                         [-13, 4, self.gremsy_angle(2.034, 1.909, 1.165)],
                         [-13, 5, self.gremsy_angle(2.025, 1.985, 1.44)],
-                        [-13, 6, self.gremsy_angle(2.183, 1.98, 1.79)]]
+                        [-13, 6, self.gremsy_angle(2.183, 1.98, 1.79)],
+                        [-15, 4, self.gremsy_angle(2.38, 1.574, 1.666)],
+                        [-15, 5, self.gremsy_angle(2.183, 1.538, 1.836)],
+                        [-15, 6, self.gremsy_angle(2.183, 1.546, 2.111)],
+                        [-16, 4, self.gremsy_angle(2.183, 1.558, 1.648)],
+                        [-16, 5, self.gremsy_angle(2.183, 1.537, 1.934)],
+                        [-16, 6, self.gremsy_angle(2.183, 1.562, 2.215)],
+                        [-17, 4, self.gremsy_angle(2.183, 1.55, 1.71)],
+                        [-17, 5, self.gremsy_angle(2.183, 1.54, 2.103)],
+                        [-17, 6, self.gremsy_angle(2.183, 1.586, 2.327)],
+                        [-18, 4, self.gremsy_angle(2.183, 1.541, 1.799)],
+                        [-18, 5, self.gremsy_angle(2.183, 1.623, 2.109)],
+                        [-18, 6, self.gremsy_angle(2.183, 1.623, 2.463)],
+                        [-19, 4, self.gremsy_angle(2.183, 1.537, 1.885)],
+                        [-19, 5, self.gremsy_angle(2.183, 1.563, 2.215)],
+                        [-19, 6, self.gremsy_angle(2.183, 1.663, 2.582)],
+                        [-20, 4, self.gremsy_angle(2.183, 1.537, 1.952)],
+                        [-20, 5, self.gremsy_angle(2.183, 1.585, 2.321)],
+                        [-20, 6, self.gremsy_angle(2.183, 1.718, 2.72)]]
         self.speed_time_azimuth_table = np.array(speed_time_azimuth_table)
             
         speed_time_elevation_table = [[10, 3, self.gremsy_angle(1.526, 1.529, 0.07)],
@@ -2362,11 +2393,71 @@ class GimbalGremsyH16:
                                         [20, 2, self.gremsy_angle(1.526, 1.579, 0.395)],
                                         [20, 3, self.gremsy_angle(1.526, 1.648, 0.616)],
                                         [20, 4, self.gremsy_angle(1.526, 1.742, 0.845)],
-                                        [-5, 3, self.gremsy_angle(1.769, 1.652, 0.1)],
-                                        [-5, 6, self.gremsy_angle(1.769, 1.58, 0.1)],
-                                        [-5, 7, self.gremsy_angle(1.769, 1.562, 0.1)],
-                                        [-5, 8, self.gremsy_angle(1.769, 1.548, 0.1)],
-                                        [-5, 10, self.gremsy_angle(1.769, 1.537, 0.1)],]
+                                        [-5, 3, self.gremsy_angle(1.769, 1.652, 0.268)],
+                                        [-5, 6, self.gremsy_angle(1.769, 1.58, 0.5)],
+                                        [-5, 7, self.gremsy_angle(1.769, 1.562, 0.575)],
+                                        [-5, 8, self.gremsy_angle(1.769, 1.548, 0.648)],
+                                        [-5, 10, self.gremsy_angle(1.769, 1.534, 0.758)],
+                                        [-6, 3, self.gremsy_angle(1.769, 1.632, 0.324)],
+                                        [-6, 6, self.gremsy_angle(1.769, 1.556, 0.608)],
+                                        [-6, 8, self.gremsy_angle(1.769, 1.531, 0.785)],
+                                        [-6, 10, self.gremsy_angle(1.769, 1.527, 0.958)],
+                                        [-7, 3, self.gremsy_angle(1.769, 1.713, 0.385)],
+                                        [-7, 6, self.gremsy_angle(1.769, 1.534, 0.717)],
+                                        [-7, 8, self.gremsy_angle(1.769, 1.526, 0.925)],
+                                        [-7, 10, self.gremsy_angle(1.769, 1.541, 1.135)],
+                                        [-8, 3, self.gremsy_angle(1.769, 1.599, 0.433)],
+                                        [-8, 6, self.gremsy_angle(1.769, 1.53, 0.983)],
+                                        [-8, 8, self.gremsy_angle(1.769, 1.533, 1.058)],
+                                        [-8, 10, self.gremsy_angle(1.769, 1.574, 1.309)],
+                                        [-9, 3, self.gremsy_angle(1.769, 1.581, 0.496)],
+                                        [-9, 6, self.gremsy_angle(1.769, 1.527, 0.934)],
+                                        [-9, 8, self.gremsy_angle(1.769, 1.554, 1.214)],
+                                        [-9, 9, self.gremsy_angle(1.769, 1.588, 1.364)],
+                                        [-10, 2, self.gremsy_angle(1.769, 1.612, 0.387)],
+                                        [-10, 5, self.gremsy_angle(1.769, 1.527, 0.883)],
+                                        [-10, 7, self.gremsy_angle(1.769, 1.551, 1.197)],
+                                        [-10, 8, self.gremsy_angle(1.769, 1.588, 1.364)],
+                                        [-11, 2, self.gremsy_angle(1.769, 1.601, 0.42)],
+                                        [-11, 5, self.gremsy_angle(1.769, 1.527, 0.96)],
+                                        [-11, 6, self.gremsy_angle(1.769, 1.541, 1.136)],
+                                        [-11, 7, self.gremsy_angle(1.769, 1.577, 1.322)],
+                                        [-12, 2, self.gremsy_angle(1.769, 1.588, 0.467)],
+                                        [-12, 5, self.gremsy_angle(1.769, 1.532, 1.048)],
+                                        [-12, 6, self.gremsy_angle(1.769, 1.559, 1.247)],
+                                        [-12, 7, self.gremsy_angle(1.769, 1.611, 1.446)],
+                                        [-13, 2, self.gremsy_angle(1.769, 1.579, 0.502)],
+                                        [-13, 5, self.gremsy_angle(1.769, 1.542, 1.144)],
+                                        [-13, 6, self.gremsy_angle(1.769, 1.588, 1.363)],
+                                        [-13, 7, self.gremsy_angle(1.769, 1.672, 1.611)],
+                                        [-14, 2, self.gremsy_angle(1.769, 1.572, 0.534)],
+                                        [-14, 5, self.gremsy_angle(1.769, 1.558, 1.231)],
+                                        [-14, 6, self.gremsy_angle(1.769, 1.624, 1.483)],
+                                        [-14, 7, self.gremsy_angle(1.769, 1.672, 1.752)],
+                                        [-15, 2, self.gremsy_angle(1.769, 1.565, 0.559)],
+                                        [-15, 4, self.gremsy_angle(1.769, 1.534, 1.069)],
+                                        [-15, 5, self.gremsy_angle(1.769, 1.58, 1.328)],
+                                        [-15, 6, self.gremsy_angle(1.769, 1.666, 1.6)],
+                                        [-16, 2, self.gremsy_angle(1.769, 1.558, 0.601)],
+                                        [-16, 4, self.gremsy_angle(1.769, 1.541, 1.136)],
+                                        [-16, 5, self.gremsy_angle(1.769, 1.604, 1.42)],
+                                        [-16, 6, self.gremsy_angle(1.769, 1.722, 1.73)],
+                                        [-17, 2, self.gremsy_angle(1.769, 1.55, 0.641)],
+                                        [-17, 4, self.gremsy_angle(1.769, 1.554, 1.212)],
+                                        [-17, 5, self.gremsy_angle(1.769, 1.634, 1.512)],
+                                        [-17, 6, self.gremsy_angle(1.769, 1.74, 1.771)],
+                                        [-18, 1, self.gremsy_angle(1.769, 1.623, 0.355)],
+                                        [-18, 3, self.gremsy_angle(1.769, 1.528, 0.98)],
+                                        [-18, 4, self.gremsy_angle(1.769, 1.568, 1.284)],
+                                        [-18, 5, self.gremsy_angle(1.769, 1.677, 1.625)],
+                                        [-19, 1, self.gremsy_angle(1.769, 1.615, 0.38)],
+                                        [-19, 3, self.gremsy_angle(1.769, 1.531, 1.031)],
+                                        [-19, 4, self.gremsy_angle(1.769, 1.591, 1.374)],
+                                        [-19, 5, self.gremsy_angle(1.769, 1.726, 1.774)],
+                                        [-20, 1, self.gremsy_angle(1.769, 1.609, 0.401)],
+                                        [-20, 3, self.gremsy_angle(1.769, 1.536, 1.086)],
+                                        [-20, 4, self.gremsy_angle(1.769, 1.613, 1.451)],
+                                        [-20, 5, self.gremsy_angle(1.769, 1.737, 1.764)]]
         self.speed_time_elevation_table = np.array(speed_time_elevation_table)
     
     def gremsy_angle(self, distance_1, distance_2, distance_3):
@@ -2385,7 +2476,7 @@ class GimbalGremsyH16:
         tmp = (distance_1**2 + distance_2**2 - distance_3**2)/(2*distance_1*distance_2)
         return np.arccos(tmp)
     
-    def plot_linear_reg_on_near_domain(self):
+    def plot_linear_reg_on_near_domain(self, loaded='august'):
         """
         Generates a figure with 3 subplots, both with measured values (default measured values or new values measured 
         for more (speed, time) tuples given as a parameter to the class)
@@ -2394,14 +2485,20 @@ class GimbalGremsyH16:
         2. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> azimuth
         3. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> elevation
         
+        if 'loaded' is august then the figure has 4 subplots, with the 4th being
+        4. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> elevation
         """
         
         is_positive_azimuth = self.speed_time_azimuth_table > 0
         is_positive_elevation = self.speed_time_elevation_table > 0       
         
-        fig = make_subplots(rows=1, cols=3, specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
-                            subplot_titles=("Pos. Speed - Azimuth", "Neg. Speed - Azimuth", "Neg. Speed - Elevation"))
-        #fig = go.Figure()
+        # We are going to use multiple if - else statements of the same kind just to maintain some readibility of the code
+        if loaded == 'august':
+            fig = make_subplots(rows=2, cols=2, specs=[[{"type": "scene"}, {"type": "scene"}], [{"type": "scene"}, {"type": "scene"}]],
+                                subplot_titles=("Pos. Speed - Azimuth", "Neg. Speed - Azimuth", "Neg. Speed - Elevation", "Pos. Speed - Elevation"))
+        else:
+            fig = make_subplots(rows=1, cols=3, specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}]],
+                                subplot_titles=("Pos. Speed - Azimuth", "Neg. Speed - Azimuth", "Neg. Speed - Elevation"))
         
         X, Y = np.meshgrid(np.linspace(10, 20, num=11), np.linspace(5, 9, num=5))
         XY = np.c_[X.flatten(), Y.flatten()]
@@ -2410,8 +2507,8 @@ class GimbalGremsyH16:
         fig.add_trace(go.Scatter3d(mode='markers', x=XY[:, 0], y=XY[:, 1], z=Z, marker=dict(color='blue', size=5,), name='Extrapolated', showlegend=True), row=1, col=1)
         fig.add_trace(go.Scatter3d(mode='markers', x=self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 0], y=self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 1],
                 z=np.rad2deg(self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=1, col=1)
-
-        X, Y = np.meshgrid(np.linspace(-20, -10, num=11), np.linspace(4, 6, num=3))
+        
+        X, Y = np.meshgrid(np.linspace(-20, -10, num=11), np.linspace(4, 6, num=3))    
         XY = np.c_[X.flatten(), Y.flatten()]
         Z = self.az_speed_neg_regresor.predict(XY)
         
@@ -2419,14 +2516,30 @@ class GimbalGremsyH16:
         fig.add_trace(go.Scatter3d(mode='markers', x=self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 0], y=self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 1],
                 z=np.rad2deg(self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=1, col=2)
         
-        X, Y = np.meshgrid(np.linspace(-10, -5, num=6), np.linspace(1, 4, num=4))
+        if loaded == 'august':
+            X, Y = np.meshgrid(np.linspace(-20, -5, num=16), np.linspace(1, 10, num=10))
+            nrow = 2
+            ncol = 1
+        else:
+            X, Y = np.meshgrid(np.linspace(-10, -5, num=6), np.linspace(1, 4, num=4))
+            nrow = 1
+            ncol = 3
         XY = np.c_[X.flatten(), Y.flatten()]
         Z = self.el_speed_neg_regresor.predict(XY)
         
-        fig.add_trace(go.Scatter3d(mode='markers', x=XY[:, 0], y=XY[:, 1], z=Z, marker=dict(color='blue', size=5,), name='Extrapolated', showlegend=True), row=1, col=3)
+        fig.add_trace(go.Scatter3d(mode='markers', x=XY[:, 0], y=XY[:, 1], z=Z, marker=dict(color='blue', size=5,), name='Extrapolated', showlegend=True), row=nrow, col=ncol)
         fig.add_trace(go.Scatter3d(mode='markers', x=self.speed_time_elevation_table[~is_positive_elevation[:, 0], 0], y=self.speed_time_elevation_table[~is_positive_elevation[:, 0], 1],
-                z=np.rad2deg(self.speed_time_elevation_table[~is_positive_elevation[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=1, col=3)
+                z=np.rad2deg(self.speed_time_elevation_table[~is_positive_elevation[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=nrow, col=ncol)
         
+        if loaded == 'august':
+            X, Y = np.meshgrid(np.linspace(10, 20, num=11), np.linspace(0, 9, num=10))
+            XY = np.c_[X.flatten(), Y.flatten()]
+            Z = self.el_speed_pos_regresor.predict(XY)
+        
+            fig.add_trace(go.Scatter3d(mode='markers', x=XY[:, 0], y=XY[:, 1], z=Z, marker=dict(color='blue', size=5,), name='Extrapolated', showlegend=True), row=2, col=2)
+            fig.add_trace(go.Scatter3d(mode='markers', x=self.speed_time_elevation_table[is_positive_elevation[:, 0], 0], y=self.speed_time_elevation_table[is_positive_elevation[:, 0], 1],
+                    z=np.rad2deg(self.speed_time_elevation_table[is_positive_elevation[:, 0], 2]), marker=dict(color='red', size=3,), name='Measured', showlegend=True), row=2, col=2)
+
         fig.update_scenes(xaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black",title='Speed',),
                         yaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Time [s]', ),
                         zaxis=dict(backgroundcolor="rgba(0, 0, 0,0)", gridcolor="rgba(1, 1, 1, 0.1)", showbackground=True, zerolinecolor="black", title='Angle [s]'),
@@ -2465,15 +2578,17 @@ class GimbalGremsyH16:
         elif yaw < 0:
             speed_yaw = 15
             
-            # Linear regresion model for angle dependence. If differente, change this line
+            # Linear regresion model for angle dependence. If different, change this line
             time_yaw_2_move = (np.abs(yaw) - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
         elif yaw == 0:
             time_yaw_2_move = 0
             
         # Choose speed for pitch movement
         if pitch > 0:
-            print("[DEBUG]: Only negative pitch values are allowed")
-            return
+            #print("[DEBUG]: Only negative pitch values are allowed")
+            speed_pitch = 10
+            time_pitch_2_move = (pitch - self.el_speed_pos_regresor.coef_[0]*speed_pitch - self.el_speed_pos_regresor.intercept_)/self.el_speed_pos_regresor.coef_[1]
+            #return
         elif pitch < 0:
             speed_pitch = -5
             time_pitch_2_move = (np.abs(pitch) - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
@@ -2693,8 +2808,8 @@ class RFSoCRemoteControlFromHost():
     Class that implements methods handling commands to be sent from the host computer (either the ground node or the drone node) to the server program
     running in the RFSoC connected through ETH to that computer.
     
-    The code used in this class was provided by Panagiotis Skrimponis and adpated by Julian D. Villegas G.    
-    
+    Code used in this class was provided by Panagiotis Skrimponis.
+    It was extended and adpated by Julian D. Villegas G.
     """
     
     def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDPs', operating_freq=57.51e9):
@@ -2712,6 +2827,7 @@ class RFSoCRemoteControlFromHost():
         self.time_finish_receive_call = 0
         self.time_begin_receive_thread = 0
         self.time_finish_receive_thread = 0
+        self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2742,19 +2858,46 @@ class RFSoCRemoteControlFromHost():
         elif cmd == 'setGainTxSivers':
             tx_bb_gain = 0x3 # tx_ctrl bit 3 (BB Ibias set) = 0: 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB
             # tx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB *
+            
             tx_bb_phase = 0x0 
-            tx_bb_iq_gain = 0x77 # this is the gain in BB, [0:3,I gain]: 0-6 dB, 16 steps, [4:7, Q gain]: 0-6 dB, 16 steps
-            tx_bfrf_gain = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps  
+            
+            # Gain in BB:
+            # [0:3, I gain]: 0-6 dB, 16 steps
+            # [4:7, Q gain]: 0-6 dB, 16 steps
+            tx_bb_iq_gain = 0x77 
+            
+            if cmd_arg > 15 or cmd_arg < 0:
+                print("[DEBUG]: Error value for the TX Gain after RF Mixer")
+                print("[DEBUG]: Range values for the TX Gain After RF Mixer are [0 - 15] dB")
+                return
+            else:            
+                # Gain after RF mixer:
+                # [0:3, RF gain]: 0-15 dB, 16 steps 
+                # [4:7, BF gain]: 0-15 dB, 16 steps  
+                tx_bfrf_gain = 0xFF 
 
             self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
                                                         + str.encode(str(int(tx_bb_phase)) + " ") \
                                                         + str.encode(str(int(tx_bb_iq_gain)) + " ") \
                                                         + str.encode(str(int(tx_bfrf_gain))))
         elif cmd == 'setGainRxSivers':
-            rx_gain_ctrl_bb1 = 0x77 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            rx_gain_ctrl_bb2 = 0x00 # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            rx_gain_ctrl_bb3 = 0x99 # I[0:3]:[0-F]:0:6 dB, 16 steps, Q[0:3]:[0-F]:0:6 dB, 16 steps,
-            rx_gain_ctrl_bfrf = 0xFF # this is the gain after RF mixer, [0:3,RF gain]: 0-15 dB, 16 steps, [4:7, BF gain]: 0-15 dB, 16 steps
+            # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            # Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            rx_gain_ctrl_bb1 = 0x77 
+            
+            # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            # Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            rx_gain_ctrl_bb2 = 0x00 
+            
+            # I[0:3]:[0-F]:0:6 dB, 16 steps
+            # Q[0:3]:[0-F]:0:6 dB, 16 steps
+            rx_gain_ctrl_bb3 = 0x99
+            
+            # Gain after RF mixer:
+            # [0:3,RF gain]: 0-15 dB, 16 steps
+            # [4:7, BF gain]: 0-15 dB, 16 steps 
+            rx_gain_ctrl_bfrf = 0xFF 
+            
             self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
@@ -2817,6 +2960,16 @@ class RFSoCRemoteControlFromHost():
         self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
         self.n_receive_calls = self.n_receive_calls + 1
 
+    def background_thread_for_pdp_vis(self):
+        data_to_send = []
+        
+        for irf_t in self.hest:
+            mag_irf_t = np.abs(irf_t)
+            pow_mag_irf_t = np.sum(mag_irf_t, axis=1)
+            aux = pow_mag_irf_t.astype(np.int32)
+            aux[:, self.beam_idx_for_vis]
+            data_to_send.append(pow_mag_irf_t.astype(np.int32))
+    
     def start_thread_receive_meas_data(self):
         """
         A thread -instead of a subprocess- is good enough since the computational expense
@@ -2827,20 +2980,20 @@ class RFSoCRemoteControlFromHost():
         'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
         
-        self.timer_rx_irf = RepeatTimer(0.05, self.receive_signal_async)
+        self.timer_rx_irf = RepeatTimer(0.1, self.receive_signal_async)
         self.set_rx_rf()
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
         self.timer_rx_irf.start()
         
-        print("[DEBUG]: receive_signal thread STARTED")
+        print("[DEBUG]: receive_signal_async thread STARTED")
     
     def stop_thread_receive_meas_data(self):
         #self.event_stop_thread_rfsoc.set()
         #self.t_receive.join()
         self.timer_rx_irf.cancel()
         self.time_finish_receive_thread = time.time()
-        print("[DEBUG]: receive_signal thread STOPPED")
+        print("[DEBUG]: receive_signal_async thread STOPPED")
         print("[DEBUG]: Received calls: ", self.n_receive_calls)
         print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", ((self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls))
         self.n_receive_calls = 0
