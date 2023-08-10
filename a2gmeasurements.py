@@ -603,7 +603,7 @@ class GpsSignaling(object):
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
         self.stream_info = []
-        self.MAX_SBF_BUFF_LEN = 1000  # Maximum number of entries in the SBF frame buffer
+        self.MAX_SBF_BUFF_LEN = 1000  # Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
 
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
@@ -1653,7 +1653,8 @@ class HelperA2GMeasurements(object):
                                 'STOPDRONERFSOC', 
                                 'FINISHDRONERFSOC',
                                 'FOLLOWGIMBAL',
-                                'SETIRF'.
+                                'SETIRF',
+                                'CLOSEDGUI'.
                                 Defaults to None.
             cmd_source_for_ans (str, optional): always provide which command you are replying to, in the answer frame.
             
@@ -1786,11 +1787,15 @@ class HelperA2GMeasurements(object):
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to FINISH measurement")
             self.myrfsoc.finish_measurement()
-            self.CONN_MUST_OVER_FLAG = True
     
     def do_set_irf_action(self):
-        1
+        if self.ID == 'GND': # double checj that we are in the gnd
+            1
     
+    def do_closed_gui_action(self):
+        if self.ID == 'DRONE':
+            self.CONN_MUST_OVER_FLAG = True
+
     def process_answer(self, msg):
         """
         This function is in charge of processing the answer message received. So far, the only message that requires
@@ -1884,6 +1889,8 @@ class HelperA2GMeasurements(object):
                 self.do_finish_meas_drone_rfsoc()
             elif rx_msg['CMD_SOURCE'] == 'SETIRF': # unidirectional command: from drone node to gnd node
                 self.do_set_irf_action()
+            elif rx_msg['CMD_SOURCE'] == 'CLOSEDGUI': # unidirectional command: from drone node to gnd node
+                self.do_closed_gui_action()
             elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
                 if self.ID == 'GROUND':
                     print('Received msg from ' + self.CLIENT_ADDRESS[0] + ' is: ' + rx_msg['DATA'])
@@ -2828,6 +2835,8 @@ class RFSoCRemoteControlFromHost():
         self.time_begin_receive_thread = 0
         self.time_finish_receive_thread = 0
         self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
+        self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
+        self.irfs_per_second = 10 # THIS MUST BE FOUND IN BETTER A WAY
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2970,6 +2979,9 @@ class RFSoCRemoteControlFromHost():
             aux[:, self.beam_idx_for_vis]
             data_to_send.append(pow_mag_irf_t.astype(np.int32))
     
+    def save_hest_buffer(self):
+        1
+
     def start_thread_receive_meas_data(self):
         """
         A thread -instead of a subprocess- is good enough since the computational expense
@@ -2979,8 +2991,9 @@ class RFSoCRemoteControlFromHost():
         A new thread is started each time the this function is called. It is required for the developer to call
         'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
-        
-        self.timer_rx_irf = RepeatTimer(0.1, self.receive_signal_async)
+
+        self.timer_rx_irf = RepeatTimer(0.15, self.receive_signal_async)
+        self.timer_save_big_hest_buf = RepeatTimer(2, self.save_hest_buffer)
         self.set_rx_rf()
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
