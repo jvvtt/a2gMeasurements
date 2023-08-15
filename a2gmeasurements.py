@@ -29,6 +29,7 @@ from multiprocessing.shared_memory import SharedMemory
 from PyQt5.QtCore import pyqtSignal
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+import pickle
 
 """
 Author: Julian D. Villegas G.
@@ -1504,6 +1505,7 @@ class HelperA2GMeasurements(object):
         self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY = -9.5e3
         self.SPEED_NODE = SPEED # m/s
         self.CONN_MUST_OVER_FLAG = False # Usefull for drone side, as its script will poll for looking if this is True
+        self.PAP_TO_PLOT = []
         
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
@@ -1662,10 +1664,13 @@ class HelperA2GMeasurements(object):
             frame (str): this might be a string array containing a json-converted dictionary(i.e. ANS frames) or other type of object (SNDDATA).    
         
         """
-
+        encode_numpy = False
         if type_frame == 'cmd':
             frame = {'TYPE': 'CMD'}
             frame['CMD_SOURCE'] = cmd
+            
+            if cmd == 'SETIRF':
+                encode_numpy = True
             
             if data:
                 frame['DATA'] = data            
@@ -1676,8 +1681,11 @@ class HelperA2GMeasurements(object):
             if data:
                 frame['CMD_SOURCE'] = cmd_source_for_ans
                 frame['DATA'] =  data
-
-        return json.dumps(frame)
+                
+        if encode_numpy:
+            return json.dumps(frame, cls=NumpyArrayEncoder)
+        else:
+            return json.dumps(frame)
 
     def do_follow_mode_gimbal(self):
         self.do_getgps_action(self, follow_mode_gimbal=True)
@@ -1788,9 +1796,10 @@ class HelperA2GMeasurements(object):
             print("[DEBUG]: Received REQUEST to FINISH measurement")
             self.myrfsoc.finish_measurement()
     
-    def do_set_irf_action(self):
+    def do_set_irf_action(self, msg_data):
         if self.ID == 'GND': # double checj that we are in the gnd
-            1
+            self.PAP_TO_PLOT = np.asarray(msg_data)
+            print("[DEBUG]: Received PAP of shape: ", self.PAP_TO_PLOT.shape)
     
     def do_closed_gui_action(self):
         if self.ID == 'DRONE':
@@ -1888,7 +1897,7 @@ class HelperA2GMeasurements(object):
             elif rx_msg['CMD_SOURCE'] == 'FINISHDRONERFSOC': # unidirectional command: from gnd node to drone node
                 self.do_finish_meas_drone_rfsoc()
             elif rx_msg['CMD_SOURCE'] == 'SETIRF': # unidirectional command: from drone node to gnd node
-                self.do_set_irf_action()
+                self.do_set_irf_action(rx_msg['DATA'])
             elif rx_msg['CMD_SOURCE'] == 'CLOSEDGUI': # unidirectional command: from drone node to gnd node
                 self.do_closed_gui_action()
             elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
@@ -1911,9 +1920,9 @@ class HelperA2GMeasurements(object):
             try:
                 # Send everything in a json serialized packet
                 if self.ID == 'GROUND':
-                    data = json.loads(self.a2g_conn.recv(1024).decode())
+                    data = json.loads(self.a2g_conn.recv(32768).decode())
                 elif self.ID == 'DRONE':
-                    data = json.loads(self.socket.recv(1024).decode())
+                    data = json.loads(self.socket.recv(32768).decode())
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
@@ -1953,7 +1962,7 @@ class HelperA2GMeasurements(object):
             type_cmd (_type_, optional): _description_. Defaults to None.
             data (object, optional): _description_. Defaults to None.
         """
-       
+
         frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd, data=data)
         
         if self.ID == 'DRONE':
@@ -2183,6 +2192,11 @@ class RepeatTimer(threading.Timer):
         while not self.finished.wait(self.interval):  
             self.function(*self.args,**self.kwargs)
 
+class NumpyArrayEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 class GimbalGremsyH16:
     """
     In azimuth and elevation, the speed is controlled by a value between [-100, 100].
@@ -2837,10 +2851,13 @@ class RFSoCRemoteControlFromHost():
         self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
         self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
         self.irfs_per_second = 7 # THIS MUST BE FOUND IN BETTER A WAY
-        self.irfs_per_second = 10 # THIS MUST BE FOUND IN BETTER A WAY
         self.MAX_BUFFER_SIZE_BYTES = 1024*1024*10 # MB
         self.saved_file_cnt = 1
         self.idx_last_irf_sent_on_actual_hest = 0
+        self.TIME_SNAPS_TO_VIS = 10
+        self.TIME_GET_IRF = 0.14
+        self.TIME_SAVE_H = 2
+        self.TIME_SEND_PAP = 1
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2974,18 +2991,23 @@ class RFSoCRemoteControlFromHost():
         self.n_receive_calls = self.n_receive_calls + 1
 
     def compute_pap_for_vis(self):
-        data_to_send = []
+        self.data_to_visualize = []
         
-        data_to_send = np.stack(self.hest[self.idx_last_irf_sent_on_actual_hest:], axis=0)
-        data_to_send = np.abs(data_to_send)
-        data_to_send = np.sum(data_to_send, axis=2)
-        data_to_send = np.mean(data_to_send, axis=0)
-        data_to_send = data_to_send.astype(np.int32)
+        if len(self.hest) > 0:
+            aux = self.idx_last_irf_sent_on_actual_hest + self.TIME_SNAPS_TO_VIS
+            if aux < len(self.hest):
+                self.data_to_visualize = np.stack(self.hest[self.idx_last_irf_sent_on_actual_hest:aux], axis=0)
+                self.data_to_visualize = np.abs(self.data_to_visualize)
+                self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
+                self.data_to_visualize = self.data_to_visualize.astype(np.int32)
 
-        self.idx_last_irf_sent_on_actual_hest = len(self.hest)
+                self.idx_last_irf_sent_on_actual_hest = aux
     
     def save_hest_buffer(self):
-        datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
+        datestr = str(datetime.datetime.now())  
+        datestr = datetime.datetime.strptime(datestr, '%Y-%m-%d-%H-%M-%S-%f')
+        
+        #datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])
                 
         with open(datestr + self.filename_to_save + str(self.saved_file_cnt) + '.npy', 'wb') as f:
             np.save(f, np.stack(self.hest, axis=0))
@@ -3009,21 +3031,26 @@ class RFSoCRemoteControlFromHost():
         'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
 
-        self.timer_rx_irf = RepeatTimer(0.15, self.receive_signal_async)
-        self.timer_save_big_hest_buf = RepeatTimer(2, self.save_hest_buffer)
-        self.timer_send_pap_for_vis = RepeatTimer(0.8, self.compute_pap_for_vis)
+        self.timer_rx_irf = RepeatTimer(self.TIME_GET_IRF, self.receive_signal_async)
+        self.timer_save_big_hest_buf = RepeatTimer(self.TIME_SAVE_H, self.save_hest_buffer)
+        self.timer_send_pap_for_vis = RepeatTimer(self.TIME_SEND_PAP, self.compute_pap_for_vis)
         self.set_rx_rf()
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
         self.timer_rx_irf.start()
+        self.timer_save_big_hest_buf.start()
+        self.timer_send_pap_for_vis.start()
         
         print("[DEBUG]: receive_signal_async thread STARTED")
+        print("[DEBUG]: save_hest_buffer thread STARTED")
+        print("[DEBUG]: compute_pap_for_vis thread STARTED")
     
     def stop_thread_receive_meas_data(self):
         #self.event_stop_thread_rfsoc.set()
         #self.t_receive.join()
         self.timer_rx_irf.cancel()
         self.timer_save_big_hest_buf.cancel()
+        self.timer_send_pap_for_vis.cancel()
         self.time_finish_receive_thread = time.time()
         print("[DEBUG]: receive_signal_async thread STOPPED")
         print("[DEBUG]: Received calls: ", self.n_receive_calls)
@@ -3038,7 +3065,9 @@ class RFSoCRemoteControlFromHost():
         #if self.t_receive.is_alive():
         #    self.stop_thread_receive_meas_data()
         
-        datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
+        #datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
+        datestr = str(datetime.datetime.now())  
+        datestr = datetime.datetime.strptime(datestr, '%Y-%m-%d-%H-%M-%S-%f')
 
         hest = np.stack(self.hest, axis=0)
         meas_time_tags = np.array(self.meas_time_tag)

@@ -311,8 +311,6 @@ class GPSVis(object):
         zoom = min(lat_zoom, lng_zoom)
         return int(zoom)
 
-
-
 class GpsOnMap(object):
     
     def __init__(self, path_to_osmpbf, canvas=None,fig=None, ax=None, air_coord=None, gnd_coord=None):
