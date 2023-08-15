@@ -2836,7 +2836,7 @@ class RFSoCRemoteControlFromHost():
         self.time_finish_receive_thread = 0
         self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
         self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
-        self.irfs_per_second = 10 # THIS MUST BE FOUND IN BETTER A WAY
+        self.irfs_per_second = 7 # THIS MUST BE FOUND IN BETTER A WAY
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2883,7 +2883,7 @@ class RFSoCRemoteControlFromHost():
                 # Gain after RF mixer:
                 # [0:3, RF gain]: 0-15 dB, 16 steps 
                 # [4:7, BF gain]: 0-15 dB, 16 steps  
-                tx_bfrf_gain = 0xFF 
+                tx_bfrf_gain = 0x40 
 
             self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
                                                         + str.encode(str(int(tx_bb_phase)) + " ") \
@@ -2905,7 +2905,7 @@ class RFSoCRemoteControlFromHost():
             # Gain after RF mixer:
             # [0:3,RF gain]: 0-15 dB, 16 steps
             # [4:7, BF gain]: 0-15 dB, 16 steps 
-            rx_gain_ctrl_bfrf = 0xFF 
+            rx_gain_ctrl_bfrf = 0xFF
             
             self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
@@ -2969,7 +2969,7 @@ class RFSoCRemoteControlFromHost():
         self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
         self.n_receive_calls = self.n_receive_calls + 1
 
-    def background_thread_for_pdp_vis(self):
+    def compute_pap_for_vis(self):
         data_to_send = []
         
         for irf_t in self.hest:
@@ -2994,6 +2994,7 @@ class RFSoCRemoteControlFromHost():
 
         self.timer_rx_irf = RepeatTimer(0.15, self.receive_signal_async)
         self.timer_save_big_hest_buf = RepeatTimer(2, self.save_hest_buffer)
+        self.timer_send_pap_for_vis = RepeatTimer(0.8, self.compute_pap_for_vis)
         self.set_rx_rf()
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
