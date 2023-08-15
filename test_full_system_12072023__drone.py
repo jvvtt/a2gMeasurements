@@ -69,6 +69,11 @@ while(not_finish_tcp_connection_attempt):
 
 if not_finish_tcp_connection_attempt == False:
     while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):
-        time.sleep(1)
+        time.sleep(0.1)
+        
+        if hasattr(drone_a2g_helper.myrfsock, 'data_to_visualize'):
+            if len(drone_a2g_helper.myrfsoc.data_to_visualize) > 0:
+                drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
+                drone_a2g_helper.myrfsoc.data_to_visualize = []  # this is the way we flush the buffer after read it, so that we don't send the same data multiple times
         
 drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')

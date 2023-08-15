@@ -406,16 +406,18 @@ class WidgetGallery(QDialog):
         # Although thus function should be called when a HelperA2GMeasurements class instance has been created, better to do a double check
         if hasattr(self, 'myhelpera2g'):
             self.update_vis_time_gps = 1
-            self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
+            #self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
             self.update_time_gimbal_follow = 1
-            self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
+            #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
             #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
-
-            self.update_vis_time_pdp = 0.5
-            self.periodical_pdp_display_thread = RepeatTimer(self.update_vis_time_pdp, self.periodical_pdp_display_callback)
         
     def periodical_pdp_display_callback(self):
-        1
+        
+        if hasattr(self, 'myhelpera2g'):
+            if hasattr(self.myhelpera2graph, 'PAP_TO_PLOT'):
+                if len(self.myhelpera2g.PAP_TO_PLOT) > 0:
+                    self.ax_pdp.imshow(self.myhelpera2g.PAP_TO_PLOT)
+                    print("[DEBUG]: Executed plot command at GND")
         
     def periodical_gps_display_callback(self):
         """
@@ -963,6 +965,9 @@ class WidgetGallery(QDialog):
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(True)
         self.finish_meas_togglePushButton.setEnabled(False)
+        self.update_vis_time_pap = 1
+        self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pdp_display_callback)
+        self.periodical_pap_display_thread.start()
     
     def stop_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
@@ -970,6 +975,7 @@ class WidgetGallery(QDialog):
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(True)
+        self.periodical_pap_display_thread.cancel()
     
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
@@ -1120,6 +1126,7 @@ class WidgetGallery(QDialog):
         if hasattr(self, 'myhelpera2g'):
             self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
+            self.periodical_pdp_display_thread.cancel()
             
     def eventFilter(self, source, event):
         if event.type()== event.Close:
