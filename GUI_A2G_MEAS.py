@@ -414,7 +414,7 @@ class WidgetGallery(QDialog):
     def periodical_pdp_display_callback(self):
         
         if hasattr(self, 'myhelpera2g'):
-            if hasattr(self.myhelpera2graph, 'PAP_TO_PLOT'):
+            if hasattr(self.myhelpera2g, 'PAP_TO_PLOT'):
                 if len(self.myhelpera2g.PAP_TO_PLOT) > 0:
                     self.ax_pdp.imshow(self.myhelpera2g.PAP_TO_PLOT)
                     print("[DEBUG]: Executed plot command at GND")
@@ -1126,7 +1126,7 @@ class WidgetGallery(QDialog):
         if hasattr(self, 'myhelpera2g'):
             self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
-            self.periodical_pdp_display_thread.cancel()
+        self.periodical_pap_display_thread.cancel()
             
     def eventFilter(self, source, event):
         if event.type()== event.Close:
