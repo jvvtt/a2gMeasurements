@@ -1511,7 +1511,7 @@ class HelperA2GMeasurements(object):
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
         if IsGimbal:
-            if self.ID == 'GND':
+            if self.ID == 'GROUND':
                 self.myGimbal = GimbalRS2()
                 self.myGimbal.start_thread_gimbal()
                 time.sleep(0.5)
@@ -1673,8 +1673,11 @@ class HelperA2GMeasurements(object):
             if cmd == 'SETIRF':
                 encode_numpy = True
             
-            if len(data)>0:
-                frame['DATA'] = data            
+                if len(data)>0:
+                    frame['DATA'] = data
+            else:
+                if data:
+                    frame['DATA'] = data
         
         elif type_frame =='ans':
             frame = {'TYPE': 'ANS'}
@@ -1761,7 +1764,7 @@ class HelperA2GMeasurements(object):
                     print('\n[ERROR]: Yaw or pitch angles are outside of range')
                     return
                 else:
-                    if self.ID == 'GND':
+                    if self.ID == 'GROUND':
                         # Cast to int values as a double check, but values are send as numbers and not as strings.
                         self.myGimbal.setPosControl(yaw=int(msg_data['YAW']), roll=0, pitch=int(msg_data['PITCH']))
                     if self.ID == 'DRONE':
@@ -1798,7 +1801,7 @@ class HelperA2GMeasurements(object):
             self.myrfsoc.finish_measurement()
     
     def do_set_irf_action(self, msg_data):
-        if self.ID == 'GND': # double checj that we are in the gnd
+        if self.ID == 'GROUND': # double checj that we are in the gnd
             self.PAP_TO_PLOT = np.asarray(msg_data)
             print("[DEBUG]: Received PAP of shape: ", self.PAP_TO_PLOT.shape)
     
@@ -1922,13 +1925,13 @@ class HelperA2GMeasurements(object):
             try:
                 # Send everything in a json serialized packet
                 if self.ID == 'GROUND':
-                    data = json.loads(self.a2g_conn.recv(32768).decode())
+                    data = json.loads(self.a2g_conn.recv(131072).decode())
                 elif self.ID == 'DRONE':
-                    data = json.loads(self.socket.recv(32768).decode())
+                    data = json.loads(self.socket.recv(131072).decode())
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
-                    print('\n[DEBUG_0]: This is the data received: ', data)
+                    print('[DEBUG]: This is the data received: ', data)
                     self.parse_rx_msg(data)
                 else:
                     if self.DBG_LVL_0:
@@ -2146,9 +2149,10 @@ class HelperA2GMeasurements(object):
             for i in DISC_WHAT:
                 if self.IsGimbal and (i == 'GIMBAL'):  
                     self.myGimbal.stop_thread_gimbal()
-                    print('\n[DEBUG]: Disconnecting gimbal')
+                    print('[DEBUG]: Disconnecting gimbal')
                     time.sleep(0.05)
-                    self.myGimbal.actual_bus.shutdown()
+                    if self.ID == 'GROUND':
+                        self.myGimbal.actual_bus.shutdown()
             
                 if self.IsGPS and (i == 'GPS'):  
                     for stream_info in self.mySeptentrioGPS.stream_info:
@@ -2171,7 +2175,8 @@ class HelperA2GMeasurements(object):
                 self.myGimbal.stop_thread_gimbal()
                 print('\n[DEBUG]: Disconnecting gimbal')
                 time.sleep(0.05)
-                self.myGimbal.actual_bus.shutdown()
+                if self.ID == 'GROUND':
+                    self.myGimbal.actual_bus.shutdown()
                 
             if self.IsGPS and (DISC_WHAT=='ALL' or DISC_WHAT == 'GPS'):  
                 for stream_info in self.mySeptentrioGPS.stream_info:
@@ -2868,11 +2873,15 @@ class RFSoCRemoteControlFromHost():
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.radio_control.connect((rfsoc_static_ip_address, radio_control_port))
-
         self.radio_data = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_data.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.radio_data.connect((rfsoc_static_ip_address, radio_data_port))
+
+        try:
+            self.radio_control.connect((rfsoc_static_ip_address, radio_control_port))
+            self.radio_data.connect((rfsoc_static_ip_address, radio_data_port))
+        except Exception as e:
+            print("[DEBUG]: Error in rfsoc socket connection: ", e)
+            print("[DEBUG]: Check RFSoC ETH, and Power it Off and On")
         
     def send_cmd(self, cmd, cmd_arg=None):
         """
@@ -2948,7 +2957,7 @@ class RFSoCRemoteControlFromHost():
         data = self.radio_control.recv(1024)
         data = data.decode('utf-8')
             
-        if data == self.RFSoCSuccessExecutionAns or data == self.RFSoCSuccessAns:
+        if self.RFSoCSuccessExecutionAns in data or self.RFSoCSuccessAns in data:
             print("[DEBUG]: Command ", cmd, " executed succesfully on Sivers or RFSoC")
         else:
             print("[DEBUG]: Command ", cmd, " was not successfully executed on Sivers or RFSoC. The following error appears: ", data)
