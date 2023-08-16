@@ -1,11 +1,21 @@
-from a2gmeasurements import HelperA2GMeasurements
+from a2gmeasurements import HelperA2GMeasurements, RepeatTimer
 from a2gUtils import geodetic2geocentric
 import time
 import threading
 import re
+from json import JSONEncoder
+import numpy as np
 
+TIME_SEND_PAP = 1
 pattern_ip_addresses = r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 print("Welcome to the DRONE client program! You have 60s to input")
+
+def send_pap_for_vis():
+    if hasattr(drone_a2g_helper.myrfsoc, 'data_to_visualize'):
+        if len(drone_a2g_helper.myrfsoc.data_to_visualize) > 0:
+            print("[DEBUG]: There is data to visualize and its length is > 0")
+            drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
+            print("[DEBUG]: Sent PAP data")
 
 def check_devices():
     GND_ADDRESS = input('Enter the GND node IP address: ')
@@ -68,12 +78,10 @@ while(not_finish_tcp_connection_attempt):
             break        
 
 if not_finish_tcp_connection_attempt == False:
-    while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):
-        time.sleep(0.1)
-        
-        if hasattr(drone_a2g_helper.myrfsock, 'data_to_visualize'):
-            if len(drone_a2g_helper.myrfsoc.data_to_visualize) > 0:
-                drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
-                drone_a2g_helper.myrfsoc.data_to_visualize = []  # this is the way we flush the buffer after read it, so that we don't send the same data multiple times
-        
+    timer_send_pap_for_vis = RepeatTimer(TIME_SEND_PAP, send_pap_for_vis)
+    timer_send_pap_for_vis.start()
+    while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):        
+        time.sleep(1)
+
+timer_send_pap_for_vis.cancel()
 drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')

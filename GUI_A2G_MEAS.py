@@ -576,6 +576,7 @@ class WidgetGallery(QDialog):
         self.disconnect_from_drone.setEnabled(True)
         
     def disconnect_drone_callback(self):
+        self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
         self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
         del self.myhelpera2g        
         
@@ -1124,7 +1125,6 @@ class WidgetGallery(QDialog):
     
     def closeEvent(self, event):
         if hasattr(self, 'myhelpera2g'):
-            self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
             self.periodical_pdp_display_thread.cancel()
             
