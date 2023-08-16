@@ -383,6 +383,8 @@ class WidgetGallery(QDialog):
         self.SUCCESS_GND_GIMBAL = SUCCESS_GND_GIMBAL
         self.SUCCESS_GND_GPS = SUCCESS_GND_GPS
         
+        self.connect_to_drone.setEnabled(True)
+        
     def create_class_instances(self, IsGPS=False, IsGimbal=False, IsRFSoC=False, GPS_Stream_Interval='sec1'):
         """
         Responsible for creating any objects (class instances) that will be used to connect to and control the devices,
@@ -496,6 +498,7 @@ class WidgetGallery(QDialog):
         self.disconnect_from_drone = QPushButton('Disconnect drone')
         self.check_connections_push_button.clicked.connect(self.check_status_all_devices)
         self.disconnect_from_drone.setEnabled(False)
+        self.connect_to_drone.setEnabled(False)
         self.connect_to_drone.clicked.connect(self.connect_drone_callback)
         self.disconnect_from_drone.clicked.connect(self.disconnect_drone_callback)
 
@@ -1126,7 +1129,8 @@ class WidgetGallery(QDialog):
     def closeEvent(self, event):
         if hasattr(self, 'myhelpera2g'):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
-        self.periodical_pap_display_thread.cancel()
+        if hasattr(self, 'periodical_pap_display_thread'):
+            self.periodical_pap_display_thread.cancel()
             
     def eventFilter(self, source, event):
         if event.type()== event.Close:
