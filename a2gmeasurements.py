@@ -1897,6 +1897,7 @@ class HelperA2GMeasurements(object):
             elif rx_msg['CMD_SOURCE'] == 'FINISHDRONERFSOC': # unidirectional command: from gnd node to drone node
                 self.do_finish_meas_drone_rfsoc()
             elif rx_msg['CMD_SOURCE'] == 'SETIRF': # unidirectional command: from drone node to gnd node
+                print("[DEBUG]: Received SETIRF cmd")
                 self.do_set_irf_action(rx_msg['DATA'])
             elif rx_msg['CMD_SOURCE'] == 'CLOSEDGUI': # unidirectional command: from drone node to gnd node
                 self.do_closed_gui_action()
@@ -1926,6 +1927,7 @@ class HelperA2GMeasurements(object):
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
+                    print('\n[DEBUG_0]: This is the data received: ', data)
                     self.parse_rx_msg(data)
                 else:
                     if self.DBG_LVL_0:
