@@ -19,6 +19,7 @@ import sys
 from serial.tools.list_ports import comports
 import pyproj as proj
 import json
+from json import JSONEncoder
 import pyvisa
 import pandas as pd
 from sys import platform
@@ -1672,7 +1673,7 @@ class HelperA2GMeasurements(object):
             if cmd == 'SETIRF':
                 encode_numpy = True
             
-            if data:
+            if len(data)>0:
                 frame['DATA'] = data            
         
         elif type_frame =='ans':
@@ -2194,11 +2195,11 @@ class RepeatTimer(threading.Timer):
         while not self.finished.wait(self.interval):  
             self.function(*self.args,**self.kwargs)
 
-class NumpyArrayEncoder(json.JSONEncoder):
+class NumpyArrayEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+        return JSONEncoder.default(self, obj)
 class GimbalGremsyH16:
     """
     In azimuth and elevation, the speed is controlled by a value between [-100, 100].
@@ -2853,13 +2854,17 @@ class RFSoCRemoteControlFromHost():
         self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
         self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
         self.irfs_per_second = 7 # THIS MUST BE FOUND IN BETTER A WAY
-        self.MAX_BUFFER_SIZE_BYTES = 1024*1024*10 # MB
-        self.saved_file_cnt = 1
+        self.MAX_PAP_BUF_SIZE = 250  
+        self.MAX_PAP_BUF_SIZE_BYTES = 1024*64*self.MAX_PAP_BUF_SIZE 
         self.idx_last_irf_sent_on_actual_hest = 0
         self.TIME_SNAPS_TO_VIS = 10
         self.TIME_GET_IRF = 0.14
-        self.TIME_SAVE_H = 2
+        self.TIME_SAVE_H = 15
         self.TIME_SEND_PAP = 1
+        self.nbeams = 64
+        self.nbytes_per_item = 2
+        self.nread = 1024
+        self.nbytes = self.nbeams * self.nbytes_per_item * self.nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -2966,61 +2971,51 @@ class RFSoCRemoteControlFromHost():
         self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
         self.send_cmd('setGainRxSivers')
     
-    def receive_signal_async(self):
+    def receive_signal_async(self, stop_event):
         """
         Function callback when the drone stops at the calculated stops based on the Flight Graph Coordinates and other inputs provided 
         in the Planning Measurements panel of the a2g App.
         
         No threading involved in this method
         """
-                
-        nbeams = 64
-        nbytes = 2
-        nread = 1024
-        self.radio_control.sendall(b"receiveSamples")
-        nbytes = nbeams * nbytes * nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
-        buf = bytearray()
+        while not stop_event.is_set():
+            self.n_receive_calls = self.n_receive_calls + 1
+            self.radio_control.sendall(b"receiveSamples")
+            buf = bytearray()
 
-        while len(buf) < nbytes:
-            data = self.radio_data.recv(nbytes)
-            buf.extend(data)
-        data = np.frombuffer(buf, dtype=np.int16)
-        rxtd = data[:nread*nbeams] + 1j*data[nread*nbeams:]
-        rxtd = rxtd.reshape(nbeams, nread)
-        
-        self.hest.append(rxtd)
-        self.meas_time_tag.append(datetime.datetime.utcnow().timetuple()[3:6]) # 3-tuple with the following structure: (hours, minutes, seconds)
-        self.n_receive_calls = self.n_receive_calls + 1
+            while len(buf) < self.nbytes:
+                data = self.radio_data.recv(self.nbytes)
+                buf.extend(data)
+            data = np.frombuffer(buf, dtype=np.int16)
+            rxtd = data[:self.nread*self.nbeams] + 1j*data[self.nread*self.nbeams:]
+            rxtd = rxtd.reshape(self.nbeams, self.nread)
+            
+            self.hest.append(rxtd)
+            
+            if len(self.hest) >= self.MAX_PAP_BUF_SIZE:
+                #self.compute_pap_for_vis()
+                self.save_hest_buffer()                
 
-    def compute_pap_for_vis(self):
-        self.data_to_visualize = []
-        
-        if len(self.hest) > 0:
-            aux = self.idx_last_irf_sent_on_actual_hest + self.TIME_SNAPS_TO_VIS
-            if aux < len(self.hest):
-                self.data_to_visualize = np.stack(self.hest[self.idx_last_irf_sent_on_actual_hest:aux], axis=0)
-                self.data_to_visualize = np.abs(self.data_to_visualize)
-                self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
-                self.data_to_visualize = self.data_to_visualize.astype(np.int32)
-
-                self.idx_last_irf_sent_on_actual_hest = aux
+    def compute_pap_for_vis(self):        
+            self.data_to_visualize = np.array(self.hest)
+            self.data_to_visualize = np.abs(self.data_to_visualize)
+            self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
+            self.data_to_visualize = self.data_to_visualize.astype(np.int32)
+            
+            print("[DEBUG]: Computed pap to be sent")
     
     def save_hest_buffer(self):
-        datestr = str(datetime.datetime.now())  
-        datestr = datetime.datetime.strptime(datestr, '%Y-%m-%d-%H-%M-%S-%f')
+        datestr = datetime.datetime.now()
+        datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
         
-        #datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])
-                
-        with open(datestr + self.filename_to_save + str(self.saved_file_cnt) + '.npy', 'wb') as f:
-            np.save(f, np.stack(self.hest, axis=0))
-        with open(datestr + self.filename_to_save + '-TIMETAGS' + str(self.saved_file_cnt) + '.npy', 'wb') as f:
-            np.save(f, np.array(self.meas_time_tag))
+        with open(datestr + '-' + self.filename_to_save + '.npy', 'wb') as f:
+            #np.save(f, np.stack(self.hest, axis=0))
+            np.save(f, np.array(self.hest))
         
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
+        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
         self.hest = []
-        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + str(self.saved_file_cnt) + '.npy')
-        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + str(self.saved_file_cnt) + '.npy')
         
-        self.saved_file_cnt = self.saved_file_cnt + 1
         self.idx_last_irf_sent_on_actual_hest = 0
 
     def start_thread_receive_meas_data(self):
@@ -3032,14 +3027,12 @@ class RFSoCRemoteControlFromHost():
         A new thread is started each time the this function is called. It is required for the developer to call
         'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
         """
-
-        self.timer_rx_irf = RepeatTimer(self.TIME_GET_IRF, self.receive_signal_async)
-        self.timer_save_big_hest_buf = RepeatTimer(self.TIME_SAVE_H, self.save_hest_buffer)
-        self.timer_send_pap_for_vis = RepeatTimer(self.TIME_SEND_PAP, self.compute_pap_for_vis)
+        self.event_stop_thread_rx_irf = threading.Event()                
+        self.thread_rx_irf = threading.Thread(target=self.receive_signal_async, args=(self.event_stop_thread_rx_irf,))
         self.set_rx_rf()
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
-        self.timer_rx_irf.start()
+        self.thread_rx_irf.start()
         self.timer_save_big_hest_buf.start()
         self.timer_send_pap_for_vis.start()
         
@@ -3048,11 +3041,7 @@ class RFSoCRemoteControlFromHost():
         print("[DEBUG]: compute_pap_for_vis thread STARTED")
     
     def stop_thread_receive_meas_data(self):
-        #self.event_stop_thread_rfsoc.set()
-        #self.t_receive.join()
-        self.timer_rx_irf.cancel()
-        self.timer_save_big_hest_buf.cancel()
-        self.timer_send_pap_for_vis.cancel()
+        self.event_stop_thread_rx_irf.set()
         self.time_finish_receive_thread = time.time()
         print("[DEBUG]: receive_signal_async thread STOPPED")
         print("[DEBUG]: Received calls: ", self.n_receive_calls)
@@ -3062,26 +3051,20 @@ class RFSoCRemoteControlFromHost():
         self.n_receive_calls = 0
         
     def finish_measurement(self):
-        
         # Check if the thread is finished and if not stop it
-        #if self.t_receive.is_alive():
-        #    self.stop_thread_receive_meas_data()
-        
-        #datestr = "".join([str(i) + '-' for i in datetime.datetime.utcnow().timetuple()[0:3]])        
-        datestr = str(datetime.datetime.now())  
-        datestr = datetime.datetime.strptime(datestr, '%Y-%m-%d-%H-%M-%S-%f')
+        if self.thread_rx_irf.is_alive():
+            self.stop_thread_receive_meas_data()
+           
+        datestr = datetime.datetime.now()
+        datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
 
         hest = np.stack(self.hest, axis=0)
-        meas_time_tags = np.array(self.meas_time_tag)
                 
-        with open(datestr + self.filename_to_save + '.npy', 'wb') as f:
+        with open(datestr + '-' + self.filename_to_save + '.npy', 'wb') as f:
             np.save(f, hest)
-        with open(datestr + self.filename_to_save + '-TIMETAGS' + '.npy', 'wb') as f:
-            np.save(f, meas_time_tags)
         
         print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
         print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
 
         self.idx_last_irf_sent_on_actual_hest = 0
-        self.saved_file_cnt = 0
         self.hest = []
