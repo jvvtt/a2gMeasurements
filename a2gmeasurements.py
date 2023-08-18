@@ -2,6 +2,7 @@ from sklearn.linear_model import LinearRegression
 import logging
 from itertools import groupby
 from operator import itemgetter
+import traceback
 import xmltodict
 import datetime
 import time
@@ -1925,13 +1926,13 @@ class HelperA2GMeasurements(object):
             try:
                 # Send everything in a json serialized packet
                 if self.ID == 'GROUND':
-                    data = json.loads(self.a2g_conn.recv(131072).decode())
+                    data = json.loads(self.a2g_conn.recv(2048).decode())
                 elif self.ID == 'DRONE':
-                    data = json.loads(self.socket.recv(131072).decode())
+                    data = json.loads(self.socket.recv(2048).decode())
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
-                    print('[DEBUG]: This is the data received: ', data['DATA'].shape)
+                    print('[DEBUG]: This is the data received: ', data)
                     self.parse_rx_msg(data)
                 else:
                     if self.DBG_LVL_0:
@@ -1945,6 +1946,7 @@ class HelperA2GMeasurements(object):
                         
                 self.rxEmptySockCounter = self.rxEmptySockCounter + 1
                 
+                #traceback.print_exc()
                 '''
                 Types of known errors:
                 1. 'timed out'
@@ -1952,7 +1954,7 @@ class HelperA2GMeasurements(object):
                 *This error is reported in the client but not in the server. Happens when the client hasn't received anything in a while, so that 'recv' function raises the exception.
                 *The conn is open and if any node send something again the other node will receive it
                 '''
-                
+                print('[SOCKET RECEIVE EXCEPTION]: ', e)
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
          
