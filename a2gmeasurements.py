@@ -2639,7 +2639,7 @@ class GimbalGremsyH16:
             print("[DEBUG]: Gremsy H16 will not move")
             return
     
-    def close_conn(self):
+    def stop_thread_gimbal(self):
         """
         Wrapper to stop_updating from SBUSEncoder
         """
