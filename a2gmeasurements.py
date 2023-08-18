@@ -6,6 +6,7 @@ import xmltodict
 import datetime
 import time
 import struct
+import traceback
 from ctypes import *
 import numpy as np
 from check_sum import *
@@ -1672,10 +1673,12 @@ class HelperA2GMeasurements(object):
             
             if cmd == 'SETIRF':
                 encode_numpy = True
-            
+                
+                # This is exepcting a list
                 if len(data)>0:
                     frame['DATA'] = data
             else:
+                # This is expecting a string or a single value for data
                 if data:
                     frame['DATA'] = data
         
@@ -1931,7 +1934,7 @@ class HelperA2GMeasurements(object):
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
-                    print('[DEBUG]: This is the data received: ', data['DATA'].shape)
+                    #print('[DEBUG]: This is the data received: ', len(data['DATA']), len(data['DATA'][0]))
                     self.parse_rx_msg(data)
                 else:
                     if self.DBG_LVL_0:
@@ -1953,6 +1956,7 @@ class HelperA2GMeasurements(object):
                 *The conn is open and if any node send something again the other node will receive it
                 '''
                 
+                #traceback.print_exc()
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
          
@@ -2205,6 +2209,7 @@ class NumpyArrayEncoder(JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return JSONEncoder.default(self, obj)
+
 class GimbalGremsyH16:
     """
     In azimuth and elevation, the speed is controlled by a value between [-100, 100].
