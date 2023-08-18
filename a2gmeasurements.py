@@ -2,6 +2,7 @@ from sklearn.linear_model import LinearRegression
 import logging
 from itertools import groupby
 from operator import itemgetter
+import traceback
 import xmltodict
 import datetime
 import time
@@ -1928,9 +1929,9 @@ class HelperA2GMeasurements(object):
             try:
                 # Send everything in a json serialized packet
                 if self.ID == 'GROUND':
-                    data = json.loads(self.a2g_conn.recv(131072).decode())
+                    data = json.loads(self.a2g_conn.recv(2048).decode())
                 elif self.ID == 'DRONE':
-                    data = json.loads(self.socket.recv(131072).decode())
+                    data = json.loads(self.socket.recv(2048).decode())
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
@@ -1948,6 +1949,7 @@ class HelperA2GMeasurements(object):
                         
                 self.rxEmptySockCounter = self.rxEmptySockCounter + 1
                 
+                #traceback.print_exc()
                 '''
                 Types of known errors:
                 1. 'timed out'
@@ -1956,7 +1958,6 @@ class HelperA2GMeasurements(object):
                 *The conn is open and if any node send something again the other node will receive it
                 '''
                 
-                #traceback.print_exc()
                 if self.DBG_LVL_0:
                     print('[SOCKET RECEIVE EXCEPTION]: ', e)
          
