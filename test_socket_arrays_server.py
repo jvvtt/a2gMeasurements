@@ -5,6 +5,8 @@ import numpy as np
 
 GND_ADDRESS = '0.0.0.0'
 myhelpera2g = HelperA2GMeasurements('GROUND', GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False)
+
+input('When you are ready, press ENTER')
 myhelpera2g.HelperStartA2GCom()
 
 time.sleep(1)
