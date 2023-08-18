@@ -1931,7 +1931,7 @@ class HelperA2GMeasurements(object):
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
-                    print('[DEBUG]: This is the data received: ', data)
+                    print('[DEBUG]: This is the data received: ', data['DATA'].shape)
                     self.parse_rx_msg(data)
                 else:
                     if self.DBG_LVL_0:

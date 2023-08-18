@@ -5,6 +5,8 @@ import numpy as np
 
 GND_ADDRESS = '192.168.175.234'
 myhelpera2g = HelperA2GMeasurements('DRONE', GND_ADDRESS, DBG_LVL_0=False, DBG_LVL_1=False)
+
+input('When ready press ENTER')
 myhelpera2g.HelperStartA2GCom()
 
 time.sleep(1)
