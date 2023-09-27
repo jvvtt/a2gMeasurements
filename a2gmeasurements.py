@@ -2691,6 +2691,9 @@ class GimbalGremsyH16:
             self.sbus.turn_on_motors()
         elif power == 'off':
             self.sbus.turn_off_motors()
+            
+    def change_gimbal_mode(self, mode='LOCK'):
+        self.sbus.MODE = mode
         
 class SBUSEncoder:
     """
@@ -2730,7 +2733,8 @@ class SBUSEncoder:
         self.time_last_move_cmd = 0
         self.cnt = 1
         self.ENABLE_UPDATE_REST = True
-    
+        self.MODE = 'LOCK'
+         
     def set_channel(self, channel, data):
         self.channels[channel] = data & 0x07ff    
     
@@ -2831,7 +2835,11 @@ class SBUSEncoder:
         self.update_channel(channel=3, value=0)
         #self.update_channel(channel=4, value=0)
         self.update_channel(channel=4, value=self.LOW_SPEED_COUNTER_rud)
-        self.update_channel(channel=5, value=0)
+        
+        if self.MODE == 'LOCK':
+            self.update_channel(channel=5, value=0)
+        elif self.MODE == 'FOLLOW':
+            self.update_channel(channel=5, value=-99)
         #time.sleep(0.1)
         
     def move_gimbal(self, ele, rud, mov_time):
@@ -2847,7 +2855,12 @@ class SBUSEncoder:
         self.update_channel(channel=2, value=ele)
         self.update_channel(channel=3, value=0)
         self.update_channel(channel=4, value=rud)
-        self.update_channel(channel=5, value=0)
+        
+        if self.MODE == 'LOCK':
+            self.update_channel(channel=5, value=0)
+        elif self.MODE == 'FOLLOW':
+            self.update_channel(channel=5, value=-99)
+        
         time.sleep(mov_time)
         self.not_move_command()
         self.ENABLE_UPDATE_REST = True
@@ -3037,13 +3050,17 @@ class RFSoCRemoteControlFromHost():
             self.hest.append(rxtd)
             
             if len(self.hest) >= self.MAX_PAP_BUF_SIZE:
-                #self.compute_pap_for_vis()
+                self.compute_pap_for_vis()
                 self.save_hest_buffer()                
 
     def compute_pap_for_vis(self):        
             self.data_to_visualize = np.array(self.hest)
             self.data_to_visualize = np.abs(self.data_to_visualize)
             self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
+            if self.data_to_visualize.shape[0] >= 20:
+                self.data_to_visualize = self.data_to_visualize[:21, ::8]
+            else:
+                self.data_to_visualize = self.data_to_visualize[:, ::8]
             self.data_to_visualize = self.data_to_visualize.astype(np.int32)
             
             print("[DEBUG]: Computed pap to be sent")
