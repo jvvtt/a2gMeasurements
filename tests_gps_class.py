@@ -65,15 +65,18 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
 def test_get_last_sbf_buffer_on_drone(gpsObject, filename, time_of_test):
     
     gpsObject.serial_connect()
-        
-    gpsObject.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
+    time.sleep(5)
+    gpsObject.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='PVTCartesian')
+    time.sleep(1)
     gpsObject.start_thread_gps()
         
     time.sleep(time_of_test)
                 
     gpsObject.stop_gps_data_retrieval(stream_number=1, msg_type='SBF')
+    time.sleep(1)
     gpsObject.stop_thread_gps()        
     
+    print(gpsObject.SBF_frame_buffer)
     file_to_save = json.dumps(gpsObject.SBF_frame_buffer)
     
     # Overwrite the file
@@ -82,9 +85,9 @@ def test_get_last_sbf_buffer_on_drone(gpsObject, filename, time_of_test):
     fid.close()
         
 # Turn on all debugging verbose
-mySeptentrioGPS = GpsSignaling(DBG_LVL_0=False, DBG_LVL_1=False, DBG_LVL_2=False)
+mySeptentrioGPS = GpsSignaling(DBG_LVL_0=True, DBG_LVL_1=True, DBG_LVL_2=True)
 
-which = 2
+which = 4
 
 if which == 1 or which == 'all':
     input('For Tests 1,2,3: GPS must be OFF')
@@ -97,5 +100,5 @@ elif which == 3 or which == 'all':
     test_get_last_sbf_buffer_info(mySeptentrioGPS,gps_state='ON_ENOUGH_BUFF_SZ')
 elif which == 4:
     input('For test 4, GPS must be ON, outdoor and on drone')
-    filename = 'test_record_gps_on_drone_Torbacka_' + str(datetime.date.today())
-    test_get_last_sbf_buffer_on_drone(filename=filename, time_of_test=60)
+    filename = 'test_record_gps_on_drone_' + str(datetime.date.today())
+    test_get_last_sbf_buffer_on_drone(mySeptentrioGPS,filename=filename, time_of_test=30)
