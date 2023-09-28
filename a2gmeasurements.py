@@ -607,7 +607,7 @@ class GpsSignaling(object):
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
         self.stream_info = []
-        self.MAX_SBF_BUFF_LEN = 1000  # Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
+        self.MAX_SBF_BUFF_LEN = 20  # Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
 
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
@@ -720,8 +720,8 @@ class GpsSignaling(object):
             else:
                 break
         
-        if self.DBG_LVL_0:
-            print('CONNECTED TO VIRTUAL SERIAL PORT IN SEPTENTRIO\r\n')
+        #if self.DBG_LVL_0:
+        print('[DEBUG]:CONNECTED TO VIRTUAL SERIAL PORT IN SEPTENTRIO')
         
         self.serial_instance = serial_instance
         time.sleep(0.1)
@@ -880,8 +880,10 @@ class GpsSignaling(object):
         self.SBF_frame_buffer.append(pvt_data_we_care)
         
         if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
+            print("[DEBUG]: Enters saving GPS coordinates")
             with open(self.save_filename + '.txt', 'a+') as file:      
-                file.write(json.dumps(self.SBF_frame_buffer))            
+                file.write(json.dumps(self.SBF_frame_buffer))       
+                print("[DEBUG]: Saved GPS cooridnates file")     
             self.SBF_frame_buffer = []
     
     def process_pvtgeodetic_sbf_data(self, raw_data):
@@ -915,8 +917,10 @@ class GpsSignaling(object):
         self.SBF_frame_buffer.append(pvt_data_we_care)
         
         if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
+            print("[DEBUG]: Enters saving GPS coordinates")
             with open(self.save_filename + '.txt', 'a+') as file:      
-                file.write(json.dumps(self.SBF_frame_buffer))            
+                file.write(json.dumps(self.SBF_frame_buffer))      
+                print("[DEBUG]: Saved GPS cooridnates file")           
             self.SBF_frame_buffer = []
             
     def process_atteuler_sbf_data(self, raw_data):
@@ -953,7 +957,8 @@ class GpsSignaling(object):
         
         if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
             with open(self.save_filename + '.txt', 'a+') as file:      
-                file.write(json.dumps(self.SBF_frame_buffer))            
+                file.write(json.dumps(self.SBF_frame_buffer))    
+                print("[DEBUG]: Saved GPS cooridnates file")             
             self.SBF_frame_buffer = []
         
     def parse_septentrio_msg(self, rx_msg):
@@ -969,8 +974,9 @@ class GpsSignaling(object):
         try:
             if self.DBG_LVL_1:
                 print('\nPARSING RX DATA')
-            if self.DBG_LVL_0:                
-                print('\nRX DATA: ', rx_msg.decode('utf-8', 'ignore'))
+            if self.DBG_LVL_0:
+                print('0 POS: ', rx_msg[0])
+                print('\nRX DATA LENGTH: ', len(rx_msg), rx_msg.decode('utf-8', 'ignore'))
             
             # The SBF output follows the $ sync1 byte, with a second sync byte that is the symbol @ or in utf-8 the decimal 64
             # Bytes indexing  works as follows:
@@ -1010,10 +1016,12 @@ class GpsSignaling(object):
                 # PVTGeodetic SBF sentenced identified by ID 4007
                 if ID_SBF_msg[0] & 8191 == 4007: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
                     self.process_pvtgeodetic_sbf_data(rx_msg)
+                    print("Received pvt geodetic")
                 
                 # PVTCart SBF sentence identified by ID 4006
                 if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
                     self.process_pvtcart_sbf_data(rx_msg)
+                    print("Received pvtcart")
                 
                 # PosCovCartesian SBF sentence identified by ID 5905
                 if ID_SBF_msg[0] & 8191 == 5905: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
@@ -1036,6 +1044,7 @@ class GpsSignaling(object):
                     if self.DBG_LVL_1:
                         1
                         #print('\nReceived AttEuler SBF sentence')
+                    print("Received attitude")
                     self.process_atteuler_sbf_data(rx_msg)
                 
                 if ID_SBF_msg[0] & 8191 == 5939: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID

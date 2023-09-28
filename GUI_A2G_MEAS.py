@@ -399,19 +399,33 @@ class WidgetGallery(QDialog):
         self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, IsRFSoC=IsRFSoC, IsGimbal=IsGimbal, IsGPS=IsGPS, rfsoc_static_ip_address='10.1.1.30', GPS_Stream_Interval=GPS_Stream_Interval, DBG_LVL_0=False, DBG_LVL_1=False)
         self.myhelpera2g.HelperStartA2GCom()
 
+        print("[DEBUG]: Starting GUI threads")
+        time.sleep(1)
+
+        self.start_GUI_threads()
+
     def start_GUI_threads(self):
         """
         Start GUI related threads. This threads are related only to the display of information
         on the GUI.
         
         """
+        print("[DEBUG]: Starting GUI threads...")
         # Although thus function should be called when a HelperA2GMeasurements class instance has been created, better to do a double check
         if hasattr(self, 'myhelpera2g'):
-            self.update_vis_time_gps = 1
-            #self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
-            self.update_time_gimbal_follow = 1
+            print("[DEBUG]: Detected helper class at creating GUI threads")
+            if self.gps_display_flag:      
+                print("[DEBUG]: GPS dispplay flag activated")      
+                self.update_vis_time_gps = 1
+                self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
+                self.periodical_gps_display_thread.start()
+            
+            if self.rs2_fm_flag:
+                print("[DEBUG]: Gimbal RS2 FM Flag activated")
+                self.update_time_gimbal_follow = 1
             #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
-            #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
+                self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd, args=('FOLLOWGIMBAL',))
+                self.periodical_gimbal_follow_thread.start()
         
     def periodical_pdp_display_callback(self):
         
@@ -493,6 +507,17 @@ class WidgetGallery(QDialog):
         air_ip_addr_label = QLabel('Drone IP:')
         self.gnd_ip_addr_value_label = QLabel('')
         self.air_ip_addr_value_text_edit = QLineEdit('')
+
+        self.GndGimbalFollowingCheckBox = QCheckBox("&RS2 FM")
+        self.GndGimbalFollowingCheckBox.setChecked(False)
+        self.GndGimbalFollowingCheckBox.toggled.connect(self.activate_rs2_fm_flag)
+        self.rs2_fm_flag = False
+
+        self.GpsDisplayCheckBox = QCheckBox("&GPS Display")
+        self.GpsDisplayCheckBox.setChecked(False)
+        self.GpsDisplayCheckBox.toggled.connect(self.activate_gps_display_flag)
+        self.gps_display_flag = False
+
         self.check_connections_push_button = QPushButton('Check')
         self.connect_to_drone = QPushButton('Connect drone')
         self.disconnect_from_drone = QPushButton('Disconnect drone')
@@ -534,10 +559,25 @@ class WidgetGallery(QDialog):
         layout.addWidget(drone_gimbal_conn_label, 1, 3, 1, 1)
         layout.addWidget(self.drone_gimbal_conn_label_modifiable, 1, 4, 1, 1) 
         layout.addWidget(self.check_connections_push_button, 1, 5, 1, 4)
-        layout.addWidget(self.connect_to_drone, 1, 9, 1, 4)
+        layout.addWidget(self.GndGimbalFollowingCheckBox, 1, 9, 1, 1)
+        layout.addWidget(self.GpsDisplayCheckBox, 1, 10, 1, 1)
+        #layout.addWidget(self.connect_to_drone, 1, 9, 1, 4)
+        layout.addWidget(self.connect_to_drone, 1, 11, 1, 2)
         layout.addWidget(self.disconnect_from_drone, 1, 13, 1, 3)
         
         self.checkConnPanel.setLayout(layout)
+    
+    def activate_rs2_fm_flag(self):        
+        if self.rs2_fm_flag:
+            self.rs2_fm_flag = False
+        else:
+            self.rs2_fm_flag = True
+    
+    def activate_gps_display_flag(self):
+        if self.gps_display_flag:
+            self.gps_display_flag = False
+        else:
+            self.gps_display_flag = True
 
     def connect_drone_callback(self):
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
@@ -588,6 +628,12 @@ class WidgetGallery(QDialog):
         self.finish_meas_togglePushButton.setEnabled(False)
         self.connect_to_drone.setEnabled(True)
         self.disconnect_from_drone.setEnabled(False)
+
+        #if hasattr(self, 'periodical_gps_display_thread'):
+        #    self.periodical_gps_display_thread.cancel()
+        
+        if hasattr(self, 'periodical_gimbal_follow_thread'):
+            self.periodical_gimbal_follow_thread.cancel()
 
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')
@@ -923,10 +969,13 @@ class WidgetGallery(QDialog):
         yaw_label = QLabel('Yaw [D]:')
         pitch_label = QLabel('Pitch [D]:')
         
-        self.rx_abs_radio_button = QRadioButton("Absolute")
-        self.rx_rel_radio_button = QRadioButton("Relative")        
-        self.rx_abs_radio_button.setChecked(True)
+        self.rx_lock_mode_radio_button = QRadioButton("Lock")
+        self.rx_follow_mode_radio_button = QRadioButton("Follow")        
+        self.rx_lock_mode_radio_button.setChecked(True)
         
+        self.rx_lock_mode_radio_button.clicked.connect(self.rx_lock_mode_radio_button_callback)
+        self.rx_follow_mode_radio_button.clicked.connect(self.rx_follow_mode_radio_button_callback)
+
         self.rx_yaw_value_text_edit = QLineEdit('')
         self.rx_pitch_value_text_edit = QLineEdit('')
         
@@ -943,8 +992,8 @@ class WidgetGallery(QDialog):
         self.rx_gimbal_move_down_push_button.clicked.connect(self.down_button_gimbal_drone_callback)
         
         layout = QGridLayout()
-        layout.addWidget(self.rx_abs_radio_button, 0, 0, 1, 3)
-        layout.addWidget(self.rx_rel_radio_button, 0, 3, 1, 3)
+        layout.addWidget(self.rx_lock_mode_radio_button, 0, 0, 1, 3)
+        layout.addWidget(self.rx_follow_mode_radio_button, 0, 3, 1, 3)
         layout.addWidget(self.rx_gimbal_manual_move_push_button, 0, 6, 1, 4)
         
         layout.addWidget(yaw_label, 1, 0, 1, 1)
@@ -959,7 +1008,29 @@ class WidgetGallery(QDialog):
         layout.addWidget(self.rx_step_manual_move_gimbal_text_edit, 3, 4, 1, 2)
         
         self.gimbalRXPanel.setLayout(layout)
+
+    def rx_lock_mode_radio_button_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            try:
+                data = {'MODE': 'LOCK'}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print(f"[DEBUG]: gimbal mode set to {data['MODE']} from application")
+            except Exception as e:
+                print("[DEBUG]: An error ocurred in the transmission of the Gremsy gimbal mode, ", e)
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
+    def rx_follow_mode_radio_button_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            try:
+                data = {'MODE': 'FOLLOW'}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print(f"[DEBUG]: gimbal mode set to {data['MODE']} from application")
+            except Exception as e:
+                print("[DEBUG]: An error ocurred in the transmission of the Gremsy gimbal mode, ", e)
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
+
     def start_meas_button_callback(self):
 
         # Experiment starts
@@ -1131,6 +1202,10 @@ class WidgetGallery(QDialog):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
         if hasattr(self, 'periodical_pap_display_thread'):
             self.periodical_pap_display_thread.cancel()
+        if hasattr(self, 'periodical_gps_display_thread'):
+            self.periodical_gps_display_thread.cancel()
+        if hasattr(self, 'periodical_gimbal_follow_thread'):
+            self.periodical_gimbal_follow_thread.cancel()
             
     def eventFilter(self, source, event):
         if event.type()== event.Close:
