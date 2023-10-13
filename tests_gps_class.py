@@ -65,15 +65,12 @@ def test_get_last_sbf_buffer_info(gpsObject, gps_state='off'):
 def test_get_last_sbf_buffer_on_drone(gpsObject, filename, time_of_test):
     
     gpsObject.serial_connect()
-    time.sleep(5)
-    gpsObject.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='PVTCartesian')
-    time.sleep(1)
+    gpsObject.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval='sec1', sbf_type='+PVTCartesian+AttEuler')
     gpsObject.start_thread_gps()
         
     time.sleep(time_of_test)
                 
     gpsObject.stop_gps_data_retrieval(stream_number=1, msg_type='SBF')
-    time.sleep(1)
     gpsObject.stop_thread_gps()        
     
     print(gpsObject.SBF_frame_buffer)
