@@ -1554,7 +1554,7 @@ class HelperA2GMeasurements(object):
                 self.mySeptentrioGPS.serial_instance.reset_input_buffer()
                 
                 if self.ID == 'DRONE':
-                    self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian')
+                    self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
                 elif self.ID == 'GROUND':
                     self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
                 print("[DEBUG]: started gps stream")
@@ -1752,10 +1752,13 @@ class HelperA2GMeasurements(object):
                 return
             
             if follow_mode_gimbal:
+                print('[DEBUG]: Last coordinates retrieved and followgimbal flag set to True to be sent')
                 data_to_send['FOLLOW_GIMBAL'] = True
             
             # data_to_send wont be any of the other error codes, because they are not set for 'what'=='Coordinates'
-                       
+            else:            
+                data_to_send['FOLLOW_GIMBAL'] = False
+                
             frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
                 
             if self.DBG_LVL_1:
@@ -1785,10 +1788,14 @@ class HelperA2GMeasurements(object):
             #msg_data = json.loads(msg_data)
 
             # Error checking
+            #if 'YAW' not in msg_data or 'PITCH' not in msg_data or 'MODE' not in msg_data:
             if 'YAW' not in msg_data or 'PITCH' not in msg_data:
-                print('\n[ERROR]: no YAW or PITCH provided')
-                return
-            else:
+                if 'MODE' not in msg_data:
+                    print('\n[ERROR]: no YAW or PITCH provided')
+                    return
+                else:
+                    self.myGimbal.change_gimbal_mode(mode=msg_data['MODE'])                    
+            elif 'YAW' in msg_data and 'PITCH' in msg_data:
                 if float(msg_data['YAW']) > 1800 or float(msg_data['PITCH']) > 400 or float(msg_data['YAW']) < -1800 or float(msg_data['PITCH']) < -600:
                     print('\n[ERROR]: Yaw or pitch angles are outside of range')
                     return
@@ -1855,11 +1862,10 @@ class HelperA2GMeasurements(object):
         if cmd_source == 'GETGPS':
             if self.DBG_LVL_1:
                 print(f'\nTHIS ({self.ID}) receives ANS to GETGPS cmd')
-            if self.ID =='DRONE':
-                # Invoke c++ function controlling drone's gimbal
-                1
-            elif self.ID == 'GROUND':
-
+            
+            if self.ID =='DRONE' or self.ID == 'GROUND': # For both cases use this idea
+            #elif self.ID == 'GROUND':
+                print("[Actually processing GPS from GND]")
                 y_drone = data['Y']
                 x_drone = data['X']
                 
@@ -1884,6 +1890,8 @@ class HelperA2GMeasurements(object):
 
                 yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
+                print("[A priori yaw and pitch are]: ", yaw_to_set, pitch_to_set)
+                
                 # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the gimbal_follows_drone method
                 while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
                     yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
@@ -1898,8 +1906,11 @@ class HelperA2GMeasurements(object):
                             if data['FOLLOW_GIMBAL']: # The corresponding value is True
                                 if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
                                     
-                                    # Has to be absolute movement, cause the 0 is the heading value.
-                                    self.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set) 
+                                    if self.ID == 'DRONE':
+                                        self.myGimbal.setPosControl(yaw=yaw_to_set/10, pitch=pitch_to_set/10) 
+                                    elif self.ID == 'GROUND':
+                                        # Has to be absolute movement, cause the 0 is the heading value
+                                         self.myGimbal.setPosControl(yaw=yaw_to_set, pitch=pitch_to_set/10) 
                                 else:
                                     print('\n[WARNING]: No gimbal available, so no rotation will happen')
                 
@@ -1915,13 +1926,17 @@ class HelperA2GMeasurements(object):
             print(f'\n[DEBUG_1]: THIS ({self.ID}) parses incoming message')
             
         if rx_msg['TYPE'] == 'ANS':
-            print("[DEBUG]: Received ANS from DRONE")
+            if self.ID == 'DRONE':
+                print("[DEBUG]: Received ANS from GND")
+            elif self.ID == 'GROUND':
+                print("[DEBUG]: Received ANS from DRONE")
             self.process_answer(rx_msg)
         elif rx_msg['TYPE'] == 'CMD':
             if rx_msg['CMD_SOURCE'] == 'FOLLOWGIMBAL':
-                print("[DEBUG]: Received FOLLOWGIMBAL/GETGPS from DRONE")
+                print("[DEBUG]: Received FOLLOWGIMBAL msg")
                 self.do_follow_mode_gimbal()            
             if rx_msg['CMD_SOURCE'] == 'GETGPS':
+                print("[DEBUG]: Received GETGPS msg")
                 self.do_getgps_action()
             elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
                 self.do_setgimbal_action(rx_msg['DATA'])
@@ -2301,31 +2316,33 @@ class GimbalGremsyH16:
         First column is time [s] and second column is angle computed from (a_{i}, a_{i+1}, b_{i}) distances
         
         """ 
-        drift_with_low_speed_counter = [[137, self.gremsy_angle(2, 1.97, 10)],
-                                        [144, self.gremsy_angle(1.97, 1.94, 10)],
-                                        [145, self.gremsy_angle(1.94, 1.927, 10)],
-                                        [156, self.gremsy_angle(1.927, 1.911, 10)],
-                                        [164, self.gremsy_angle(1.911, 1.898, 10)],
-                                        [148, self.gremsy_angle(1.898, 1.892, 10)],
-                                        [164, self.gremsy_angle(1.892, 1.89, 10)],
-                                        [176, self.gremsy_angle(1.89, 1.894, 10)],
-                                        [185, self.gremsy_angle(1.894, 1.9, 10)],
-                                        [159, self.gremsy_angle(1.9, 1.914, 10)],
-                                        [159, self.gremsy_angle(1.914, 1.932, 10)],
-                                        [146, self.gremsy_angle(1.932, 1.954, 10)]]
+        drift_with_low_speed_counter = [[137, self.gremsy_angle(2, 1.97, 0.10)],
+                                        [144, self.gremsy_angle(1.97, 1.94, 0.10)],
+                                        [145, self.gremsy_angle(1.94, 1.927, 0.10)],
+                                        [156, self.gremsy_angle(1.927, 1.911, 0.10)],
+                                        [164, self.gremsy_angle(1.911, 1.898, 0.10)],
+                                        [148, self.gremsy_angle(1.898, 1.892, 0.10)],
+                                        [164, self.gremsy_angle(1.892, 1.89, 0.10)],
+                                        [176, self.gremsy_angle(1.89, 1.894, 0.10)],
+                                        [185, self.gremsy_angle(1.894, 1.9, 0.10)],
+                                        [159, self.gremsy_angle(1.9, 1.914, 0.10)],
+                                        [159, self.gremsy_angle(1.914, 1.932, 0.10)],
+                                        [146, self.gremsy_angle(1.932, 1.954, 0.10)]]
         
-        drift_without_low_speed_counter = [[28.91, self.gremsy_angle(2, 1.971, 10)],
-                                           [28.43, self.gremsy_angle(1.971, 1.95, 10)],
-                                           [28.46, self.gremsy_angle(1.95, 1.923, 10)],
-                                           [30.14, self.gremsy_angle(1.923, 1.9, 10)],
-                                           [29.76, self.gremsy_angle(1.9, 1.888, 10)],
-                                           [29.36, self.gremsy_angle(1.888, 1.884, 10)],
-                                           [31.41, self.gremsy_angle(1.884, 1.872, 10)],
-                                           [31.3, self.gremsy_angle(1.872, 1.881, 10)],
-                                           [28.77, self.gremsy_angle(1.881, 1.89, 10)],
-                                           [31.56, self.gremsy_angle(1.89, 1.912, 10)],
-                                           [29.15, self.gremsy_angle(1.912, 1.935, 10)]]
+        drift_without_low_speed_counter = [[28.91, self.gremsy_angle(2, 1.971, 0.10)],
+                                           [28.43, self.gremsy_angle(1.971, 1.95, 0.10)],
+                                           [28.46, self.gremsy_angle(1.95, 1.923, 0.10)],
+                                           [30.14, self.gremsy_angle(1.923, 1.9, 0.10)],
+                                           [29.76, self.gremsy_angle(1.9, 1.888, 0.10)],
+                                           [29.36, self.gremsy_angle(1.888, 1.884, 0.10)],
+                                           [31.41, self.gremsy_angle(1.884, 1.872, 0.10)],
+                                           [31.3, self.gremsy_angle(1.872, 1.881, 0.10)],
+                                           [28.77, self.gremsy_angle(1.881, 1.89, 0.10)],
+                                           [31.56, self.gremsy_angle(1.89, 1.912, 0.10)],
+                                           [29.15, self.gremsy_angle(1.912, 1.935, 0.10)]]
         
+        self.drift_with_low_speed_counter = drift_with_low_speed_counter
+        self.drift_without_low_speed_counter = drift_without_low_speed_counter
         self.avg_drift_with_low_speed_counter = np.array(drift_with_low_speed_counter).mean(axis=0) # 2D array 
         self.avg_drift_without_low_speed_counter = np.array(drift_without_low_speed_counter).mean(axis=0) # 2D array
     
@@ -2691,6 +2708,10 @@ class GimbalGremsyH16:
             self.sbus.turn_on_motors()
         elif power == 'off':
             self.sbus.turn_off_motors()
+            
+    def change_gimbal_mode(self, mode='LOCK'):
+        self.sbus.change_mode(mode=mode)
+        self.sbus.MODE = mode
         
 class SBUSEncoder:
     """
@@ -2730,7 +2751,8 @@ class SBUSEncoder:
         self.time_last_move_cmd = 0
         self.cnt = 1
         self.ENABLE_UPDATE_REST = True
-    
+        self.MODE = 'LOCK'
+         
     def set_channel(self, channel, data):
         self.channels[channel] = data & 0x07ff    
     
@@ -2813,7 +2835,7 @@ class SBUSEncoder:
         #self.set_channel(channel, int(scale * 2047))
     
     def update_rest_state_channel(self):
-        if self.cnt % 5 == 0:
+        if self.cnt % 2 == 0:
             self.update_channel(channel=4, value=0)
         else:
             self.update_channel(channel=4, value=self.LOW_SPEED_COUNTER_rud)
@@ -2831,7 +2853,11 @@ class SBUSEncoder:
         self.update_channel(channel=3, value=0)
         #self.update_channel(channel=4, value=0)
         self.update_channel(channel=4, value=self.LOW_SPEED_COUNTER_rud)
-        self.update_channel(channel=5, value=0)
+        
+        if self.MODE == 'LOCK':
+            self.update_channel(channel=5, value=0)
+        elif self.MODE == 'FOLLOW':
+            self.update_channel(channel=5, value=-100)
         #time.sleep(0.1)
         
     def move_gimbal(self, ele, rud, mov_time):
@@ -2847,7 +2873,12 @@ class SBUSEncoder:
         self.update_channel(channel=2, value=ele)
         self.update_channel(channel=3, value=0)
         self.update_channel(channel=4, value=rud)
-        self.update_channel(channel=5, value=0)
+        
+        if self.MODE == 'LOCK':
+            self.update_channel(channel=5, value=0)
+        elif self.MODE == 'FOLLOW':
+            self.update_channel(channel=5, value=-100)
+        
         time.sleep(mov_time)
         self.not_move_command()
         self.ENABLE_UPDATE_REST = True
@@ -2866,6 +2897,12 @@ class SBUSEncoder:
         
         # Turn on motors and set the gimbal to follow mode
         #self.update_channel(channel=5, value=-100)
+        
+    def change_mode(self, mode='LOCK'):
+        if mode == 'FOLLOW':
+            self.update_channel(channel=5, value=-100)
+        elif mode == 'LOCK':
+            self.update_channel(channel=5, value=0)
 
 class RFSoCRemoteControlFromHost():
     """
@@ -3037,13 +3074,17 @@ class RFSoCRemoteControlFromHost():
             self.hest.append(rxtd)
             
             if len(self.hest) >= self.MAX_PAP_BUF_SIZE:
-                #self.compute_pap_for_vis()
+                self.compute_pap_for_vis()
                 self.save_hest_buffer()                
 
     def compute_pap_for_vis(self):        
             self.data_to_visualize = np.array(self.hest)
             self.data_to_visualize = np.abs(self.data_to_visualize)
             self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
+            if self.data_to_visualize.shape[0] >= 20:
+                self.data_to_visualize = self.data_to_visualize[:21, ::8]
+            else:
+                self.data_to_visualize = self.data_to_visualize[:, ::8]
             self.data_to_visualize = self.data_to_visualize.astype(np.int32)
             
             print("[DEBUG]: Computed pap to be sent")
