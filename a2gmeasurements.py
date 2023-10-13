@@ -469,10 +469,14 @@ class GimbalRS2(object):
         if self.DBG_LVL_0:
             print("Start receiving messages")
         while not stop_event.is_set():
-            rx_msg = bus.recv(1)
-            if rx_msg is not None:    
-                self.cntBytes = self.cntBytes + 1
-                self.can_callback(rx_msg)
+            try:
+                rx_msg = bus.recv(1)
+                if rx_msg is not None:    
+                    self.cntBytes = self.cntBytes + 1
+                    self.can_callback(rx_msg)
+            except Exception as e:
+                #There might be an error due to the gimbal disconnecting itself due to improper balance
+                print("[DEBUG]: Error in Gimbal RS2 callback, ", e)
                 
         if self.DBG_LVL_0:
             print("Stopped receiving messages")
@@ -602,8 +606,9 @@ class GpsSignaling(object):
         """
         
         # Initializations
-        
-        self.save_filename = save_filename + '-' + datetime.datetime.now().strftime('%Y-%m-%d')
+        datestr = datetime.datetime.now()
+        datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
+        self.save_filename = save_filename + '-' + datestr
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
         self.stream_info = []
@@ -685,7 +690,7 @@ class GpsSignaling(object):
             if 'Septentrio USB Device - CDC Abstract Control Model (ACM)' in desc:
                     #self.serial_port = '/dev/ttyACM0'
                     self.serial_port = this_port
-                    self.interface_number = 1
+                    self.interface_number = 2
             # Windows driver
             elif 'Septentrio Virtual USB COM Port 1' in desc: # Choose the first virtual COM port
                     self.serial_port = this_port
@@ -844,7 +849,11 @@ class GpsSignaling(object):
         ERR =  struct.unpack('<1B', raw_data[14:15])[0]
         X =  struct.unpack('<1d', raw_data[15:23])[0]
         Y =  struct.unpack('<1d', raw_data[23:31])[0]
-        Z = struct.unpack('<1d', raw_data[31:39])[0]
+        try:
+            Z = struct.unpack('<1d', raw_data[31:39])[0]
+        except Exception as e:
+            if self.DBG_LVL_0:
+                print("[DEBUG]: error unpacking Z coord, ", e)
         Undulation =  struct.unpack('<1f', raw_data[39:43])[0]
         Vx =  struct.unpack('<1f', raw_data[43:47])[0]
         Vy = struct.unpack('<1f', raw_data[47:51])[0]
@@ -939,7 +948,10 @@ class GpsSignaling(object):
         ERR =  struct.unpack('<1B', raw_data[14:15])[0]
         MODE =  struct.unpack('<1H', raw_data[15:17])[0]
         Heading =  struct.unpack('<1f', raw_data[19:23])[0]
-        Pitch =  struct.unpack('<1f', raw_data[23:27])[0]
+        try:
+            Pitch =  struct.unpack('<1f', raw_data[23:27])[0]
+        except Exception as e:
+            print("[DEBUG]: Error unpacking Pitch attitude, ", e)
         Roll = struct.unpack('<1f', raw_data[27:31])[0]
         PitchDot =  struct.unpack('<1f', raw_data[31:35])[0]
         RollDot =  struct.unpack('<1f', raw_data[35:39])[0]
@@ -1016,12 +1028,12 @@ class GpsSignaling(object):
                 # PVTGeodetic SBF sentenced identified by ID 4007
                 if ID_SBF_msg[0] & 8191 == 4007: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
                     self.process_pvtgeodetic_sbf_data(rx_msg)
-                    print("Received pvt geodetic")
+                    #print("Received pvt geodetic")
                 
                 # PVTCart SBF sentence identified by ID 4006
                 if ID_SBF_msg[0] & 8191 == 4006: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID                    
                     self.process_pvtcart_sbf_data(rx_msg)
-                    print("Received pvtcart")
+                    #print("Received pvtcart")
                 
                 # PosCovCartesian SBF sentence identified by ID 5905
                 if ID_SBF_msg[0] & 8191 == 5905: # np.sum([np.power(2,i) for i in range(13)]) # --->  bits 0-12 contain the ID
@@ -1519,8 +1531,11 @@ class HelperA2GMeasurements(object):
         self.CONN_MUST_OVER_FLAG = False # Usefull for drone side, as its script will poll for looking if this is True
         self.PAP_TO_PLOT = []
         
+        print(IsGPS, self.IsGPS)
+
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
+            print("[DEBUG]: Created RFSoC class")
         if IsGimbal:
             if self.ID == 'GROUND':
                 self.myGimbal = GimbalRS2()
@@ -1529,9 +1544,10 @@ class HelperA2GMeasurements(object):
             elif self.ID == 'DRONE':
                 self.myGimbal = GimbalGremsyH16()
                 self.myGimbal.start_conn()
-                
+            print("[DEBUG]: Created Gimbal class")    
         if IsGPS:
-            self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True)
+            self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True, DBG_LVL_1=False, DBG_LVL_0=False)
+            print("[DEBUG]: Created GPS class")
             self.mySeptentrioGPS.serial_connect()
             
             if self.mySeptentrioGPS.GPS_CONN_SUCCESS:
@@ -1541,7 +1557,7 @@ class HelperA2GMeasurements(object):
                     self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian')
                 elif self.ID == 'GROUND':
                     self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
-                
+                print("[DEBUG]: started gps stream")
                 #self.mySeptentrioGPS.start_gps_data_retrieval(msg_type='NMEA', nmea_type='GGA', interval='sec1')
                 self.mySeptentrioGPS.start_thread_gps()
                 time.sleep(0.5)
@@ -1705,7 +1721,7 @@ class HelperA2GMeasurements(object):
             return json.dumps(frame)
 
     def do_follow_mode_gimbal(self):
-        self.do_getgps_action(self, follow_mode_gimbal=True)
+        self.do_getgps_action(follow_mode_gimbal=True)
     
     def do_getgps_action(self, follow_mode_gimbal=False):
         """
@@ -1739,18 +1755,18 @@ class HelperA2GMeasurements(object):
                 data_to_send['FOLLOW_GIMBAL'] = True
             
             # data_to_send wont be any of the other error codes, because they are not set for 'what'=='Coordinates'
-            else:            
-                frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
+                       
+            frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
                 
-                if self.DBG_LVL_1:
-                    print('\n[DEBUG_1]:Received the GETGPS and read the SBF buffer')
-                if self.ID == 'GROUND':
-                    self.a2g_conn.sendall(frame_to_send.encode())
-                if self.ID == 'DRONE':
-                    self.socket.sendall(frame_to_send.encode())
+            if self.DBG_LVL_1:
+                print('\n[DEBUG_1]:Received the GETGPS and read the SBF buffer')
+            if self.ID == 'GROUND':
+                self.a2g_conn.sendall(frame_to_send.encode())
+            if self.ID == 'DRONE':
+                self.socket.sendall(frame_to_send.encode())
                 
-                if self.DBG_LVL_1:
-                    print('\n[DEBUG_1]: Sent SBF buffer')
+            if self.DBG_LVL_1:
+                print('\n[DEBUG_1]: Sent SBF buffer')
     
         else:
             print('\n[WARNING]:ASKED for GPS position but no GPS connected: IsGPS is False')
@@ -1899,9 +1915,11 @@ class HelperA2GMeasurements(object):
             print(f'\n[DEBUG_1]: THIS ({self.ID}) parses incoming message')
             
         if rx_msg['TYPE'] == 'ANS':
+            print("[DEBUG]: Received ANS from DRONE")
             self.process_answer(rx_msg)
         elif rx_msg['TYPE'] == 'CMD':
             if rx_msg['CMD_SOURCE'] == 'FOLLOWGIMBAL':
+                print("[DEBUG]: Received FOLLOWGIMBAL/GETGPS from DRONE")
                 self.do_follow_mode_gimbal()            
             if rx_msg['CMD_SOURCE'] == 'GETGPS':
                 self.do_getgps_action()
@@ -1989,6 +2007,8 @@ class HelperA2GMeasurements(object):
             self.socket.sendall(frame.encode())
         elif self.ID == 'GROUND':
             self.a2g_conn.sendall(frame.encode())
+            if type_cmd == 'FOLLOWGIMBAL':
+                print("[DEBUG]: FOLLOWGIMBAL cmd sent")
     
     def az_rot_gnd_gimbal_toggle_sig_generator(self, Naz, meas_time=10, filename=None):
         """

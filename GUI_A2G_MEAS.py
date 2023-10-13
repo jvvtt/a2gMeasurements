@@ -1,3 +1,5 @@
+import json
+import datetime
 import platform
 import re
 import subprocess
@@ -53,7 +55,7 @@ class WidgetGallery(QDialog):
         self.SUCCESS_GND_GPS = False
 
         self.create_check_connections_panel()
-        self.create_log_terminal()
+       # self.create_log_terminal()
         self.create_Gimbal_GND_panel()
         self.create_Gimbal_AIR_panel()
         self.create_FPGA_settings_panel()
@@ -72,9 +74,9 @@ class WidgetGallery(QDialog):
         mainLayout.addWidget(self.pdpPlotPanel, 4, 0, 7, 2)
         mainLayout.addWidget(self.gps_vis_panel, 4, 2, 7, 2)
         mainLayout.addWidget(self.planningMeasurementsPanel, 11, 0, 2, 2)
-        mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
+       # mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
         
-        self.write_to_log_terminal('Welcome to A2G Measurements Center!')
+        #self.write_to_log_terminal('Welcome to A2G Measurements Center!')
                 
         self.setLayout(mainLayout)
 
@@ -619,6 +621,9 @@ class WidgetGallery(QDialog):
         self.disconnect_from_drone.setEnabled(True)
         
     def disconnect_drone_callback(self):
+        if hasattr(self, 'periodical_gimbal_follow_thread'):
+            self.periodical_gimbal_follow_thread.cancel()
+
         self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
         self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
         del self.myhelpera2g        
@@ -627,13 +632,7 @@ class WidgetGallery(QDialog):
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
         self.connect_to_drone.setEnabled(True)
-        self.disconnect_from_drone.setEnabled(False)
-
-        #if hasattr(self, 'periodical_gps_display_thread'):
-        #    self.periodical_gps_display_thread.cancel()
-        
-        if hasattr(self, 'periodical_gimbal_follow_thread'):
-            self.periodical_gimbal_follow_thread.cancel()
+        self.disconnect_from_drone.setEnabled(False)     
 
     def create_FPGA_settings_panel(self):
         self.fpgaSettingsPanel = QGroupBox('FPGA settings')
@@ -1055,6 +1054,16 @@ class WidgetGallery(QDialog):
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
         print("[DEBUG]: SENT REQUEST to FINISH measurement")
+
+        datestr = datetime.datetime.now()
+        datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S')
+        description = {'H': self.height_from_gnd_text_edit.text(), 'D': self.d_tx_rx_text_edit.text()}
+        
+        with open('dist_heig_' + datestr + '.txt', 'a+') as file:      
+            file.write(json.dumps(description))       
+        
+        print("[DEBUG]: Saved file with dists between txr and height of drone")
+        
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
@@ -1090,6 +1099,9 @@ class WidgetGallery(QDialog):
 
         self.time_value_text_edit = QLineEdit('')
         
+        self.height_from_gnd_text_edit = QLineEdit('')
+        self.d_tx_rx_text_edit = QLineEdit('')
+
         self.how_trigger_measurements_radio_button_man = QRadioButton("Manual")
         self.how_trigger_measurements_radio_button_man.clicked.connect(self.manual_meas_radio_button_callback)
         self.how_trigger_measurements_radio_button_auto = QRadioButton("Automatic") 
@@ -1098,18 +1110,27 @@ class WidgetGallery(QDialog):
         
         choose_what_type_time_label = QLabel('Choose parameter:')
         value_parameter_label = QLabel('Value:')
+
+        height_from_gndl_label = QLabel('Height [m]:')
+        d_tx_rx_label = QLabel('Distance [m]:')
         
         layout = QGridLayout()
         layout.addWidget(self.how_trigger_measurements_radio_button_man, 0, 0, 1, 2)
         layout.addWidget(self.how_trigger_measurements_radio_button_auto, 0, 2, 1, 2)
+
         layout.addWidget(choose_what_type_time_label, 1, 0, 1, 1)
         layout.addWidget(self.choose_what_time_is_specified_ComboBox, 1, 1, 1, 1)
         layout.addWidget(value_parameter_label, 1, 2, 1, 1)
         layout.addWidget(self.time_value_text_edit, 1, 3, 1, 1)
+
+        layout.addWidget(height_from_gndl_label, 2, 0, 1, 1)
+        layout.addWidget(self.height_from_gnd_text_edit, 2, 1, 1, 1)
+        layout.addWidget(d_tx_rx_label, 2, 2, 1, 1)
+        layout.addWidget(self.d_tx_rx_text_edit, 2, 3, 1, 1)
         
-        layout.addWidget(self.start_meas_togglePushButton, 2, 0, 1, 1)
-        layout.addWidget(self.stop_meas_togglePushButton, 2, 1, 1, 1)
-        layout.addWidget(self.finish_meas_togglePushButton, 2, 2, 1, 2)
+        layout.addWidget(self.start_meas_togglePushButton, 3, 0, 1, 1)
+        layout.addWidget(self.stop_meas_togglePushButton, 3, 1, 1, 1)
+        layout.addWidget(self.finish_meas_togglePushButton, 3, 2, 1, 2)
         
         self.planningMeasurementsPanel.setLayout(layout)
     
