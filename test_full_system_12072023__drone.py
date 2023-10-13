@@ -11,11 +11,12 @@ pattern_ip_addresses = r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 print("Welcome to the DRONE client program! You have 60s to input")
 
 def send_pap_for_vis():
-    if hasattr(drone_a2g_helper.myrfsoc, 'data_to_visualize'):
-        if len(drone_a2g_helper.myrfsoc.data_to_visualize) > 0:
-            print("[DEBUG]: There is data to visualize and its length is > 0")
-            drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
-            print("[DEBUG]: Sent PAP data")
+    if hasattr(drone_a2g_helper, 'myrfsoc'):
+        if hasattr(drone_a2g_helper.myrfsoc, 'data_to_visualize'):
+            if len(drone_a2g_helper.myrfsoc.data_to_visualize) > 0:
+                print("[DEBUG]: There is data to visualize and its length is > 0")
+                drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
+                print("[DEBUG]: Sent PAP data")
 
 def check_devices():
     GND_ADDRESS = input('Enter the GND node IP address: ')
@@ -82,6 +83,8 @@ if not_finish_tcp_connection_attempt == False:
     timer_send_pap_for_vis.start()
     while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):        
         time.sleep(1)
+        drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
+        print("[DEBUG]: FOLLOWGIMBAL cmd sent")
 
 timer_send_pap_for_vis.cancel()
 drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
