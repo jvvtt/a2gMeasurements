@@ -41,6 +41,7 @@ class WidgetGallery(QDialog):
         self.setWindowTitle("A2G Measurements Center")
 
         # Parameters of the GUI
+        self.STATIC_DRONE_IP_ADDRESS = '192.168.0.157'
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
         self.remote_drone_conn = None
@@ -167,8 +168,9 @@ class WidgetGallery(QDialog):
         output = stdout.read().decode('utf-8')
         error = stderr.read().decode('utf-8')
 
+        expected_str_out = "Reply from " + drone_fpga_static_ip_addr
         # Print the output and error, if any
-        if "Reply" in output:
+        if expected_str_out in output:
             print("[DEBUG]: RFSoC detected at DRONE node")
             success_drone_fpga = True
         else:
@@ -508,7 +510,7 @@ class WidgetGallery(QDialog):
         gnd_ip_addr_label = QLabel('Ground IP:')
         air_ip_addr_label = QLabel('Drone IP:')
         self.gnd_ip_addr_value_label = QLabel('')
-        self.air_ip_addr_value_text_edit = QLineEdit('')
+        self.air_ip_addr_value_text_edit = QLineEdit(self.STATIC_DRONE_IP_ADDRESS)
 
         self.GndGimbalFollowingCheckBox = QCheckBox("&RS2 FM")
         self.GndGimbalFollowingCheckBox.setChecked(False)
