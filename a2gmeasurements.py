@@ -1590,7 +1590,6 @@ class HelperA2GMeasurements(object):
             yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
         """
 
-        # Ground station
         if self.IsGPS:            
             coords, head_info = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
             
@@ -1863,9 +1862,31 @@ class HelperA2GMeasurements(object):
             if self.DBG_LVL_1:
                 print(f'\nTHIS ({self.ID}) receives ANS to GETGPS cmd')
             
-            if self.ID =='DRONE' or self.ID == 'GROUND': # For both cases use this idea
-            #elif self.ID == 'GROUND':
-                print("[Actually processing GPS from GND]")
+            if self.ID =='DRONE':
+                y_gnd = data['Y']
+                x_gnd = data['X']
+                
+                datum_coordinates = data['Datum']
+                
+                if y_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
+                    print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
+                    return
+
+                # Z is in geocentric coordinates and does not correspond to the actual height:
+                # Geocentric WGS84
+                if datum_coordinates == 0:
+                    lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'])
+                    self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
+                # Geocentric ETRS89
+                elif datum_coordinates == 30:
+                    lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'], EPSG_GEOCENTRIC=4346)
+                    self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
+                else:
+                    print('\nERROR: Not known geocentric datum')
+                    return
+
+                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)
+            elif self.ID == 'GROUND':
                 y_drone = data['Y']
                 x_drone = data['X']
                 
