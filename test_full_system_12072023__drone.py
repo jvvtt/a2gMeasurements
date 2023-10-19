@@ -19,30 +19,34 @@ def send_pap_for_vis():
                 print("[DEBUG]: Sent PAP data")
 
 def check_devices():
-    GND_ADDRESS = input('Enter the GND node IP address: ')
-    is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))
+    Q_GND_ADDRESS = input('Confirm the predefined static GND IP addr is 192.168.0.124: y/n')
+    if Q_GND_ADDRESS == 'y' or Q_GND_ADDRESS == 'Y':
+        GND_ADDRESS = '192.168.0.124'
+    elif Q_GND_ADDRESS == 'n' or Q_GND_ADDRESS == 'N':
+        GND_ADDRESS = input('Enter the GND node IP address: ')
+        is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))
 
-    while(not is_ip_addr):
-        print("IP address entered is not an IP address. ")
-        GND_ADDRESS = input('Enter GND node IP address: ')
-        is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))    
+        while(not is_ip_addr):
+            print("IP address entered is not an IP address. ")
+            GND_ADDRESS = input('Enter GND node IP address: ')
+            is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))
 
     is_gps_used = input('GPS at DRONE is going to be used? y/n: ')
-    if is_gps_used == 'y':
+    if is_gps_used == 'y' or is_gps_used == 'Y':
         gps_used = True
-    elif is_gps_used == 'n':
+    elif is_gps_used == 'n' or is_gps_used == 'N':
         gps_used = False
 
     is_gimbal_used = input('Gimbal at DRONE is going to be used? y/n: ')
-    if is_gimbal_used == 'y':
+    if is_gimbal_used == 'y' or is_gimbal_used == 'Y':
         gimbal_used = True
-    elif is_gimbal_used == 'n' :
+    elif is_gimbal_used == 'n' or is_gimbal_used == 'N':
         gimbal_used = False
         
     is_rfsoc_used = input('RFSoC at DRONE is going to be used? y/n: ')
-    if is_rfsoc_used == 'y':
+    if is_rfsoc_used == 'y' or is_rfsoc_used == 'Y':
         rfsoc_used = True
-    elif is_rfsoc_used == 'n':
+    elif is_rfsoc_used == 'n' or is_rfsoc_used == 'N':
         rfsoc_used = False
         
     return GND_ADDRESS, gps_used, gimbal_used, rfsoc_used
