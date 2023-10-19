@@ -59,8 +59,7 @@ class WidgetGallery(QDialog):
        # self.create_log_terminal()
         self.create_Gimbal_GND_panel()
         self.create_Gimbal_AIR_panel()
-        self.create_FPGA_settings_panel()
-        self.create_Beamsteering_settings_panel()
+        self.create_fpga_and_sivers_panel()
         self.create_Planning_Measurements_panel()
         self.create_GPS_visualization_panel()
         self.create_pdp_plot_panel()
@@ -69,9 +68,9 @@ class WidgetGallery(QDialog):
         mainLayout.addWidget(self.checkConnPanel, 0, 0, 1 , 4)
         mainLayout.addWidget(self.gimbalTXPanel, 1, 0, 3, 1)
         mainLayout.addWidget(self.gimbalRXPanel, 1, 1, 3, 1)
-        mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 3, 1)
-        mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 3, 1)
-        #mainLayout.addWidget(self.gpsPanel, 2, 0)
+        mainLayout.addWidget(self.fpgaAndSiversSettingsPanel, 1, 2, 3, 2)
+        #mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 3, 1)
+        #mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 3, 1)
         mainLayout.addWidget(self.pdpPlotPanel, 4, 0, 7, 2)
         mainLayout.addWidget(self.gps_vis_panel, 4, 2, 7, 2)
         mainLayout.addWidget(self.planningMeasurementsPanel, 11, 0, 2, 2)
@@ -635,12 +634,55 @@ class WidgetGallery(QDialog):
         self.finish_meas_togglePushButton.setEnabled(False)
         self.connect_to_drone.setEnabled(True)
         self.disconnect_from_drone.setEnabled(False)     
+    
+    def create_fpga_and_sivers_panel(self):
+        self.fpgaAndSiversSettingsPanel = QGroupBox('RFSoC and Sivers settings')
 
-    def create_FPGA_settings_panel(self):
-        self.fpgaSettingsPanel = QGroupBox('FPGA settings')
-        
-    def create_Beamsteering_settings_panel(self):
-        self.beamsteeringSettingsPanel = QGroupBox('Beamsteering settings')
+        rf_op_freq_label = QLabel('Freq. Operation [Hz]:')
+        tx_bb_gain_label = QLabel('Tx BB Gain [HEX]:')
+        tx_bb_phase_label = QLabel('Tx BB Phase [HEX]:')
+        tx_bb_iq_gain_label = QLabel('Tx BB IQ Gain [HEX]:')
+        tx_bfrf_gain_label = QLabel('Tx BF & RF Gain [HEX]:')
+        rx_bb_gain_1_label = QLabel('Rx BB Gain 1 [HEX]:')
+        rx_bb_gain_2_label = QLabel('Rx BB Gain 2 [HEX]:')
+        rx_bb_gain_3_label = QLabel('Rx BB Gain 3 [HEX]:')
+        rx_bfrf_gain_label = QLabel('Rx BF & RF Gain [HEX]:')
+
+        self.rf_op_freq_text_edit = QLineEdit('57.51e9')
+        self.tx_bb_gain_text_edit = QLineEdit('3')
+        self.tx_bb_phase_text_edit = QLineEdit('0')
+        self.tx_bb_iq_gain_text_edit = QLineEdit('77')
+        self.tx_bfrf_gain_text_edit = QLineEdit('40')
+        self.rx_bb_gain_1_text_edit = QLineEdit('77')
+        self.rx_bb_gain_2_text_edit = QLineEdit('00')
+        self.rx_bb_gain_3_text_edit = QLineEdit('99')
+        self.rx_bfrf_gain_text_edit = QLineEdit('FF')
+
+        layout = QGridLayout()
+
+        layout.addWidget(rf_op_freq_label, 0, 0, 1, 2)
+        layout.addWidget(self.rf_op_freq_text_edit, 0, 2, 1, 2)
+        layout.addWidget(tx_bb_gain_label, 1, 0, 1, 1)
+        layout.addWidget(self.tx_bb_gain_text_edit, 1, 1, 1, 1)
+        layout.addWidget(rx_bb_gain_1_label, 1, 2, 1, 1)
+        layout.addWidget(self.rx_bb_gain_1_text_edit, 1, 3, 1, 1)
+
+        layout.addWidget(tx_bb_phase_label, 2, 0, 1, 1)
+        layout.addWidget(self.tx_bb_phase_text_edit, 2, 1, 1, 1)
+        layout.addWidget(rx_bb_gain_2_label, 2, 2, 1, 1)
+        layout.addWidget(self.rx_bb_gain_2_text_edit, 2, 3, 1, 1)
+
+        layout.addWidget(tx_bb_iq_gain_label, 3, 0, 1, 1)
+        layout.addWidget(self.tx_bb_iq_gain_text_edit, 3, 1, 1, 1)
+        layout.addWidget(rx_bb_gain_3_label, 3, 2, 1, 1)
+        layout.addWidget(self.rx_bb_gain_3_text_edit, 3, 3, 1, 1)
+
+        layout.addWidget(tx_bfrf_gain_label, 4, 0, 1, 1)
+        layout.addWidget(self.tx_bfrf_gain_text_edit, 4, 1, 1, 1)
+        layout.addWidget(rx_bfrf_gain_label, 4, 2, 1, 1)
+        layout.addWidget(self.rx_bfrf_gain_text_edit, 4, 3, 1, 1)
+
+        self.fpgaAndSiversSettingsPanel.setLayout(layout)
 
     def checker_gimbal_input_range(self, angle):
 
@@ -1035,9 +1077,21 @@ class WidgetGallery(QDialog):
     def start_meas_button_callback(self):
 
         # Experiment starts
-        self.myhelpera2g.myrfsoc.transmit_signal()
-        self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC')
+        self.myhelpera2g.myrfsoc.transmit_signal(carrier_freq=float(self.rf_op_freq_text_edit.text()),
+                                                tx_bb_gain=int(self.tx_bb_gain_text_edit.text(), 16),
+                                                tx_bb_iq_gain=int(self.tx_bb_iq_gain_text_edit.text(), 16),
+                                                tx_bb_phase=int(self.tx_bb_phase_text_edit.text(), 16),
+                                                tx_bfrf_gain=int(self.tx_bfrf_gain_text_edit.text(), 16))
+        
+        data = {'carrier_freq': float(self.rf_op_freq_text_edit.text()),
+                'rx_gain_ctrl_bb1': int(self.rx_bb_gain_1_text_edit.text(), 16),
+                'rx_gain_ctrl_bb2': int(self.rx_bb_gain_2_text_edit.text(), 16),
+                'rx_gain_ctrl_bb3': int(self.rx_bb_gain_3_text_edit.text(), 16),
+                'rx_gain_ctrl_bfrf': int(self.rx_bfrf_gain_text_edit.text(), 16)}
+        
+        self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC', data=data)
         print("[DEBUG]: SENT REQUEST to START measurement")
+
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(True)
         self.finish_meas_togglePushButton.setEnabled(False)

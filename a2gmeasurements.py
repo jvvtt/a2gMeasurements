@@ -1488,7 +1488,8 @@ class HelperA2GMeasurements(object):
                  rfsoc_static_ip_address=None, #uses the default ip_adress
                  F0=None, L0=None,
                  SPEED=0,
-                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.001):
+                 GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.001,
+                 operating_freq=57.51e9):
         """        
         GROUND station is the server and AIR station is the client.
 
@@ -1534,7 +1535,7 @@ class HelperA2GMeasurements(object):
         print(IsGPS, self.IsGPS)
 
         if IsRFSoC:
-            self.myrfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=rfsoc_static_ip_address)
+            self.myrfsoc = RFSoCRemoteControlFromHost(operating_freq=operating_freq, rfsoc_static_ip_address=rfsoc_static_ip_address)
             print("[DEBUG]: Created RFSoC class")
         if IsGimbal:
             if self.ID == 'GROUND':
@@ -1808,7 +1809,7 @@ class HelperA2GMeasurements(object):
         else:
             print('\n[WARNING]: Action to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
-    def do_start_meas_drone_rfsoc(self):
+    def do_start_meas_drone_rfsoc(self, msg_data):
         """
         This comand is unidirectional. It is sent by the ground station (where the GUI resides) to the drone station.
         The purpose is to START the drone rfsoc measurement (call to 'receive_data').
@@ -1817,7 +1818,7 @@ class HelperA2GMeasurements(object):
         """
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to START measurement")
-            self.myrfsoc.start_thread_receive_meas_data()
+            self.myrfsoc.start_thread_receive_meas_data(msg_data)
     
     def do_stop_meas_drone_rfsoc(self):
         """
@@ -1962,7 +1963,7 @@ class HelperA2GMeasurements(object):
             elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
                 self.do_setgimbal_action(rx_msg['DATA'])
             elif rx_msg['CMD_SOURCE'] == 'STARTDRONERFSOC': # unidirectional command: from gnd node to drone node
-                self.do_start_meas_drone_rfsoc()
+                self.do_start_meas_drone_rfsoc(rx_msg['DATA'])
             elif rx_msg['CMD_SOURCE'] == 'STOPDRONERFSOC': # unidirectional command: from gnd node to drone node
                 self.do_stop_meas_drone_rfsoc()
             elif rx_msg['CMD_SOURCE'] == 'FINISHDRONERFSOC': # unidirectional command: from gnd node to drone node
@@ -2934,7 +2935,7 @@ class RFSoCRemoteControlFromHost():
     It was extended and adpated by Julian D. Villegas G.
     """
     
-    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDPs', operating_freq=57.51e9):
+    def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDAPs', operating_freq=57.51e9):
         self.operating_freq = operating_freq
         self.radio_control_port = radio_control_port
         self.radio_data_port = radio_data_port
@@ -2953,7 +2954,7 @@ class RFSoCRemoteControlFromHost():
         self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
         self.irfs_per_second = 7 # THIS MUST BE FOUND IN BETTER A WAY
         self.MAX_PAP_BUF_SIZE = 250  
-        self.MAX_PAP_BUF_SIZE_BYTES = 1024*64*self.MAX_PAP_BUF_SIZE 
+        self.MAX_PAP_BUF_SIZE_BYTES = self.MAX_PAP_BUF_SIZE * self.bytes_per_irf
         self.idx_last_irf_sent_on_actual_hest = 0
         self.TIME_SNAPS_TO_VIS = 10
         self.TIME_GET_IRF = 0.14
@@ -2985,6 +2986,8 @@ class RFSoCRemoteControlFromHost():
             cmd_arg (str or float): command parameter. This the list of supported parameters for each command:
                                     'setModeSivers'                   'RXen_0_TXen1', 'RXen1_TXen0', 'RXen0_TXen0'
                                     'setCarrierFrequencySivers'        float number, i.e.: 57.51e9
+                                    'setGainTxSivers'    dict with this structure {'tx_bb_gain': 0x00, 'tx_bb_phase': 0x00, 'tx_bb_iq_gain': 0x00, 'tx_bfrf_gain': 0x00}
+                                    'setGainRxSivers'    dict with this structure {'rx_gain_ctrl_bb1':0x00, 'rx_gain_ctrl_bb2':0x00, 'rx_gain_ctrl_bb3':0x00, 'rx_gain_ctrl_bfrf':0x00}
         """
 
         if cmd == 'setModeSivers':
@@ -2995,47 +2998,20 @@ class RFSoCRemoteControlFromHost():
         elif cmd == 'setCarrierFrequencySivers':
             self.radio_control.sendall(b"setCarrierFrequency "+str.encode(str(cmd_arg)))
         elif cmd == 'setGainTxSivers':
-            tx_bb_gain = 0x3 # tx_ctrl bit 3 (BB Ibias set) = 0: 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB
-            # tx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB *
-            
-            tx_bb_phase = 0x0 
-            
-            # Gain in BB:
-            # [0:3, I gain]: 0-6 dB, 16 steps
-            # [4:7, Q gain]: 0-6 dB, 16 steps
-            tx_bb_iq_gain = 0x77 
-            
-            #if cmd_arg > 15 or cmd_arg < 0:
-            #    print("[DEBUG]: Error value for the TX Gain after RF Mixer")
-            #    print("[DEBUG]: Range values for the TX Gain After RF Mixer are [0 - 15] dB")
-            #    return
-            #else:            
-                # Gain after RF mixer:
-                # [0:3, RF gain]: 0-15 dB, 16 steps 
-                # [4:7, BF gain]: 0-15 dB, 16 steps  
-            tx_bfrf_gain = 0x40 
+            tx_bb_gain = cmd_arg['tx_bb_gain']
+            tx_bb_phase = cmd_arg['tx_bb_phase']
+            tx_bb_iq_gain = cmd_arg['tx_bb_iq_gain']
+            tx_bfrf_gain = cmd_arg['tx_bfrf_gain']
 
             self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
                                                         + str.encode(str(int(tx_bb_phase)) + " ") \
                                                         + str.encode(str(int(tx_bb_iq_gain)) + " ") \
                                                         + str.encode(str(int(tx_bfrf_gain))))
         elif cmd == 'setGainRxSivers':
-            # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            # Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            rx_gain_ctrl_bb1 = 0x77 
-            
-            # I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            # Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            rx_gain_ctrl_bb2 = 0x00 
-            
-            # I[0:3]:[0-F]:0:6 dB, 16 steps
-            # Q[0:3]:[0-F]:0:6 dB, 16 steps
-            rx_gain_ctrl_bb3 = 0x99
-            
-            # Gain after RF mixer:
-            # [0:3,RF gain]: 0-15 dB, 16 steps
-            # [4:7, BF gain]: 0-15 dB, 16 steps 
-            rx_gain_ctrl_bfrf = 0xFF
+            rx_gain_ctrl_bb1 = cmd_arg['rx_gain_ctrl_bb1']
+            rx_gain_ctrl_bb2 = cmd_arg['rx_gain_ctrl_bb2']
+            rx_gain_ctrl_bb3 = cmd_arg['rx_gain_ctrl_bb3']
+            rx_gain_ctrl_bfrf = cmd_arg['rx_gain_ctrl_bfrf']
             
             self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
@@ -3055,23 +3031,59 @@ class RFSoCRemoteControlFromHost():
         else:
             print("[DEBUG]: Command ", cmd, " was not successfully executed on Sivers or RFSoC. The following error appears: ", data)
     
-    def transmit_signal(self):
+    def transmit_signal(self, tx_bb_gain=0x3, tx_bb_phase=0, tx_bb_iq_gain=0x77, tx_bfrf_gain=0x40, carrier_freq=57.51e9):
         """
-        Wrapper for commands required to transmit signal from RFSoC.
+        Wrapper function to set Tx gains and frequency of operation
 
-        Once THIS command is executed, the TX on the RFSoC is always transmitting.
+        Args:
+            tx_bb_gain (hexadecimal, optional): Defaults to 0x3.
+             tx_ctrl bit 3 (BB Ibias set) = 0: 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB
+             tx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB
+            tx_bb_phase (int, optional): Defaults to 0.
+            tx_bb_iq_gain (hexadecimal, optional): Defaults to 0x77.
+             Gain in BB:
+             [0:3, I gain]: 0-6 dB, 16 steps
+             [4:7, Q gain]: 0-6 dB, 16 steps
+            tx_bfrf_gain (hexadecimal, optional): Defaults to 0x40.
+             Gain after RF mixer:
+             [0:3, RF gain]: 0-15 dB, 16 steps 
+             [4:7, BF gain]: 0-15 dB, 16 steps  
+            carrier_freq (float, optional): _description_. Defaults to 57.51e9.
+        """
 
-        """ 
+        dict_tx_gains = {'tx_bb_gain': tx_bb_gain, 'tx_bb_phase': tx_bb_phase, 'tx_bb_iq_gain': tx_bb_iq_gain, 'tx_bfrf_gain': tx_bfrf_gain}
 
         self.send_cmd('transmitSamples')
         self.send_cmd('setModeSivers', cmd_arg='RXen0_TXen1')
-        self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
-        self.send_cmd('setGainTxSivers')
+        self.send_cmd('setCarrierFrequencySivers', cmd_arg=carrier_freq)
+        self.send_cmd('setGainTxSivers', cmd_arg=dict_tx_gains)
         
-    def set_rx_rf(self):
+    def set_rx_rf(self, rx_gain_ctrl_bb1=0x77, rx_gain_ctrl_bb2=0x00, rx_gain_ctrl_bb3=0x99, rx_gain_ctrl_bfrf=0xFF, carrier_freq=57.51e9):
+        """
+        Wrapper function to set Rx gains and Frequency of operation
+
+        Args:
+            rx_gain_ctrl_bb1 (hexadecimal, optional): Defaults to 0x77.
+             I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+             Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            rx_gain_ctrl_bb2 (hexadecimal, optional): Defaults to 0x00.
+             I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+             Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            rx_gain_ctrl_bb3 (hexadecimal, optional): Defaults to 0x99.
+             I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+             Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
+            rx_gain_ctrl_bfrf (_type_, optional): Defaults to 0xFF.
+             Gain after RF mixer:
+             [0:3,RF gain]: 0-15 dB, 16 steps
+             [4:7, BF gain]: 0-15 dB, 16 steps 
+            carrier_freq (_type_, optional): _description_. Defaults to 57.51e9.
+        """
+
+        dict_rx_gains = {'rx_gain_ctrl_bb1':rx_gain_ctrl_bb1, 'rx_gain_ctrl_bb2':rx_gain_ctrl_bb2, 'rx_gain_ctrl_bb3':rx_gain_ctrl_bb3, 'rx_gain_ctrl_bfrf':rx_gain_ctrl_bfrf}
+
         self.send_cmd('setModeSivers', cmd_arg='RXen1_TXen0')
-        self.send_cmd('setCarrierFrequencySivers', cmd_arg=self.operating_freq)
-        self.send_cmd('setGainRxSivers')
+        self.send_cmd('setCarrierFrequencySivers', cmd_arg=carrier_freq)
+        self.send_cmd('setGainRxSivers', cmd_arg=dict_rx_gains)
     
     def receive_signal_async(self, stop_event):
         """
@@ -3124,7 +3136,7 @@ class RFSoCRemoteControlFromHost():
         
         self.idx_last_irf_sent_on_actual_hest = 0
 
-    def start_thread_receive_meas_data(self):
+    def start_thread_receive_meas_data(self, msg_data):
         """
         A thread -instead of a subprocess- is good enough since the computational expense
         of the task is not donde in the host computer but in the RFSoC. The host just reads
@@ -3135,7 +3147,11 @@ class RFSoCRemoteControlFromHost():
         """
         self.event_stop_thread_rx_irf = threading.Event()                
         self.thread_rx_irf = threading.Thread(target=self.receive_signal_async, args=(self.event_stop_thread_rx_irf,))
-        self.set_rx_rf()
+        self.set_rx_rf(carrier_freq=msg_data['carrier_freq'],
+                       rx_gain_ctrl_bb1=msg_data['rx_gain_ctrl_bb1'],
+                       rx_gain_ctrl_bb2=msg_data['rx_gain_ctrl_bb2'],
+                       rx_gain_ctrl_bb3=msg_data['rx_gain_ctrl_bb3'],
+                       rx_gain_ctrl_bfrf=msg_data['rx_gain_ctrl_bfrf'])
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
         self.thread_rx_irf.start()
