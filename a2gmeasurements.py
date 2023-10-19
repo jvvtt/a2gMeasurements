@@ -1590,7 +1590,6 @@ class HelperA2GMeasurements(object):
             yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
         """
 
-        # Ground station
         if self.IsGPS:            
             coords, head_info = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
             
@@ -1728,7 +1727,6 @@ class HelperA2GMeasurements(object):
         Function to execute when the received instruction in the a2g comm link is 'GETGPS'.
 
         """
-        
         if self.DBG_LVL_1:
             print(f"THIS ({self.ID}) receives a GETGPS command")
     
@@ -1743,6 +1741,7 @@ class HelperA2GMeasurements(object):
             # 3) The receiver is not connected to enough satellites or multipath propagation is very strong, so that ERROR == 1
             
             data_to_send = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Coordinates')
+            
             if data_to_send['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
                 # More verbose
                 return
@@ -1862,11 +1861,32 @@ class HelperA2GMeasurements(object):
         if cmd_source == 'GETGPS':
             if self.DBG_LVL_1:
                 print(f'\nTHIS ({self.ID}) receives ANS to GETGPS cmd')
+            
             if self.ID =='DRONE':
-                # Invoke c++ function controlling drone's gimbal
-                #1
-            #elif self.ID == 'GROUND':
-                print("[Actually processing GPS from GND]")
+                y_gnd = data['Y']
+                x_gnd = data['X']
+                
+                datum_coordinates = data['Datum']
+                
+                if y_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
+                    print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
+                    return
+
+                # Z is in geocentric coordinates and does not correspond to the actual height:
+                # Geocentric WGS84
+                if datum_coordinates == 0:
+                    lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'])
+                    self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
+                # Geocentric ETRS89
+                elif datum_coordinates == 30:
+                    lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'], EPSG_GEOCENTRIC=4346)
+                    self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
+                else:
+                    print('\nERROR: Not known geocentric datum')
+                    return
+
+                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)
+            elif self.ID == 'GROUND':
                 y_drone = data['Y']
                 x_drone = data['X']
                 
@@ -1907,8 +1927,11 @@ class HelperA2GMeasurements(object):
                             if data['FOLLOW_GIMBAL']: # The corresponding value is True
                                 if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
                                     
-                                    # Has to be absolute movement, cause the 0 is the heading value
-                                    self.myGimbal.setPosControl(yaw=yaw_to_set/10, pitch=pitch_to_set/10) 
+                                    if self.ID == 'DRONE':
+                                        self.myGimbal.setPosControl(yaw=yaw_to_set/10, pitch=pitch_to_set/10) 
+                                    elif self.ID == 'GROUND':
+                                        # Has to be absolute movement, cause the 0 is the heading value
+                                         self.myGimbal.setPosControl(yaw=yaw_to_set, pitch=pitch_to_set/10) 
                                 else:
                                     print('\n[WARNING]: No gimbal available, so no rotation will happen')
                 
@@ -1924,7 +1947,10 @@ class HelperA2GMeasurements(object):
             print(f'\n[DEBUG_1]: THIS ({self.ID}) parses incoming message')
             
         if rx_msg['TYPE'] == 'ANS':
-            print("[DEBUG]: Received ANS from GND")
+            if self.ID == 'DRONE':
+                print("[DEBUG]: Received ANS from GND")
+            elif self.ID == 'GROUND':
+                print("[DEBUG]: Received ANS from DRONE")
             self.process_answer(rx_msg)
         elif rx_msg['TYPE'] == 'CMD':
             if rx_msg['CMD_SOURCE'] == 'FOLLOWGIMBAL':
