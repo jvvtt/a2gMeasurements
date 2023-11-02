@@ -1,3 +1,4 @@
+from scipy.optimize import minimize, minimize_scalar
 from sklearn.linear_model import LinearRegression
 import logging
 from itertools import groupby
@@ -33,6 +34,9 @@ from PyQt5.QtCore import pyqtSignal
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 import pickle
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel
+from sklearn.metrics import mean_squared_error
 
 """
 Author: Julian D. Villegas G.
@@ -2290,6 +2294,8 @@ class GimbalGremsyH16:
             speed_time_elevation_table (ndarray): n x 3. First column is speed, second column is time, third column is elevation. 
         
         """               
+        self.cnt_imu_readings = 0
+        
         if speed_time_azimuth_table is not None:
             self.speed_time_azimuth_table = speed_time_azimuth_table
             self.speed_time_elevation_table = speed_time_elevation_table
@@ -2299,39 +2305,209 @@ class GimbalGremsyH16:
 
         # Assume linear fit:
         # For a longer range of speeds than the used in the default data, it is very likely that the fit won't be linear
-        self.build_linear_fit()    
+        self.fit_model_to_gimbal_angular_data(model='gp')    
+        self.start_imu_thread()
     
-    def build_linear_fit(self):
-        """
-        Fit a plane to the (speed, time, angle) table
+    def define_home_position(self):
+        print("[DEBUG]: Defining HOME for Gremsy... This might take a second")
         
-        """
+        start_time = time.time()
+        yaw_before = 1000 # Set it high for first iteration
+        pitch_before = 1000 # Set it high for first iteration
+        cnt = self.cnt_imu_readings
+        DONT_STOP = True
+        while(DONT_STOP):
+            if cnt != self.cnt_imu_readings:
+                yaw = self.last_imu_reading['YAW']
+                pitch = self.last_imu_reading['PITCH']
+                
+                if yaw - yaw_before <= 1:
+                    CONDITION_YAW_SATISFIED = True
+                else:
+                    CONDITION_YAW_SATISFIED = False
+                    
+                if pitch - pitch_before <= 1:
+                    CONDITION_PITCH_SATISFIED = True
+                else:
+                    CONDITION_PITCH_SATISFIED = False
+                
+                if CONDITION_YAW_SATISFIED and CONDITION_PITCH_SATISFIED:
+                    break        
+            
+                yaw_before = yaw
+                pitch_before = pitch
+                cnt = self.cnt_imu_readings
+
+        self.home_position = {'YAW': yaw, 'PITCH': pitch}
+        print(f"TIME SPENT DEFINE HOME POSITION: {time.time() - start_time}")
+    
+    def start_imu_thread(self, COM_PORT='COM21'):
+        try:
+            self.imu_serial = serial.Serial(COM_PORT, 9600)
+            print("[DEBUG]: Connected to IMU")
+        except Exception as e:
+            print("[DEBUG]: Exception when connecting to IMU: ", e)
+        else:
+            try:
+                self.event_stop_thread_imu = threading.Event()                
+                self.thread_read_imu = threading.Thread(target=self.receive_imu_data, args=(self.event_stop_thread_imu,))
+                self.thread_read_imu.start()
+                print(f"[DEBUG]: READ IMU THREAD STARTED")
+            except Exception as e:
+                print("[DEBUG]: Exception when starting READ IMU thread")
+        #for (this_port, desc, verbose) in sorted(comports()):
+        #    print(f"PORT: {this_port}, DESC: {desc}, verbose: {verbose}")
+    
+    def receive_imu_data(self, stop_event):
+        while not stop_event.is_set():
+            data = self.imu_serial.readline().decode('utf-8').strip()
+            data = data.split(',')
+            
+            self.last_imu_reading = {'YAW': float(data[0]), 'PITCH': float(data[1]), 'ROLL': float(data[2])}
+            self.cnt_imu_readings = self.cnt_imu_readings + 1
+            
+            if self.cnt_imu_readings > 1e12:
+                self.cnt_imu_readings = 0
+            
+        #print(f"YAW: {data[0]}, PITCH: {data[1]}, ROLL: {data[2]}")
+        
+    def stop_thread_imu(self):
+        if self.thread_read_imu.is_alive():
+            self.event_stop_thread_imu.set()
+        
+        self.imu_serial.close()
+        
+    def fit_model_to_gimbal_angular_data(self, model='linear'):      
+        # Define the kernel for Gaussian Process Regressor
+        kernel = 1.0 * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2)) + WhiteKernel(noise_level=1e-5, noise_level_bounds=(1e-10, 1e-3))
+        
         is_positive_azimuth = self.speed_time_azimuth_table > 0
         is_positive_elevation = self.speed_time_elevation_table > 0
         
         X = self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 0:2]
         y = np.rad2deg(self.speed_time_azimuth_table[is_positive_azimuth[:, 0], 2])
-        self.az_speed_pos_regresor = LinearRegression().fit(X, y)
+        if model =='linear':
+            self.az_speed_pos_regresor = LinearRegression().fit(X, y)
+        elif model == 'gp':
+            self.az_speed_pos_regresor = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, random_state=42).fit(X, y)
         self.score_az_speed_pos_regresor = self.az_speed_pos_regresor.score(X, y)
         print("[DEBUG]: POSITIVE SPEEDS (LEFT), AZIMUTH, R^2 Score Linear Reg: ", self.score_az_speed_pos_regresor)
         
         X = self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 0:2]
         y = np.rad2deg(self.speed_time_azimuth_table[~is_positive_azimuth[:, 0], 2])
-        self.az_speed_neg_regresor = LinearRegression().fit(X, y)
+        if model == 'linear':
+            self.az_speed_neg_regresor = LinearRegression().fit(X, y)
+        elif model == 'gp':
+            self.az_speed_neg_regresor = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, random_state=42).fit(X, y)
         self.score_az_speed_neg_regresor = self.az_speed_neg_regresor.score(X, y)
         print("[DEBUG]: NEGATIVE SPEEDS (RIGHT), AZIMUTH, R^2 Score Linear Reg: ", self.score_az_speed_neg_regresor)
         
         X = self.speed_time_elevation_table[~is_positive_elevation[:, 0], 0:2]
         y = np.rad2deg(self.speed_time_elevation_table[~is_positive_elevation[:, 0], 2])
-        self.el_speed_neg_regresor = LinearRegression().fit(X, y)
+        if model == 'linear':
+            self.el_speed_neg_regresor = LinearRegression().fit(X, y)
+        elif model == 'gp':
+            self.el_speed_neg_regresor = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, random_state=42).fit(X, y).fit(X, y)
         self.score_el_speed_neg_regresor = self.el_speed_neg_regresor.score(X, y)
         print("[DEBUG]: NEGATIVE SPEEDS (DOWN), ELEVATION, R^2 Score Linear Reg: ", self.score_el_speed_neg_regresor)
 
         X = self.speed_time_elevation_table[is_positive_elevation[:, 0], 0:2]
         y = np.rad2deg(self.speed_time_elevation_table[is_positive_elevation[:, 0], 2])
-        self.el_speed_pos_regresor = LinearRegression().fit(X, y)
+        if model == 'linear':
+            self.el_speed_pos_regresor = LinearRegression().fit(X, y)
+        elif model == 'gp':
+            self.el_speed_pos_regresor = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, random_state=42).fit(X, y).fit(X, y)
         self.score_el_speed_pos_regresor = self.el_speed_pos_regresor.score(X, y)
-        print("[DEBUG]: POSITIVE SPEEDS (UP), ELEVATION, R^2 Score Linear Reg: ", self.score_el_speed_neg_regresor)   
+        print("[DEBUG]: POSITIVE SPEEDS (UP), ELEVATION, R^2 Score Linear Reg: ", self.score_el_speed_neg_regresor)
+        
+    def setPosControlGPModel(self, yaw=0, pitch=0):
+        """
+        ------------THIS REQUIRES MORE TESTING. A BETTER GRID OF MEASURED SPEED, TIME, ANGLE ---------------------------
+        ------------THIS FUNCTION SHOULD GUARANTEE THAT THE RETURNED TIME (FOR BOTH YAW AND PITCH) IS POSITIVE ----------
+        
+        Computes the speed and time reauired to set the desired angle if using the gp model for the measured angle values
+
+        Args:
+            yaw (float, optional): SHOULD BE FLOAT. Defaults to None.
+            pitch (float, optional): SHOULD BE FLOAT. Defaults to None.
+
+        Raises:
+            Exception: _description_
+
+        Returns:
+            _type_: _description_
+        """
+        start_time = time.time()
+        
+        # Define a function to find the corresponding X values for the desired Y
+        def find_feature_values_for_angle(model, desired_angle, suggested_speed):           
+            # Define a function to minimize (difference between predicted and desired Y)
+            def objective_function(x):
+                #x = np.atleast_2d(x)
+                y = np.array([[suggested_speed, x]])
+                return np.abs(model.predict(y) - desired_angle)
+
+            # Initialize with a guess for speed and time
+            initial_guess = 3
+
+            # Use an optimization method to find the feature values that result in the desired yaw angle
+            result = minimize_scalar(objective_function, bounds=(0, 50), method='bounded')
+            #result = minimize(objective_function, initial_guess, method='Nelder-Mead')
+
+            if result.success:
+                return result.x
+            else:
+                raise Exception("Optimization did not converge.")
+
+        total_time = time.time() - start_time
+                
+        # Find the corresponding feature values (speed and time) for the desired angle
+        if yaw > 0.0 and yaw < 10:
+            speed_yaw = 10.0
+            time_yaw = find_feature_values_for_angle(self.az_speed_pos_regresor, yaw, speed_yaw)
+        elif yaw >= 10.0 and yaw < 60:
+            speed_yaw = 13.0
+            time_yaw = find_feature_values_for_angle(self.az_speed_neg_regresor, yaw, speed_yaw)
+        elif yaw >= 60:
+            speed_yaw = 15.0
+            time_yaw = find_feature_values_for_angle(self.az_speed_neg_regresor, yaw, speed_yaw)
+        if yaw < 0.0 and yaw > -10:
+            speed_yaw = -3.0
+            time_yaw = find_feature_values_for_angle(self.az_speed_pos_regresor, yaw, speed_yaw)
+        elif yaw <= -10.0 and yaw > -60:
+            speed_yaw = -7.0
+            time_yaw = find_feature_values_for_angle(self.az_speed_neg_regresor, yaw, speed_yaw)
+        elif yaw <= -60:
+            speed_yaw = -10.0
+            time_yaw = find_feature_values_for_angle(self.az_speed_neg_regresor, yaw, speed_yaw)
+        elif yaw == 0.0:
+            speed_yaw = 0
+            time_yaw = 0
+        if pitch > 0.0 and pitch < 10.0:
+            speed_pitch = 5.0
+            time_pitch = find_feature_values_for_angle(self.el_speed_pos_regresor, pitch, speed_pitch)
+        elif pitch >=10 and pitch < 60:
+            speed_pitch = 8.0
+            time_pitch = find_feature_values_for_angle(self.el_speed_pos_regresor, pitch, speed_pitch)
+        elif pitch >= 60:
+            speed_pitch = 10.0
+            time_pitch = find_feature_values_for_angle(self.el_speed_pos_regresor, pitch, speed_pitch)
+        elif pitch < 0.0 and pitch > -10:
+            speed_pitch = -5.0
+            time_pitch = find_feature_values_for_angle(self.el_speed_neg_regresor, pitch, speed_pitch)
+        elif pitch <-10 and pitch > -60:
+            speed_pitch = -8.0
+            time_pitch = find_feature_values_for_angle(self.el_speed_neg_regresor, pitch, speed_pitch)
+        elif pitch <= -60:
+            speed_pitch = -10.0
+            time_pitch = find_feature_values_for_angle(self.el_speed_neg_regresor, pitch, speed_pitch)
+        elif pitch == 0.0:
+            speed_pitch = 0
+            time_pitch = 0
+        
+        #print(f"[DEBUG]: Time it took to find the speed and time corresponding to the DESIRED ANGLE: {total_time}")
+        
+        return speed_yaw, time_yaw, speed_pitch, time_pitch
         
     def load_measured_drifts(self):
         """
@@ -2662,8 +2838,15 @@ class GimbalGremsyH16:
     def start_conn(self):
         self.sbus = SBUSEncoder()
         self.sbus.start_sbus(serial_interface='COM20', period_packet=0.015)
+        
+        self.define_home_position()
     
-    def setPosControl(self, yaw, pitch):
+    def stop_conn(self):
+        self.stop_thread_imu()
+        self.stop_thread_gimbal()
+        self.sbus.stop_updating()
+    
+    def setPosControl(self, yaw, pitch, model='linear'):
         """
         Set yaw and pitch
 
@@ -2672,31 +2855,44 @@ class GimbalGremsyH16:
             pitch (float): Angle in degrees. Valid range between [, ]
         """
         
-        # Choose speed for yaw movement
-        if yaw > 0:
-            speed_yaw = -11
-            
-            # Linear regresion model for angle dependence. If different, change this line
-            time_yaw_2_move = (yaw - self.az_speed_neg_regresor.coef_[0]*speed_yaw - self.az_speed_neg_regresor.intercept_)/self.az_speed_neg_regresor.coef_[1]
-        elif yaw < 0:
-            speed_yaw = 15
-            
-            # Linear regresion model for angle dependence. If different, change this line
-            time_yaw_2_move = (np.abs(yaw) - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
-        elif yaw == 0:
-            time_yaw_2_move = 0
-            
-        # Choose speed for pitch movement
-        if pitch > 0:
-            #print("[DEBUG]: Only negative pitch values are allowed")
-            speed_pitch = 10
-            time_pitch_2_move = (pitch - self.el_speed_pos_regresor.coef_[0]*speed_pitch - self.el_speed_pos_regresor.intercept_)/self.el_speed_pos_regresor.coef_[1]
-            #return
-        elif pitch < 0:
-            speed_pitch = -5
-            time_pitch_2_move = (np.abs(pitch) - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
-        elif pitch == 0:
-            time_pitch_2_move = 0
+        if model == 'linear':
+            # Choose speed for yaw movement
+            if yaw > 0:
+                speed_yaw = -11
+                
+                # Linear regresion model for angle dependence. If different, change this line
+                time_yaw_2_move = (yaw - self.az_speed_neg_regresor.coef_[0]*speed_yaw - self.az_speed_neg_regresor.intercept_)/self.az_speed_neg_regresor.coef_[1]
+            elif yaw < 0:
+                speed_yaw = 15
+                
+                # Linear regresion model for angle dependence. If different, change this line
+                time_yaw_2_move = (np.abs(yaw) - self.az_speed_pos_regresor.coef_[0]*speed_yaw - self.az_speed_pos_regresor.intercept_)/self.az_speed_pos_regresor.coef_[1]
+            elif yaw == 0:
+                time_yaw_2_move = 0
+                
+            # Choose speed for pitch movement
+            if pitch > 0:
+                #print("[DEBUG]: Only negative pitch values are allowed")
+                speed_pitch = 10
+                time_pitch_2_move = (pitch - self.el_speed_pos_regresor.coef_[0]*speed_pitch - self.el_speed_pos_regresor.intercept_)/self.el_speed_pos_regresor.coef_[1]
+                #return
+            elif pitch < 0:
+                speed_pitch = -5
+                time_pitch_2_move = (np.abs(pitch) - self.el_speed_neg_regresor.coef_[0]*speed_pitch - self.el_speed_neg_regresor.intercept_)/self.el_speed_neg_regresor.coef_[1]
+            elif pitch == 0:
+                time_pitch_2_move = 0
+                
+        elif model == 'gp':
+            if yaw == 0:
+                yaw = None
+            else:
+                yaw = float(yaw)
+            if pitch == 0:
+                pitch = None
+            else:
+                pitch = float(pitch)
+                
+            speed_yaw, time_yaw_2_move, speed_pitch, time_pitch_2_move = self.setPosControlGPModel(yaw=yaw, pitch=yaw)
         
         if (time_yaw_2_move > 0) and (time_pitch_2_move > 0):
             print("[DEBUG]: Gremsy H16 moves in yaw first: TIME to complete movement: ", time_yaw_2_move)
@@ -2712,7 +2908,7 @@ class GimbalGremsyH16:
         elif (time_yaw_2_move <= 0) and (time_pitch_2_move <= 0):
             print("[DEBUG]: Gremsy H16 will not move")
             return
-    
+            
     def stop_thread_gimbal(self):
         """
         Wrapper to stop_updating from SBUSEncoder
