@@ -1983,6 +1983,55 @@ class HelperA2GMeasurements(object):
                 elif self.ID == 'DRONE':
                     print('Received msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
     
+    def decode_message(data):
+        source_id, destination_id, message_type, cmd, length = struct.unpack('BBBBB', data[:5])
+        data_bytes = data[5:]
+
+        if message_type == 0x01: # SHORT type message
+            if cmd == 0x03 and length == 3: # SETGIMBAL
+                print(len(data_bytes))
+                data_bytes = data_bytes[:12]
+                print(len(data_bytes))
+                yaw, pitch, roll = struct.unpack('fff', data_bytes)
+                return source_id, destination_id, message_type, cmd, length, {'Yaw': yaw, 'Pitch': pitch, 'Roll': roll}
+            elif cmd == 0x04 and length == 5: # STARTDRONERFSOC
+                print(len(data_bytes))
+                data_bytes = data_bytes[:20]
+                print(len(data_bytes))
+                data_array = np.frombuffer(data_bytes, dtype=np.float32)
+                return source_id, destination_id, message_type, cmd, length, data_array
+        elif message_type == 0x02 and cmd == 0x07: # LONG type message
+            last = int(4*length*32)
+            print(len(data_bytes))
+            data_bytes = data_bytes[:last]
+            print(len(data_bytes))
+            data_array = np.frombuffer(data_bytes, dtype=np.float32)
+            data_array = data_array.reshape((length, 32))
+            return source_id, destination_id, message_type, cmd, length, data_array
+
+    def encode_message(source_id, destination_id, message_type, cmd, data_array=None):
+        if message_type == 0x01:
+            if cmd == 0x03 and data_array and len(data_array) == 3:
+                yaw, pitch, roll = data_array
+                data = struct.pack('fff', yaw, pitch, roll)
+                length = 3
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
+            elif cmd == 0x04 and data_array and len(data_array) == 5:
+                data = np.array(data_array, dtype=np.float32)
+                data_bytes = data.tobytes()
+                length = 5
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
+        elif message_type == 0x02 and cmd == 0x07:
+            # For CMD=0x07, data_array should be a 2D array (e.g., 10x32)
+            data = np.array(data_array, dtype=np.float32)
+            data_bytes = data.tobytes()
+            length = len(data_array)
+            message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
+        else:
+            message = None
+
+        return message
+
     def socket_receive(self, stop_event):
         """
         Callback for when receiveing an incoming socket message.
