@@ -56,7 +56,7 @@ class WidgetGallery(QDialog):
         self.SUCCESS_GND_GPS = False
 
         self.create_check_connections_panel()
-       # self.create_log_terminal()
+        #self.create_log_terminal()
         self.create_Gimbal_GND_panel()
         self.create_Gimbal_AIR_panel()
         self.create_fpga_and_sivers_panel()
@@ -69,14 +69,14 @@ class WidgetGallery(QDialog):
         mainLayout.addWidget(self.gimbalTXPanel, 1, 0, 3, 1)
         mainLayout.addWidget(self.gimbalRXPanel, 1, 1, 3, 1)
         mainLayout.addWidget(self.fpgaAndSiversSettingsPanel, 1, 2, 3, 2)
-        #mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 3, 1)
-        #mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 3, 1)
         mainLayout.addWidget(self.pdpPlotPanel, 4, 0, 7, 2)
         mainLayout.addWidget(self.gps_vis_panel, 4, 2, 7, 2)
         mainLayout.addWidget(self.planningMeasurementsPanel, 11, 0, 2, 2)
-       # mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
+        #mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
         
         #self.write_to_log_terminal('Welcome to A2G Measurements Center!')
+
+        #self.original_stdout = sys.stdout
                 
         self.setLayout(mainLayout)
 
@@ -1283,6 +1283,9 @@ class WidgetGallery(QDialog):
             self.periodical_gps_display_thread.cancel()
         if hasattr(self, 'periodical_gimbal_follow_thread'):
             self.periodical_gimbal_follow_thread.cancel()
+        
+        # Last thing to do is to redirect the stdout
+        sys.stdout = self.original_stdout
             
     def eventFilter(self, source, event):
         if event.type()== event.Close:

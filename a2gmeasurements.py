@@ -2424,6 +2424,7 @@ class GimbalGremsyH16:
         """
         ------------THIS REQUIRES MORE TESTING. A BETTER GRID OF MEASURED SPEED, TIME, ANGLE ---------------------------
         ------------THIS FUNCTION SHOULD GUARANTEE THAT THE RETURNED TIME (FOR BOTH YAW AND PITCH) IS POSITIVE ----------
+        ------------WITH ACTUAL DATA THE EXTRAPOLATION DOES NOT GIVE PHYSICAL CONSISTENT RESULTS (i.e. TIME IT TAKES TO MOVE 60 DEG AT SPEED 20 IS SMALLER THAN THE ONE IT TAKES TO MOVE 60 DEG AT A LOWER SPEED)
         
         Computes the speed and time reauired to set the desired angle if using the gp model for the measured angle values
 
