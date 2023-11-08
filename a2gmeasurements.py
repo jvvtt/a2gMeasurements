@@ -1757,20 +1757,22 @@ class HelperA2GMeasurements(object):
             
             if follow_mode_gimbal:
                 print('[DEBUG]: Last coordinates retrieved and followgimbal flag set to True to be sent')
-                data_to_send['FOLLOW_GIMBAL'] = True
+                data_to_send['FOLLOW_GIMBAL'] = 0x01
             
             # data_to_send wont be any of the other error codes, because they are not set for 'what'=='Coordinates'
             else:            
-                data_to_send['FOLLOW_GIMBAL'] = False
-                
+                data_to_send['FOLLOW_GIMBAL'] = 0x02
+            
+            if self.ID == 'GROUND':
+                frame_to_send = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x02, data=data_to_send)
             frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
                 
             if self.DBG_LVL_1:
                 print('\n[DEBUG_1]:Received the GETGPS and read the SBF buffer')
             if self.ID == 'GROUND':
-                self.a2g_conn.sendall(frame_to_send.encode())
+                self.a2g_conn.sendall(frame_to_send)
             if self.ID == 'DRONE':
-                self.socket.sendall(frame_to_send.encode())
+                self.socket.sendall(frame_to_send)
                 
             if self.DBG_LVL_1:
                 print('\n[DEBUG_1]: Sent SBF buffer')
@@ -1849,7 +1851,7 @@ class HelperA2GMeasurements(object):
         if self.ID == 'DRONE':
             self.CONN_MUST_OVER_FLAG = True
 
-    def process_answer(self, msg):
+    def process_answer_get_gps(self, data):
         """
         This function is in charge of processing the answer message received. So far, the only message that requires
         an answer is the "GETGPS" command type message. The "GETGPS" command is used to update the gimbal orientation.
@@ -1858,87 +1860,79 @@ class HelperA2GMeasurements(object):
             msg (dictionary): 
         """
         if self.DBG_LVL_1:
-                print(f'\nTHIS ({self.ID}) receives protocol ANS')
-                
-        cmd_source = msg['CMD_SOURCE']        
-        data = msg['DATA']
-
-        if cmd_source == 'GETGPS':
-            if self.DBG_LVL_1:
-                print(f'\nTHIS ({self.ID}) receives ANS to GETGPS cmd')
+            print(f'\nTHIS ({self.ID}) receives protocol ANS')
             
-            if self.ID =='DRONE':
-                y_gnd = data['Y']
-                x_gnd = data['X']
+        if self.ID =='DRONE':
+            y_gnd = data['Y']
+            x_gnd = data['X']
                 
-                datum_coordinates = data['Datum']
+            datum_coordinates = data['Datum']
                 
-                if y_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
-                    print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
-                    return
+            if y_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_gnd == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
+                print('[ERROR]: no GPS coordinates received from DRONE through socket link')
+                return
 
                 # Z is in geocentric coordinates and does not correspond to the actual height:
                 # Geocentric WGS84
-                if datum_coordinates == 0:
-                    lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'])
-                    self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
+            if datum_coordinates == 0:
+                lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'])
+                self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
                 # Geocentric ETRS89
-                elif datum_coordinates == 30:
-                    lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'], EPSG_GEOCENTRIC=4346)
-                    self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
-                else:
-                    print('\nERROR: Not known geocentric datum')
-                    return
+            elif datum_coordinates == 30:
+                lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'], EPSG_GEOCENTRIC=4346)
+                self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
+            else:
+                print('[ERROR]: Not known geocentric datum')
+                return
 
-                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)
-            elif self.ID == 'GROUND':
-                y_drone = data['Y']
-                x_drone = data['X']
+            yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)
+        elif self.ID == 'GROUND':
+            y_drone = data['Y']
+            x_drone = data['X']
                 
-                datum_coordinates = data['Datum']
+            datum_coordinates = data['Datum']
                 
-                if y_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
-                    print('\n[ERROR]: no GPS coordinates received from DRONE through socket link')
-                    return
+            if y_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL or x_drone == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
+                print('[ERROR]: no GPS coordinates received from DRONE through socket link')
+                return
 
                 # Z is in geocentric coordinates and does not correspond to the actual height:
                 # Geocentric WGS84
-                if datum_coordinates == 0:
-                    lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'])
-                    self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
+            if datum_coordinates == 0:
+                lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'])
+                self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
                 # Geocentric ETRS89
-                elif datum_coordinates == 30:
-                    lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'], EPSG_GEOCENTRIC=4346)
-                    self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
-                else:
-                    print('\nERROR: Not known geocentric datum')
-                    return
+            elif datum_coordinates == 30:
+                lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'], EPSG_GEOCENTRIC=4346)
+                self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
+            else:
+                print('[ERROR]: Not known geocentric datum')
+                return
 
-                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
-                
-                print("[A priori yaw and pitch are]: ", yaw_to_set, pitch_to_set)
+            yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
                 # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the gimbal_follows_drone method
-                while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
-                    yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
+            while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
+                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
-                if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
-                    print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
-                else:
-                    print(f"[WARNING]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
+            if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+                print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
+            else:
+                print(f"[DEBUG]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
                     
-                    if 'FOLLOW_GIMBAL' in data: # The dictionary key has been created
-                        if data['FOLLOW_GIMBAL'] is not None: # The dictionary key is not empty
-                            if data['FOLLOW_GIMBAL']: # The corresponding value is True
-                                if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
-                                    
-                                    if self.ID == 'DRONE':
-                                        self.myGimbal.setPosControl(yaw=yaw_to_set/10, pitch=pitch_to_set/10) 
-                                    elif self.ID == 'GROUND':
-                                        # Has to be absolute movement, cause the 0 is the heading value
-                                         self.myGimbal.setPosControl(yaw=yaw_to_set, pitch=pitch_to_set/10) 
-                                else:
-                                    print('\n[WARNING]: No gimbal available, so no rotation will happen')
+                if data['FOLLOW_GIMBAL'] == 0x01: # True, Follow gimbal
+                    if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
+                        if self.ID == 'DRONE':
+                            self.myGimbal.setPosControl(yaw=yaw_to_set/10, pitch=pitch_to_set/10) 
+                            print(f"[DEBUG]: This {self.ID} gimbal WILL follow its pair node as stated by user")
+                        elif self.ID == 'GROUND':
+                                # Has to be absolute movement, cause the 0 is the heading value
+                            self.myGimbal.setPosControl(yaw=yaw_to_set, pitch=pitch_to_set/10) 
+                            print(f"[DEBUG]: This {self.ID} gimbal WILL follow its pair node as stated by user")
+                    else:
+                        print('[WARNING]: No gimbal available, so no rotation will happen')
+                elif data['FOLLOW_GIMBAL'] == 0x02: # False
+                    print(f"[DEBUG]: This {self.ID} gimbal will NOT follow its pair node as stated by user")
                 
     def parse_rx_msg(self, rx_msg):
         """
@@ -1956,7 +1950,7 @@ class HelperA2GMeasurements(object):
                 print("[DEBUG]: Received ANS from GND")
             elif self.ID == 'GROUND':
                 print("[DEBUG]: Received ANS from DRONE")
-            self.process_answer(rx_msg)
+            self.process_answer_get_gps(rx_msg)
         elif rx_msg['TYPE'] == 'CMD':
             if rx_msg['CMD_SOURCE'] == 'FOLLOWGIMBAL':
                 print("[DEBUG]: Received FOLLOWGIMBAL msg")
@@ -1983,52 +1977,119 @@ class HelperA2GMeasurements(object):
                 elif self.ID == 'DRONE':
                     print('Received msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
     
-    def decode_message(data):
+    def decode_message(self, data):
         source_id, destination_id, message_type, cmd, length = struct.unpack('BBBBB', data[:5])
         data_bytes = data[5:]
 
-        if message_type == 0x01: # SHORT type message
-            if cmd == 0x03 and length == 3: # SETGIMBAL
-                print(len(data_bytes))
-                data_bytes = data_bytes[:12]
-                print(len(data_bytes))
+        if message_type == 0x01: # SHORT cmd type message
+            if cmd == 0x01 and length == 0: # FOLLOWGIMBAL
+                print(f"THIS {self.ID} receives FOLLOWGIMBAL cmd")
+                self.do_follow_mode_gimbal()
+            elif cmd == 0x02 and length == 0: # GETGPS
+                print(f"THIS {self.ID} receives GETGPS cmd")
+                self.do_getgps_action()
+            elif cmd == 0x03 and length == 3: # SETGIMBAL
+                print(f"THIS {self.ID} receives SETGIMBAL cmd")
+                data_bytes = data_bytes[:12] # 3 float32 array entries
                 yaw, pitch, roll = struct.unpack('fff', data_bytes)
-                return source_id, destination_id, message_type, cmd, length, {'Yaw': yaw, 'Pitch': pitch, 'Roll': roll}
+                self.do_setgimbal_action({'YAW': yaw, 'ROLL': roll, 'PITCH': pitch})
             elif cmd == 0x04 and length == 5: # STARTDRONERFSOC
-                print(len(data_bytes))
-                data_bytes = data_bytes[:20]
-                print(len(data_bytes))
+                print(f"THIS {self.ID} receives STARTDRONERFSOC cmd")
+                data_bytes = data_bytes[:20] # 5 float32 array entries
                 data_array = np.frombuffer(data_bytes, dtype=np.float32)
+                msg_data = {'carrier_freq': data_array[0],
+                            'rx_gain_ctrl_bb1': data_array[1],
+                            'rx_gain_ctrl_bb2': data_array[2],
+                            'rx_gain_ctrl_bb3': data_array[3],
+                            'rx_gain_ctrl_bfrf': data_array[4]}
+                self.do_start_meas_drone_rfsoc(msg_data)
+            elif cmd == 0x05 and length == 0: # STOPDRONERFSOC
+                print(f"THIS {self.ID} receives STOPDRONERFSOC cmd")
+                self.do_stop_meas_drone_rfsoc()
+            elif cmd == 0x06 and length == 0: # FINISHDRONERFSOC
+                print(f"THIS {self.ID} receives FINISHDRONERFSOC cmd")
+                self.do_finish_meas_drone_rfsoc()
+            elif cmd == 0x07 and length == 0: # CLOSEDGUI
+                print(f"THIS {self.ID} receives CLOSEDGUI cmd")
+                self.do_closed_gui_action()
+            else:
+                print("[DEBUG]: cmd not known when decoding.  No action will be done")
+        elif message_type == 0x02: # LONG cmd type msg
+            if cmd == 0x01: # SETIRF
+                last = int(4*length*16) # The data type of the array entries is float32 and it will have always 16 beams and variable number of time snapshots
+                data_bytes = data_bytes[:last]
+                data_array = np.frombuffer(data_bytes, dtype=np.float32)
+                data_array = data_array.reshape((length, 32))
                 return source_id, destination_id, message_type, cmd, length, data_array
-        elif message_type == 0x02 and cmd == 0x07: # LONG type message
-            last = int(4*length*32)
-            print(len(data_bytes))
-            data_bytes = data_bytes[:last]
-            print(len(data_bytes))
-            data_array = np.frombuffer(data_bytes, dtype=np.float32)
-            data_array = data_array.reshape((length, 32))
-            return source_id, destination_id, message_type, cmd, length, data_array
+            else:
+                print("[DEBUG]: cmd not known when decoding.  No action will be done")
+        elif message_type == 0x03: # ANS type
+            if cmd == 0x01: # Response to GETGPS
+                print(f'THIS ({self.ID}) receives ANS to GETGPS cmd')
+                data_bytes = data_bytes[:26]
+                x,y,z,datum,follow_gimbal = struct.unpack('dddBB', data_bytes)
+                msg_data = {'X': x, 'Y': y, 'Z': z, 'Datum': datum, 'FOLLOW_GIMBAL': follow_gimbal}
+                self.process_answer_get_gps(msg_data)
+            else:
+                print("[DEBUG]: cmd not known when decoding.  No action will be done")
+        else:
+            print("[WARNING]: message_type not known when decoding. No action will be done")
 
-    def encode_message(source_id, destination_id, message_type, cmd, data_array=None):
-        if message_type == 0x01:
-            if cmd == 0x03 and data_array and len(data_array) == 3:
-                yaw, pitch, roll = data_array
-                data = struct.pack('fff', yaw, pitch, roll)
+    def encode_message(source_id, destination_id, message_type, cmd, data=None):
+        """_summary_
+
+        Args:
+            source_id (_type_): _description_
+            destination_id (_type_): _description_
+            message_type (_type_): _description_
+            cmd (_type_): _description_
+            data (list of lists, list or dict, optional): SETGIMBAL is a dict.
+                                                          STARTDRONERFOSC is a list. 
+                                                          SETIRF is a list of list.
+                                                          Response to GPS is a dict.
+        Returns:
+            _type_: _description_
+        """
+        if message_type == 0x01: # SHORT type of message
+            if cmd == 0x01: # FOLLOWGIMBAL
+                length = 0
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
+            elif cmd == 0x02: # GETGPS
+                length = 0
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
+            elif cmd == 0x03 and data and len(data) == 3: # SETGIMBAL
+                data = struct.pack('fff', data['YAW'], data['PITCH'], data['ROLL'])
                 length = 3
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
-            elif cmd == 0x04 and data_array and len(data_array) == 5:
-                data = np.array(data_array, dtype=np.float32)
+            elif cmd == 0x04 and data and len(data) == 5: # STARTDRONERFSOC
+                data = np.array(data, dtype=np.float32)
                 data_bytes = data.tobytes()
                 length = 5
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
-        elif message_type == 0x02 and cmd == 0x07:
-            # For CMD=0x07, data_array should be a 2D array (e.g., 10x32)
-            data = np.array(data_array, dtype=np.float32)
-            data_bytes = data.tobytes()
-            length = len(data_array)
+            elif cmd == 0x05: # STOPDRONERFSOC
+                length = 0
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
+            elif cmd == 0x06: # FINISHDRONERFSOC
+                length = 0
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
+            elif cmd == 0x07: # CLOSEDGUI
+                length = 0
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
+        elif message_type == 0x02: #LONG type message
+            if cmd == 0x07: # SETIRF
+                if data is None:
+                    print("[DEBUG]: An array must be provided")
+                    return
+                data = np.array(data, dtype=np.float32)
+                data_bytes = data.tobytes()
+                length = len(data)
             message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
+        elif message_type == 0x03: # ANS message type
+            if cmd == 0x01: # Response to GETGPS
+                message = struct.pack('dddBB', data['X'], data['Y'], data['Z'], data['Datum'], data['FOLLOW_GIMBAL'])
         else:
-            message = None
+            print("[DEBUG]: message_type not known when encoding.")
+            return
 
         return message
 
@@ -2046,14 +2107,14 @@ class HelperA2GMeasurements(object):
             try:
                 # Send everything in a json serialized packet
                 if self.ID == 'GROUND':
-                    data = json.loads(self.a2g_conn.recv(2048).decode())
+                    data = self.a2g_conn.recv(4096) # Up to 1 message of 63 rows and 16 cols of float32 entries
                 elif self.ID == 'DRONE':
-                    data = json.loads(self.socket.recv(2048).decode())
+                    data = self.socket.recv(4096)
                 if data:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: This is the data received: ', data)
                     #print('[DEBUG]: This is the data received: ', len(data['DATA']), len(data['DATA'][0]))
-                    self.parse_rx_msg(data)
+                    self.decode_message(data)
                 else:
                     if self.DBG_LVL_0:
                         print('\n[DEBUG_0]: "data" in "if data" in "socket_receive" is None')
