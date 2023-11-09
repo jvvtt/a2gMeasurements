@@ -484,86 +484,6 @@ class GimbalRS2(object):
                 
         if self.DBG_LVL_0:
             print("Stopped receiving messages")
-
-    def on_press(self, key):
-        """Keboard handling. This function is called when the user press a button. Its an early implementation of the GUI to request
-        for specific actions on the gimbal. REPLACED BY WEBAPP 
-
-        Args:
-            key (char): the pressed key
-        """
-        '''
-        if hasattr(key, 'char'):
-            print('Pressed: {}'.format(key.char))
-        else:
-            print('special key pressed: {0}'.format(key))
-
-        '''
-
-    def on_release(self, key):
-        """Keboard handling. This function is called when the user releases a button. Its an early implementation of the GUI to request
-        for specific actions on the gimbal. REPLACED BY WEB APP
-
-        Provides gimbal control through keyboard
-       
-        Args:
-            key (char): the released key
-
-        Returns:
-            boolean: If 'False' the keyboard thread is stopped
-        """
-
-        if self.keyboard_set_flag:
-            self.keyboard_buff.append(key.char)
-
-        if hasattr(key, 'char'):
-            #print('Released: {}'.format(key.char))
-
-            if key.char == 'r':
-                print('REQUEST GIMBAL POSITION')
-                self.request_current_position()
-
-            elif key.char == 's':
-                print('SETTING GIMBAL POSITION...')
-                self.keyboard_set_flag = True
-
-            elif key.char == 'q':
-                self.keyboard_set_flag = False
-                
-                # Delete the 'q' from the buffer (last item)
-                self.keyboard_buff.pop()
-
-                lop = ''
-                lop_v = []
-
-                for x in self.keyboard_buff:
-                    if x == ',':
-                        lop_v.append(int(lop))
-                        lop = ''
-                    else:
-                        lop = lop + x
-
-                if lop != '':
-                    lop_v.append(int(lop))
-                    lop = ''
-
-                print('ENTERED: ', lop_v)
-                yaw = lop_v[0]
-                roll = lop_v[1]
-                pitch = lop_v[2]
-                
-                self.setPosControl(yaw, roll, pitch, time_for_action=0x1A)
-
-                print('GIMBAL POSITION SET')
-
-                # Flush the keyboard buffer
-                self.keyboard_buff = []
-
-            elif key == keyboard.Key.esc:
-                self.MAIN_LOOP_STOP = False
-
-                # Returning False Stops the listener
-                return False
     
     def start_thread_gimbal(self, bitrate=1000000):
         """
@@ -1672,58 +1592,6 @@ class HelperA2GMeasurements(object):
         
         return yaw_to_set, pitch_to_set
     
-    def build_a2g_frame(self, type_frame='cmd', data=None, cmd=None, cmd_source_for_ans=None):
-        """
-        Builds the frame for the a2g communication messages.
-
-        Args:
-            type_frame (str, optional): 'cmd' or 'ans'. Defaults to 'cmd'.
-            data (str, optional): data to be set with the 'cmd' (i.e. for the comand 'SETGIMBAL', data contains the gimbal position to be set).
-                                  Or data to be sent in 'ans' frame. 
-            cmd (str, optional): List of commands includes:
-                                'GETGPS', 
-                                'SETGIMBAL', 
-                                'STARTDRONERFSOC', 
-                                'STOPDRONERFSOC', 
-                                'FINISHDRONERFSOC',
-                                'FOLLOWGIMBAL',
-                                'SETIRF',
-                                'CLOSEDGUI'.
-                                Defaults to None.
-            cmd_source_for_ans (str, optional): always provide which command you are replying to, in the answer frame.
-            
-        Returns:
-            frame (str): this might be a string array containing a json-converted dictionary(i.e. ANS frames) or other type of object (SNDDATA).    
-        
-        """
-        encode_numpy = False
-        if type_frame == 'cmd':
-            frame = {'TYPE': 'CMD'}
-            frame['CMD_SOURCE'] = cmd
-            
-            if cmd == 'SETIRF':
-                encode_numpy = True
-                
-                # This is exepcting a list
-                if len(data)>0:
-                    frame['DATA'] = data
-            else:
-                # This is expecting a string or a single value for data
-                if data:
-                    frame['DATA'] = data
-        
-        elif type_frame =='ans':
-            frame = {'TYPE': 'ANS'}
-            
-            if data:
-                frame['CMD_SOURCE'] = cmd_source_for_ans
-                frame['DATA'] =  data
-                
-        if encode_numpy:
-            return json.dumps(frame, cls=NumpyArrayEncoder)
-        else:
-            return json.dumps(frame)
-
     def do_follow_mode_gimbal(self):
         self.do_getgps_action(follow_mode_gimbal=True)
     
@@ -1764,8 +1632,7 @@ class HelperA2GMeasurements(object):
                 data_to_send['FOLLOW_GIMBAL'] = 0x02
             
             if self.ID == 'GROUND':
-                frame_to_send = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x02, data=data_to_send)
-            frame_to_send = self.build_a2g_frame(type_frame='ans', data=data_to_send, cmd_source_for_ans='GETGPS')
+                frame_to_send = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x03, cmd=0x01, data=data_to_send)
                 
             if self.DBG_LVL_1:
                 print('\n[DEBUG_1]:Received the GETGPS and read the SBF buffer')
@@ -1934,49 +1801,6 @@ class HelperA2GMeasurements(object):
                 elif data['FOLLOW_GIMBAL'] == 0x02: # False
                     print(f"[DEBUG]: This {self.ID} gimbal will NOT follow its pair node as stated by user")
                 
-    def parse_rx_msg(self, rx_msg):
-        """
-        Handles the received socket data. 
-
-        Args:
-            rx_msg (str): received data from socket
-        """
-
-        if self.DBG_LVL_1:
-            print(f'\n[DEBUG_1]: THIS ({self.ID}) parses incoming message')
-            
-        if rx_msg['TYPE'] == 'ANS':
-            if self.ID == 'DRONE':
-                print("[DEBUG]: Received ANS from GND")
-            elif self.ID == 'GROUND':
-                print("[DEBUG]: Received ANS from DRONE")
-            self.process_answer_get_gps(rx_msg)
-        elif rx_msg['TYPE'] == 'CMD':
-            if rx_msg['CMD_SOURCE'] == 'FOLLOWGIMBAL':
-                print("[DEBUG]: Received FOLLOWGIMBAL msg")
-                self.do_follow_mode_gimbal()            
-            if rx_msg['CMD_SOURCE'] == 'GETGPS':
-                print("[DEBUG]: Received GETGPS msg")
-                self.do_getgps_action()
-            elif rx_msg['CMD_SOURCE'] == 'SETGIMBAL':
-                self.do_setgimbal_action(rx_msg['DATA'])
-            elif rx_msg['CMD_SOURCE'] == 'STARTDRONERFSOC': # unidirectional command: from gnd node to drone node
-                self.do_start_meas_drone_rfsoc(rx_msg['DATA'])
-            elif rx_msg['CMD_SOURCE'] == 'STOPDRONERFSOC': # unidirectional command: from gnd node to drone node
-                self.do_stop_meas_drone_rfsoc()
-            elif rx_msg['CMD_SOURCE'] == 'FINISHDRONERFSOC': # unidirectional command: from gnd node to drone node
-                self.do_finish_meas_drone_rfsoc()
-            elif rx_msg['CMD_SOURCE'] == 'SETIRF': # unidirectional command: from drone node to gnd node
-                print("[DEBUG]: Received SETIRF cmd")
-                self.do_set_irf_action(rx_msg['DATA'])
-            elif rx_msg['CMD_SOURCE'] == 'CLOSEDGUI': # unidirectional command: from drone node to gnd node
-                self.do_closed_gui_action()
-            elif rx_msg['CMD_SOURCE'] == 'DEBUG_WIFI_RANGE':
-                if self.ID == 'GROUND':
-                    print('Received msg from ' + self.CLIENT_ADDRESS[0] + ' is: ' + rx_msg['DATA'])
-                elif self.ID == 'DRONE':
-                    print('Received msg from ' + self.SERVER_ADDRESS + ' is: ' + rx_msg['DATA'])
-    
     def decode_message(self, data):
         source_id, destination_id, message_type, cmd, length = struct.unpack('BBBBB', data[:5])
         data_bytes = data[5:]
@@ -1995,13 +1819,13 @@ class HelperA2GMeasurements(object):
                 self.do_setgimbal_action({'YAW': yaw, 'ROLL': roll, 'PITCH': pitch})
             elif cmd == 0x04 and length == 5: # STARTDRONERFSOC
                 print(f"THIS {self.ID} receives STARTDRONERFSOC cmd")
-                data_bytes = data_bytes[:20] # 5 float32 array entries
-                data_array = np.frombuffer(data_bytes, dtype=np.float32)
-                msg_data = {'carrier_freq': data_array[0],
-                            'rx_gain_ctrl_bb1': data_array[1],
-                            'rx_gain_ctrl_bb2': data_array[2],
-                            'rx_gain_ctrl_bb3': data_array[3],
-                            'rx_gain_ctrl_bfrf': data_array[4]}
+                data_bytes = data_bytes[:12] # 1 float32 and 4 int16
+                carr_freq, rx_1, rx_2, rx_3, rx_bfrf = struct.unpack('fHHHH', data_bytes)
+                msg_data = {'carrier_freq': carr_freq,
+                            'rx_gain_ctrl_bb1': rx_1,
+                            'rx_gain_ctrl_bb2': rx_2,
+                            'rx_gain_ctrl_bb3': rx_3,
+                            'rx_gain_ctrl_bfrf': rx_bfrf}
                 self.do_start_meas_drone_rfsoc(msg_data)
             elif cmd == 0x05 and length == 0: # STOPDRONERFSOC
                 print(f"THIS {self.ID} receives STOPDRONERFSOC cmd")
@@ -2020,7 +1844,7 @@ class HelperA2GMeasurements(object):
                 data_bytes = data_bytes[:last]
                 data_array = np.frombuffer(data_bytes, dtype=np.float32)
                 data_array = data_array.reshape((length, 32))
-                return source_id, destination_id, message_type, cmd, length, data_array
+                self.do_set_irf_action(data_array)
             else:
                 print("[DEBUG]: cmd not known when decoding.  No action will be done")
         elif message_type == 0x03: # ANS type
@@ -2035,7 +1859,7 @@ class HelperA2GMeasurements(object):
         else:
             print("[WARNING]: message_type not known when decoding. No action will be done")
 
-    def encode_message(source_id, destination_id, message_type, cmd, data=None):
+    def encode_message(self, source_id, destination_id, message_type, cmd, data=None):
         """_summary_
 
         Args:
@@ -2045,7 +1869,7 @@ class HelperA2GMeasurements(object):
             cmd (_type_): _description_
             data (list of lists, list or dict, optional): SETGIMBAL is a dict.
                                                           STARTDRONERFOSC is a list. 
-                                                          SETIRF is a list of list.
+                                                          SETIRF is an 2D array .
                                                           Response to GPS is a dict.
         Returns:
             _type_: _description_
@@ -2062,10 +1886,8 @@ class HelperA2GMeasurements(object):
                 length = 3
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
             elif cmd == 0x04 and data and len(data) == 5: # STARTDRONERFSOC
-                data = np.array(data, dtype=np.float32)
-                data_bytes = data.tobytes()
                 length = 5
-                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
+                message = struct.pack('BBBBBfHHHH', source_id, destination_id, message_type, cmd, length, data['carrier_freq'], data['rx_gain_ctrl_bb1'], data['rx_gain_ctrl_bb2'], data['rx_gain_ctrl_bb3'], data['rx_gain_ctrl_bfrf'])
             elif cmd == 0x05: # STOPDRONERFSOC
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
@@ -2076,14 +1898,13 @@ class HelperA2GMeasurements(object):
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
         elif message_type == 0x02: #LONG type message
-            if cmd == 0x07: # SETIRF
+            if cmd == 0x01: # SETIRF
                 if data is None:
                     print("[DEBUG]: An array must be provided")
                     return
-                data = np.array(data, dtype=np.float32)
                 data_bytes = data.tobytes()
                 length = len(data)
-            message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
         elif message_type == 0x03: # ANS message type
             if cmd == 0x01: # Response to GETGPS
                 message = struct.pack('dddBB', data['X'], data['Y'], data['Z'], data['Datum'], data['FOLLOW_GIMBAL'])
@@ -2152,14 +1973,27 @@ class HelperA2GMeasurements(object):
             data (object, optional): _description_. Defaults to None.
         """
 
-        frame = self.build_a2g_frame(type_frame='cmd', cmd=type_cmd, data=data)
-        
+        if type_cmd == 'SETGIMBAL':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x03, data=data)
+        elif type_cmd == 'FOLLOWGMBAL':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x01)
+        elif type_cmd == 'GETGPS':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x02)
+        elif type_cmd == 'CLOSEDGUI':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x07)
+        elif type_cmd == 'STARTDRONERFSOC':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x04, data=data)
+        elif type_cmd == 'STOPDRONERFSOC':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x05)
+        elif type_cmd == 'FINISHDRONERFSOC':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x06)
+        elif type_cmd == 'SETIRF':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x02, cmd=0x01, data=data)
         if self.ID == 'DRONE':
-            self.socket.sendall(frame.encode())
+            self.socket.sendall(frame)
         elif self.ID == 'GROUND':
-            self.a2g_conn.sendall(frame.encode())
-            if type_cmd == 'FOLLOWGIMBAL':
-                print("[DEBUG]: FOLLOWGIMBAL cmd sent")
+            self.a2g_conn.sendall(frame)
+        print(f"[DEBUG]: This {self.ID} node sends {type_cmd} cmd")
     
     def az_rot_gnd_gimbal_toggle_sig_generator(self, Naz, meas_time=10, filename=None):
         """
@@ -3421,13 +3255,16 @@ class RFSoCRemoteControlFromHost():
             self.data_to_visualize = np.array(self.hest)
             self.data_to_visualize = np.abs(self.data_to_visualize)
             self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
-            if self.data_to_visualize.shape[0] >= 20:
-                self.data_to_visualize = self.data_to_visualize[:21, ::8]
-            else:
-                self.data_to_visualize = self.data_to_visualize[:, ::8]
-            self.data_to_visualize = self.data_to_visualize.astype(np.int32)
             
-            print("[DEBUG]: Computed pap to be sent")
+            # FOR MAX_PAP_BUF_SIZE = 250, THIS GIVES EXACTLY 63 TIME SNAPSHOTS
+            self.data_to_visualize = self.data_to_visualize[::4, ::16]
+            
+            # Non expensive Double check
+            if self.data_to_visualize.shape[0] > 63:
+                self.data_to_visualize = self.data_to_visualize[:63, ::16]
+            #self.data_to_visualize = self.data_to_visualize.tolist()
+            
+            print(f"[DEBUG]: Computed pap to be sent")
     
     def save_hest_buffer(self):
         datestr = datetime.datetime.now()
