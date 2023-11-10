@@ -1645,7 +1645,8 @@ class HelperA2GMeasurements(object):
                 print('\n[DEBUG_1]: Sent SBF buffer')
     
         else:
-            print('\n[WARNING]:ASKED for GPS position but no GPS connected: IsGPS is False')
+            #print('[WARNING]:ASKED for GPS position but no GPS connected: IsGPS is False')
+            1
     
     def do_setgimbal_action(self, msg_data):
         """
@@ -1712,7 +1713,6 @@ class HelperA2GMeasurements(object):
     def do_set_irf_action(self, msg_data):
         if self.ID == 'GROUND': # double checj that we are in the gnd
             self.PAP_TO_PLOT = np.asarray(msg_data)
-            print("[DEBUG]: Received PAP of shape: ", self.PAP_TO_PLOT.shape)
     
     def do_closed_gui_action(self):
         if self.ID == 'DRONE':
@@ -1807,7 +1807,7 @@ class HelperA2GMeasurements(object):
 
         if message_type == 0x01: # SHORT cmd type message
             if cmd == 0x01 and length == 0: # FOLLOWGIMBAL
-                print(f"THIS {self.ID} receives FOLLOWGIMBAL cmd")
+                #print(f"THIS {self.ID} receives FOLLOWGIMBAL cmd")
                 self.do_follow_mode_gimbal()
             elif cmd == 0x02 and length == 0: # GETGPS
                 print(f"THIS {self.ID} receives GETGPS cmd")
@@ -1840,10 +1840,11 @@ class HelperA2GMeasurements(object):
                 print("[DEBUG]: cmd not known when decoding.  No action will be done")
         elif message_type == 0x02: # LONG cmd type msg
             if cmd == 0x01: # SETIRF
+                print(f"THIS {self.ID} receives SETIRF cmd. Time snaps: {length}")
                 last = int(4*length*16) # The data type of the array entries is float32 and it will have always 16 beams and variable number of time snapshots
                 data_bytes = data_bytes[:last]
                 data_array = np.frombuffer(data_bytes, dtype=np.float32)
-                data_array = data_array.reshape((length, 32))
+                data_array = data_array.reshape((length, 16))
                 self.do_set_irf_action(data_array)
             else:
                 print("[DEBUG]: cmd not known when decoding.  No action will be done")
@@ -1886,8 +1887,9 @@ class HelperA2GMeasurements(object):
                 length = 3
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
             elif cmd == 0x04 and data and len(data) == 5: # STARTDRONERFSOC
+                data = struct.pack('fHHHH', data['carrier_freq'], data['rx_gain_ctrl_bb1'], data['rx_gain_ctrl_bb2'], data['rx_gain_ctrl_bb3'], data['rx_gain_ctrl_bfrf'])
                 length = 5
-                message = struct.pack('BBBBBfHHHH', source_id, destination_id, message_type, cmd, length, data['carrier_freq'], data['rx_gain_ctrl_bb1'], data['rx_gain_ctrl_bb2'], data['rx_gain_ctrl_bb3'], data['rx_gain_ctrl_bfrf'])
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
             elif cmd == 0x05: # STOPDRONERFSOC
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)

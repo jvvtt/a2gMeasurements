@@ -55,6 +55,8 @@ class WidgetGallery(QDialog):
         self.SUCCESS_GND_GIMBAL = False
         self.SUCCESS_GND_GPS = False
 
+        #self.original_stdout = sys.stdout
+
         self.create_check_connections_panel()
         #self.create_log_terminal()
         self.create_Gimbal_GND_panel()
@@ -75,13 +77,11 @@ class WidgetGallery(QDialog):
         #mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
         
         #self.write_to_log_terminal('Welcome to A2G Measurements Center!')
-
-        #self.original_stdout = sys.stdout
                 
         self.setLayout(mainLayout)
 
         self.showMaximized()
-    
+
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
         """
         Checks ssh connection betwwen ground node (running the GUI) and the computer on the drone.
@@ -431,7 +431,6 @@ class WidgetGallery(QDialog):
                 self.periodical_gimbal_follow_thread.start()
         
     def periodical_pdp_display_callback(self):
-        
         if hasattr(self, 'myhelpera2g'):
             if hasattr(self.myhelpera2g, 'PAP_TO_PLOT'):
                 if len(self.myhelpera2g.PAP_TO_PLOT) > 0:
@@ -1090,7 +1089,6 @@ class WidgetGallery(QDialog):
                 'rx_gain_ctrl_bfrf': int(self.rx_bfrf_gain_text_edit.text(), 16)}
         
         self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC', data=data)
-        print("[DEBUG]: SENT REQUEST to START measurement")
 
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(True)
@@ -1098,6 +1096,7 @@ class WidgetGallery(QDialog):
         self.update_vis_time_pap = 1
         self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pdp_display_callback)
         self.periodical_pap_display_thread.start()
+        print(f"[DEBUG]: This {self.myhelpera2g.ID} started thread periodical_pap_display")
     
     def stop_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
@@ -1285,7 +1284,7 @@ class WidgetGallery(QDialog):
             self.periodical_gimbal_follow_thread.cancel()
         
         # Last thing to do is to redirect the stdout
-        sys.stdout = self.original_stdout
+        #sys.stdout = self.original_stdout
             
     def eventFilter(self, source, event):
         if event.type()== event.Close:
