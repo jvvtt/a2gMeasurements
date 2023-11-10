@@ -1617,10 +1617,12 @@ class HelperA2GMeasurements(object):
             
             if data_to_send['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
                 # More verbose
+                print(f"[WARNING]: This {self.ID} has nothing on GPS buffer")
                 return
             
             elif data_to_send['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_NO_COORD_AVAIL:
                 # More verbose
+                print(f"[WARNING]: This {self.ID} does not have GPS or GPS signals are not available")
                 return
             
             if follow_mode_gimbal:
@@ -1807,20 +1809,26 @@ class HelperA2GMeasurements(object):
 
         if message_type == 0x01: # SHORT cmd type message
             if cmd == 0x01 and length == 0: # FOLLOWGIMBAL
-                #print(f"THIS {self.ID} receives FOLLOWGIMBAL cmd")
+                print(f"[DEBUG]: THIS {self.ID} receives FOLLOWGIMBAL cmd")
                 self.do_follow_mode_gimbal()
             elif cmd == 0x02 and length == 0: # GETGPS
-                print(f"THIS {self.ID} receives GETGPS cmd")
+                print(f"[DEBUG]: THIS {self.ID} receives GETGPS cmd")
                 self.do_getgps_action()
             elif cmd == 0x03 and length == 3: # SETGIMBAL
-                print(f"THIS {self.ID} receives SETGIMBAL cmd")
+                print(f"[DEBUG]: THIS {self.ID} receives SETGIMBAL cmd")
                 data_bytes = data_bytes[:12] # 3 float32 array entries
                 yaw, pitch, roll = struct.unpack('fff', data_bytes)
                 self.do_setgimbal_action({'YAW': yaw, 'ROLL': roll, 'PITCH': pitch})
             elif cmd == 0x04 and length == 5: # STARTDRONERFSOC
-                print(f"THIS {self.ID} receives STARTDRONERFSOC cmd")
+                print(f"[DEBUG]: THIS {self.ID} receives STARTDRONERFSOC cmd")
                 data_bytes = data_bytes[:12] # 1 float32 and 4 int16
                 carr_freq, rx_1, rx_2, rx_3, rx_bfrf = struct.unpack('fHHHH', data_bytes)
+                
+                # float round-error check
+                if carr_freq > 70e9 and np.abs(carr_freq-70e9) < 1500: # float round-error of 1.5 kHz
+                    carr_freq = 70e9
+                elif carr_freq < 57.51e9 and np.abs(carr_freq-57.51e9) < 1500: #float round-error of 1.5 kHz
+                    carr_freq = 57.51e9
                 msg_data = {'carrier_freq': carr_freq,
                             'rx_gain_ctrl_bb1': rx_1,
                             'rx_gain_ctrl_bb2': rx_2,
@@ -1828,16 +1836,16 @@ class HelperA2GMeasurements(object):
                             'rx_gain_ctrl_bfrf': rx_bfrf}
                 self.do_start_meas_drone_rfsoc(msg_data)
             elif cmd == 0x05 and length == 0: # STOPDRONERFSOC
-                print(f"THIS {self.ID} receives STOPDRONERFSOC cmd")
+                print(f"[DEBUG]: THIS {self.ID} receives STOPDRONERFSOC cmd")
                 self.do_stop_meas_drone_rfsoc()
             elif cmd == 0x06 and length == 0: # FINISHDRONERFSOC
-                print(f"THIS {self.ID} receives FINISHDRONERFSOC cmd")
+                print(f"[DEBUG]: THIS {self.ID} receives FINISHDRONERFSOC cmd")
                 self.do_finish_meas_drone_rfsoc()
             elif cmd == 0x07 and length == 0: # CLOSEDGUI
-                print(f"THIS {self.ID} receives CLOSEDGUI cmd")
+                print(f"[DEBUG]: THIS {self.ID} receives CLOSEDGUI cmd")
                 self.do_closed_gui_action()
             else:
-                print("[DEBUG]: cmd not known when decoding.  No action will be done")
+                print("[WARNING]: cmd not known when decoding.  No action will be done")
         elif message_type == 0x02: # LONG cmd type msg
             if cmd == 0x01: # SETIRF
                 print(f"THIS {self.ID} receives SETIRF cmd. Time snaps: {length}")
@@ -1847,16 +1855,16 @@ class HelperA2GMeasurements(object):
                 data_array = data_array.reshape((length, 16))
                 self.do_set_irf_action(data_array)
             else:
-                print("[DEBUG]: cmd not known when decoding.  No action will be done")
+                print("[WARNING]: cmd not known when decoding.  No action will be done")
         elif message_type == 0x03: # ANS type
             if cmd == 0x01: # Response to GETGPS
-                print(f'THIS ({self.ID}) receives ANS to GETGPS cmd')
+                print(f'[DEBUG]: THIS ({self.ID}) receives ANS to GETGPS cmd')
                 data_bytes = data_bytes[:26]
                 x,y,z,datum,follow_gimbal = struct.unpack('dddBB', data_bytes)
                 msg_data = {'X': x, 'Y': y, 'Z': z, 'Datum': datum, 'FOLLOW_GIMBAL': follow_gimbal}
                 self.process_answer_get_gps(msg_data)
             else:
-                print("[DEBUG]: cmd not known when decoding.  No action will be done")
+                print("[WARNING]: cmd not known when decoding.  No action will be done")
         else:
             print("[WARNING]: message_type not known when decoding. No action will be done")
 
@@ -1977,7 +1985,7 @@ class HelperA2GMeasurements(object):
 
         if type_cmd == 'SETGIMBAL':
             frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x03, data=data)
-        elif type_cmd == 'FOLLOWGMBAL':
+        elif type_cmd == 'FOLLOWGIMBAL':
             frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x01)
         elif type_cmd == 'GETGPS':
             frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x02)
@@ -3096,7 +3104,7 @@ class RFSoCRemoteControlFromHost():
         self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
         self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
         self.irfs_per_second = 7 # THIS MUST BE FOUND IN BETTER A WAY
-        self.MAX_PAP_BUF_SIZE = 250  
+        self.MAX_PAP_BUF_SIZE = 220  
         self.MAX_PAP_BUF_SIZE_BYTES = self.MAX_PAP_BUF_SIZE * self.bytes_per_irf
         self.idx_last_irf_sent_on_actual_hest = 0
         self.TIME_SNAPS_TO_VIS = 10
@@ -3257,14 +3265,15 @@ class RFSoCRemoteControlFromHost():
             self.data_to_visualize = np.array(self.hest)
             self.data_to_visualize = np.abs(self.data_to_visualize)
             self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
+            self.data_to_visualize = self.data_to_visualize[:, ::4]
             
-            # FOR MAX_PAP_BUF_SIZE = 250, THIS GIVES EXACTLY 63 TIME SNAPSHOTS
-            self.data_to_visualize = self.data_to_visualize[::4, ::16]
+            # Compute 10-time-snaps block mean
+            tmp = self.data_to_visualize.reshape((-1, 10, self.data_to_visualize.shape[1]//16, 16))
+            tmp = tmp.transpose((0,2,1,3))
+            tmp = np.mean(tmp, axis=(2,))
+            self.data_to_visualize = np.squeeze(tmp)
             
-            # Non expensive Double check
-            if self.data_to_visualize.shape[0] > 63:
-                self.data_to_visualize = self.data_to_visualize[:63, ::16]
-            #self.data_to_visualize = self.data_to_visualize.tolist()
+            self.data_to_visualize = np.asarray(self.data_to_visualize, dtype=np.float32)
             
             print(f"[DEBUG]: Computed pap to be sent")
     
@@ -3301,12 +3310,8 @@ class RFSoCRemoteControlFromHost():
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
         self.thread_rx_irf.start()
-        self.timer_save_big_hest_buf.start()
-        self.timer_send_pap_for_vis.start()
         
         print("[DEBUG]: receive_signal_async thread STARTED")
-        print("[DEBUG]: save_hest_buffer thread STARTED")
-        print("[DEBUG]: compute_pap_for_vis thread STARTED")
     
     def stop_thread_receive_meas_data(self):
         self.event_stop_thread_rx_irf.set()
