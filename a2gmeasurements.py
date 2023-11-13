@@ -3258,10 +3258,12 @@ class RFSoCRemoteControlFromHost():
             self.hest.append(rxtd)
             
             if len(self.hest) >= self.MAX_PAP_BUF_SIZE:
+                print(f"[DEBUG]: Time between PAP callbacks: {time.time() - self.start_time_pap_callback}")
                 self.compute_pap_for_vis()
                 self.save_hest_buffer()                
 
     def compute_pap_for_vis(self):        
+            start_time = time.time()
             self.data_to_visualize = np.array(self.hest)
             self.data_to_visualize = np.abs(self.data_to_visualize)
             self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
@@ -3275,7 +3277,7 @@ class RFSoCRemoteControlFromHost():
             
             self.data_to_visualize = np.asarray(self.data_to_visualize, dtype=np.float32)
             
-            print(f"[DEBUG]: Computed pap to be sent")
+            print(f"[DEBUG]: Computed pap in {time.time() - start_time}")
     
     def save_hest_buffer(self):
         datestr = datetime.datetime.now()
@@ -3290,6 +3292,7 @@ class RFSoCRemoteControlFromHost():
         self.hest = []
         
         self.idx_last_irf_sent_on_actual_hest = 0
+        self.start_time_pap_callback = time.time()
 
     def start_thread_receive_meas_data(self, msg_data):
         """
@@ -3310,6 +3313,7 @@ class RFSoCRemoteControlFromHost():
         time.sleep(0.1)
         self.time_begin_receive_thread = time.time()
         self.thread_rx_irf.start()
+        self.start_time_pap_callback = time.time()
         
         print("[DEBUG]: receive_signal_async thread STARTED")
     
