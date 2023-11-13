@@ -254,6 +254,66 @@ class WidgetGallery(QDialog):
         
         return success_gnd_gimbal
     
+    def check_if_server_running_drone_fpga(self):
+        """
+        Checks if the server.py daemon is running on the ground fpga.
+        
+        ASSUMES GROUND FPGA IP STATIC ADDR (ETH) IS 10.1.1.30 (THIS IS THE DEFAULT SETUP)
+
+        Returns:
+            _type_: _description_
+        """
+        if self.remote_drone_conn is None:
+            success_server_drone_fpga = None
+            print('[DEBUG]: No SSH connection to drone detected. The server-running-on-drone check can not be done.')
+        else:
+            try:
+                stdin, stdout, stderr = self.remote_drone_conn.exec_command('ssh xilinx@10.1.1.40')
+                stdin.channel.send("xilinx\n")
+                stdin.channel.send("ps aux | grep mmwsdr\n")
+                stdin.channel.shutdown_write()
+
+                if stderr != '':
+                    print("[DEBUG]: Error when trying to ssh DRONE fpga: ", stderr)
+                else:
+                    stdin_out = stdout.read().decode('utf-8')
+
+                    if 'server.py'in stdin_out and 'run.sh' in stdin_out:
+                        print("[DEBUG]: Server script is running on GND fpga")
+                    else:
+                        self.remote_drone_conn.exec_command('cd jupyter_notebooks/mmwsdr')
+                        stdin, stdout, stderr = self.remote_drone_conn.exec_command('sudo ./run.sh')
+                        stdin.channel.send("xilinx\n")
+                        stdin.channel.shutdown_write()
+
+                # Exit the ssh
+                stdin, stdout, stderr = self.remote_drone_conn.exec_command('exit')
+            except Exception as e:
+                print(f"This error occurred when trying to check if server is running on drone fpga: {e}")
+
+    def check_if_server_running_gnd_fpga(self):
+        if self.remote_drone_conn is None:
+            print('[DEBUG]: No SSH connection to drone detected. The server-running-on-drone check can not be done.')
+        else:
+            try:
+                conn_gnd_fpga = paramiko.SSHClient()
+                conn_gnd_fpga.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                conn_gnd_fpga.connect('10.1.1.30', username='xilinx', password='xilinx')
+            except Exception as e:
+                print(f"This error occurred when trying to check if server is running on GND fpga: {e}")
+                success_server_gnd_fpga = False    
+            else:
+                stdin, stdout, stderr = conn_gnd_fpga.exec_command('ps aux | grep mmwsdr')
+                output = stdout.read().decode()
+
+                if stderr.read().decode() == '' and 'server.py' in output and 'run.sh' in output:
+                    print("[DEBUG]: Server script is running on GND fpga")
+                else:
+                    conn_gnd_fpga.exec_command('cd jupyter_notebooks/mmwsdr')
+                    stdin, stdout, stderr = conn_gnd_fpga.exec_command('sudo ./run.sh')
+                    stdin.channel.send("xilinx\n")
+                    stdin.channel.shutdown_write()
+
     def check_if_gnd_gps_connected(self):
         """
         Function for checking if gps is connected to the ground node.
@@ -624,6 +684,13 @@ class WidgetGallery(QDialog):
     def disconnect_drone_callback(self):
         if hasattr(self, 'periodical_gimbal_follow_thread'):
             self.periodical_gimbal_follow_thread.cancel()
+
+        if self.stop_meas_togglePushButton.isChecked():
+            print("[DEBUG]: Before disconnecting, the ongoing measurement will be stopped")
+            self.stop_meas_button_callback()
+        if self.finish_meas_togglePushButton.isChecked():
+            print("[DEBUG]: Before disconnecting, the ongoing measurement will be finished")
+            self.finish_meas_button_callback()
 
         self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
         self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
@@ -1115,10 +1182,10 @@ class WidgetGallery(QDialog):
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S')
         description = {'H': self.height_from_gnd_text_edit.text(), 'D': self.d_tx_rx_text_edit.text()}
         
-        with open('dist_heig_' + datestr + '.txt', 'a+') as file:      
-            file.write(json.dumps(description))       
+        with open('description_' + datestr + '.txt', 'a+') as file:
+            file.write(self.meas_description_text_edit.text())
         
-        print("[DEBUG]: Saved file with dists between txr and height of drone")
+        print("[DEBUG]: Saved description file on GND node")
         
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
@@ -1155,8 +1222,9 @@ class WidgetGallery(QDialog):
 
         self.time_value_text_edit = QLineEdit('')
         
-        self.height_from_gnd_text_edit = QLineEdit('')
-        self.d_tx_rx_text_edit = QLineEdit('')
+        self.meas_description_text_edit = QLineEdit('')
+        #self.height_from_gnd_text_edit = QLineEdit('')
+        #self.d_tx_rx_text_edit = QLineEdit('')
 
         self.how_trigger_measurements_radio_button_man = QRadioButton("Manual")
         self.how_trigger_measurements_radio_button_man.clicked.connect(self.manual_meas_radio_button_callback)
@@ -1167,8 +1235,9 @@ class WidgetGallery(QDialog):
         choose_what_type_time_label = QLabel('Choose parameter:')
         value_parameter_label = QLabel('Value:')
 
-        height_from_gndl_label = QLabel('Height [m]:')
-        d_tx_rx_label = QLabel('Distance [m]:')
+        description_label = QLabel('Description:')
+        #height_from_gndl_label = QLabel('Height [m]:')
+        #d_tx_rx_label = QLabel('Distance [m]:')
         
         layout = QGridLayout()
         layout.addWidget(self.how_trigger_measurements_radio_button_man, 0, 0, 1, 2)
@@ -1179,10 +1248,12 @@ class WidgetGallery(QDialog):
         layout.addWidget(value_parameter_label, 1, 2, 1, 1)
         layout.addWidget(self.time_value_text_edit, 1, 3, 1, 1)
 
-        layout.addWidget(height_from_gndl_label, 2, 0, 1, 1)
-        layout.addWidget(self.height_from_gnd_text_edit, 2, 1, 1, 1)
-        layout.addWidget(d_tx_rx_label, 2, 2, 1, 1)
-        layout.addWidget(self.d_tx_rx_text_edit, 2, 3, 1, 1)
+        #layout.addWidget(height_from_gndl_label, 2, 0, 1, 1)
+        #layout.addWidget(self.height_from_gnd_text_edit, 2, 1, 1, 1)
+        #layout.addWidget(d_tx_rx_label, 2, 2, 1, 1)
+        #layout.addWidget(self.d_tx_rx_text_edit, 2, 3, 1, 1)
+        layout.addWidget(description_label, 2, 0, 1, 1)
+        layout.addWidget(self.meas_description_text_edit, 2, 1, 1, 3)
         
         layout.addWidget(self.start_meas_togglePushButton, 3, 0, 1, 1)
         layout.addWidget(self.stop_meas_togglePushButton, 3, 1, 1, 1)
