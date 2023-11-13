@@ -1848,7 +1848,7 @@ class HelperA2GMeasurements(object):
                 print("[WARNING]: cmd not known when decoding.  No action will be done")
         elif message_type == 0x02: # LONG cmd type msg
             if cmd == 0x01: # SETIRF
-                print(f"THIS {self.ID} receives SETIRF cmd. Time snaps: {length}")
+                print(f"[DEBUG]: THIS {self.ID} receives SETIRF cmd. Time snaps: {length}")
                 last = int(4*length*16) # The data type of the array entries is float32 and it will have always 16 beams and variable number of time snapshots
                 data_bytes = data_bytes[:last]
                 data_array = np.frombuffer(data_bytes, dtype=np.float32)

@@ -1100,6 +1100,9 @@ class WidgetGallery(QDialog):
         self.update_vis_time_pap = 1
         self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pap_display_callback)
         self.periodical_pap_display_thread.start()
+        #self.periodical_pap_display_thread = QTimer()
+        #self.periodical_pap_display_thread.timeout.connect(self.periodical_pap_display_callback)
+        #self.periodical_pap_display_thread.start(1000)
         print(f"[DEBUG]: This {self.myhelpera2g.ID} started thread periodical_pap_display")
     
     def stop_meas_button_callback(self):
@@ -1260,8 +1263,8 @@ class WidgetGallery(QDialog):
         self.papPlotPanel = QGroupBox('PAP')
         self.time_snaps = 22
         self.plot_widget = pg.PlotWidget() 
-        self.plot_widget.setLabel('bottom', 'Beam steering angle [deg]')
-        self.plot_widget.setLabel('left', 'Time snapshot number')
+        self.plot_widget.setLabel('left', 'Beam steering angle [deg]')
+        self.plot_widget.setLabel('bottom', 'Time snapshot number')
 
         layout = QVBoxLayout()
         layout.addWidget(self.plot_widget)
@@ -1304,6 +1307,7 @@ class WidgetGallery(QDialog):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
         if hasattr(self, 'periodical_pap_display_thread'):
             self.periodical_pap_display_thread.cancel()
+            #self.periodical_pap_display_thread.stop()
         if hasattr(self, 'periodical_gps_display_thread'):
             self.periodical_gps_display_thread.cancel()
         if hasattr(self, 'periodical_gimbal_follow_thread'):
