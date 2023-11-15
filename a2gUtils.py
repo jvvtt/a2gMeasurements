@@ -101,6 +101,24 @@ def make_flight_graph_coordinates(flight_graph, number_stops_per_edge):
         
         return intermediate_coords
 
+def compute_block_mean_2d_array(array, block_length):
+    """
+    Compute the block mean of a matrix by assuming the matrix consists of blocks of size
+    block_length-by-array.shape[1].
+        
+    'array' should be a matrix, and 'block_length' should be less than array.shape[1].
+
+    Args:
+        array (ndarray): _description_
+        block_length (int): _description_
+    """
+        
+    tmp = array.reshape((-1, block_length, array.shape[1]//array.shape[1], array.shape[1]))
+    tmp = tmp.transpose((0,2,1,3))
+    tmp = np.mean(tmp, axis=(2,))
+    tmp = np.squeeze(tmp)
+    return tmp   
+    
 class GPSVis(object):
     """
         DEPRECATED CLASS MAINTENED FOR HISTORY [JUPYTER NOTEBOOK TESTS].

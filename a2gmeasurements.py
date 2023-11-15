@@ -27,7 +27,7 @@ import pyvisa
 import pandas as pd
 from sys import platform
 from crc import Calculator, Configuration, Crc16
-from a2gUtils import geocentric2geodetic, geodetic2geocentric
+from a2gUtils import geocentric2geodetic, geodetic2geocentric, compute_block_mean_2d_array
 from pyproj import Transformer, Geod
 from multiprocessing.shared_memory import SharedMemory
 from PyQt5.QtCore import pyqtSignal
@@ -1572,7 +1572,10 @@ class HelperA2GMeasurements(object):
         
         wgs84_geod = Geod(ellps='WGS84')
         
-        ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_ground, lat_ground, lon_drone, lat_drone)
+        if self.ID == 'GROUND':
+            ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_ground, lat_ground, lon_drone, lat_drone)
+        elif self.ID == 'DRONE':
+            ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_drone, lat_drone, lon_ground, lat_ground)
                                 
         pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)
         pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
@@ -1729,7 +1732,7 @@ class HelperA2GMeasurements(object):
             msg (dictionary): 
         """
         if self.DBG_LVL_1:
-            print(f'\nTHIS ({self.ID}) receives protocol ANS')
+            print(f"THIS ({self.ID}) receives protocol ANS")
             
         if self.ID =='DRONE':
             y_gnd = data['Y']
@@ -1745,16 +1748,17 @@ class HelperA2GMeasurements(object):
                 # Geocentric WGS84
             if datum_coordinates == 0:
                 lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'])
-                self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
                 # Geocentric ETRS89
             elif datum_coordinates == 30:
                 lat_gnd, lon_gnd, height_gnd = geocentric2geodetic(x_gnd, y_gnd, data['Z'], EPSG_GEOCENTRIC=4346)
-                self.last_drone_coords_requested = {'LAT': lat_gnd, 'LON': lon_gnd}
             else:
                 print('[ERROR]: Not known geocentric datum')
                 return
 
             yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)
+            
+            while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
+                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)           
         elif self.ID == 'GROUND':
             y_drone = data['Y']
             x_drone = data['X']
@@ -1769,10 +1773,12 @@ class HelperA2GMeasurements(object):
                 # Geocentric WGS84
             if datum_coordinates == 0:
                 lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'])
+                # This is for GUI GPS panel to show drone coordinates
                 self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
                 # Geocentric ETRS89
             elif datum_coordinates == 30:
                 lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'], EPSG_GEOCENTRIC=4346)
+                # This is for GUI GPS panel to show drone coordinates
                 self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
             else:
                 print('[ERROR]: Not known geocentric datum')
@@ -1784,25 +1790,21 @@ class HelperA2GMeasurements(object):
             while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
                 yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
                 
-            if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
-                print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
-            else:
-                print(f"[DEBUG]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
+        if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+            print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
+            print(f"[DEBUG]: This {self.ID} gimbal will NOT follow its pair node due to ERROR")
+        else:
+            print(f"[DEBUG]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
                     
-                if data['FOLLOW_GIMBAL'] == 0x01: # True, Follow gimbal
-                    if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
-                        if self.ID == 'DRONE':
-                            self.myGimbal.setPosControl(yaw=yaw_to_set/10, pitch=pitch_to_set/10) 
-                            print(f"[DEBUG]: This {self.ID} gimbal WILL follow its pair node as stated by user")
-                        elif self.ID == 'GROUND':
-                                # Has to be absolute movement, cause the 0 is the heading value
-                            self.myGimbal.setPosControl(yaw=yaw_to_set, pitch=pitch_to_set/10) 
-                            print(f"[DEBUG]: This {self.ID} gimbal WILL follow its pair node as stated by user")
-                    else:
-                        print('[WARNING]: No gimbal available, so no rotation will happen')
-                elif data['FOLLOW_GIMBAL'] == 0x02: # False
-                    print(f"[DEBUG]: This {self.ID} gimbal will NOT follow its pair node as stated by user")
-                
+            if data['FOLLOW_GIMBAL'] == 0x01: # True, Follow gimbal
+                if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
+                    self.myGimbal.setPosControl(yaw=yaw_to_set, pitch=pitch_to_set) 
+                    print(f"[DEBUG]: This {self.ID} gimbal WILL follow its pair node as stated by user")
+                else:
+                    print('[WARNING]: No gimbal available, so no rotation will happen')
+            elif data['FOLLOW_GIMBAL'] == 0x02: # False
+                print(f"[DEBUG]: This {self.ID} gimbal will NOT follow its pair node as stated by user")
+        
     def decode_message(self, data):
         source_id, destination_id, message_type, cmd, length = struct.unpack('BBBBB', data[:5])
         data_bytes = data[5:]
@@ -3238,10 +3240,11 @@ class RFSoCRemoteControlFromHost():
     
     def receive_signal_async(self, stop_event):
         """
-        Function callback when the drone stops at the calculated stops based on the Flight Graph Coordinates and other inputs provided 
-        in the Planning Measurements panel of the a2g App.
-        
-        No threading involved in this method
+        Function callback for the thread of reading rx signal from fpga. Asks the server at the rfsoc to do the logic/procedure to get
+        the rx signal at the rfsoc and then sends it back to the host computer.
+
+        Args:
+            stop_event (threading.Event): event that stops this thread
         """
         while not stop_event.is_set():
             self.n_receive_calls = self.n_receive_calls + 1
@@ -3257,29 +3260,50 @@ class RFSoCRemoteControlFromHost():
             
             self.hest.append(rxtd)
             
+            if len(self.hest) == 22:
+                self.data_to_visualize = self.pipeline_operations_rfsoc_rx_ndarray(np.array(self.hest), 2)
+            
+            if len(self.hest) > 22: # maximum packet size to send over the tcp connection
+                tmp = self.pipeline_operations_rfsoc_rx_ndarray(rxtd, 1)
+                self.data_to_visualize = np.roll(self.data_to_visualize, -1, axis=0) 
+                self.data_to_visualize[-1, :] = tmp 
+            
             if len(self.hest) >= self.MAX_PAP_BUF_SIZE:
                 print(f"[DEBUG]: Time between PAP callbacks: {time.time() - self.start_time_pap_callback}")
-                self.compute_pap_for_vis()
-                self.save_hest_buffer()                
+                self.save_hest_buffer()      
+    
+    def pipeline_operations_rfsoc_rx_ndarray(self, array, axis, each_n_beams=4):
+        """
+        Compute a pipeline of predefined operations for 'array'.
 
-    def compute_pap_for_vis(self):        
-            start_time = time.time()
-            self.data_to_visualize = np.array(self.hest)
-            self.data_to_visualize = np.abs(self.data_to_visualize)
-            self.data_to_visualize = np.sum(self.data_to_visualize, axis=2)
-            self.data_to_visualize = self.data_to_visualize[:, ::4]
+        Args:
+            array (ndarray): numpy array of 2 or 3 dimensions
+            axis (int): axis over which to compute the sum. It should be less than len(array.shape)
+            each_n_beams (int, optional): _description_. Defaults to 4.
+
+        Returns:
+            _type_: _description_
+        """
+        if axis >= len(array.shape):
+            print(f"[DEBUG]: Invalid axis over which to add entries. The array has: {len(array.shape)} dimensions")
+            return 0
+        
+        aux = np.abs(array) 
+        aux = aux * aux # faster pow 2
+        aux = np.sum(aux, axis=axis)
+        aux = aux[:, ::each_n_beams]
             
-            # Compute 10-time-snaps block mean
-            tmp = self.data_to_visualize.reshape((-1, 10, self.data_to_visualize.shape[1]//16, 16))
-            tmp = tmp.transpose((0,2,1,3))
-            tmp = np.mean(tmp, axis=(2,))
-            self.data_to_visualize = np.squeeze(tmp)
+        # Compute 10-time-snaps block mean
+        #self.data_to_visualize = compute_block_mean_2d_array(self.data_to_visualize, 10)
             
-            self.data_to_visualize = np.asarray(self.data_to_visualize, dtype=np.float32)
-            
-            print(f"[DEBUG]: Computed pap in {time.time() - start_time}")
+        aux = np.asarray(aux, dtype=np.float32)
+        return aux
     
     def save_hest_buffer(self):
+        """
+        Save the raw (time-snaps, n_beams, n_delay_taps) array
+        
+        """
         datestr = datetime.datetime.now()
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
         
