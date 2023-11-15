@@ -89,6 +89,7 @@ if not_finish_tcp_connection_attempt == False:
         time.sleep(1)
         if FLAG_DRONE_ASKS_FOLLOWGIMBAL:
             drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
-
-timer_send_pap_for_vis.cancel()
-drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
+    timer_send_pap_for_vis.cancel()
+    drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
+else:
+    print("[DEBUG]: TCP connection attempts failed")
