@@ -3291,8 +3291,12 @@ class RFSoCRemoteControlFromHost():
         aux = np.abs(array) 
         aux = aux * aux # faster pow 2
         aux = np.sum(aux, axis=axis)
-        aux = aux[:, ::each_n_beams]
-            
+        if axis==1:
+            aux = aux[::each_n_beams]
+        elif axis==2:
+            aux = aux[:, ::each_n_beams]
+        else:
+            print("[ERROR]: Wrong axis over which to do pipeline_operations_rfsoc_rx_ndarray")
         # Compute 10-time-snaps block mean
         #self.data_to_visualize = compute_block_mean_2d_array(self.data_to_visualize, 10)
             

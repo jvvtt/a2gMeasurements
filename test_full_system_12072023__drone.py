@@ -7,7 +7,7 @@ from json import JSONEncoder
 import numpy as np
 
 TIME_SEND_PAP = 0.5
-FLAG_DRONE_ASKS_FOLLOWGIMBAL = True
+FLAG_DRONE_ASKS_FOLLOWGIMBAL = False
 
 pattern_ip_addresses = r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 
