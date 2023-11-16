@@ -15,8 +15,9 @@ def send_pap_for_vis():
     if hasattr(drone_a2g_helper, 'myrfsoc'):
         if hasattr(drone_a2g_helper.myrfsoc, 'data_to_visualize'):
             if len(drone_a2g_helper.myrfsoc.data_to_visualize) > 0:
-                print(f"[DEBUG]: SETIRF array shape is: {drone_a2g_helper.myrfsoc.data_to_visualize.shape}")
-                drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
+                if not drone_a2g_helper.STOP_SEND_SETIRF_FLAG:
+                    print(f"[DEBUG]: SETIRF array shape is: {drone_a2g_helper.myrfsoc.data_to_visualize.shape}")
+                    drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
 
 def check_devices():
     Q_GND_ADDRESS = input('Confirm the predefined static GND IP addr is 192.168.0.124 (y/n): ')

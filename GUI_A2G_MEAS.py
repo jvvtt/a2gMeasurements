@@ -1207,7 +1207,7 @@ class WidgetGallery(QDialog):
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S')
         
         with open('description_' + datestr + '.txt', 'a+') as file:
-            file.write(self.meas_description_text_edit.text())
+            file.write(self.meas_description_text_edit.document().toPlainText())
         
         print("[DEBUG]: Saved description file on GND node")
         
@@ -1231,7 +1231,7 @@ class WidgetGallery(QDialog):
         self.finish_meas_togglePushButton.clicked.connect(self.finish_meas_button_callback)
         
         self.meas_description_text_edit = QPlainTextEdit('')
-        self.meas_description_text_edit.insertPlainText("Enter measurement description:\n")
+        self.meas_description_text_edit.setPlaceholderText("Enter measurement description here")
         
         layout = QGridLayout()
         layout.addWidget(self.meas_description_text_edit, 0, 0, 3, 6)

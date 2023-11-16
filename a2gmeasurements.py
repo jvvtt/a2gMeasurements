@@ -1698,6 +1698,7 @@ class HelperA2GMeasurements(object):
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to START measurement")
             self.myrfsoc.start_thread_receive_meas_data(msg_data)
+            self.STOP_SEND_SETIRF_FLAG = False
     
     def do_stop_meas_drone_rfsoc(self):
         """
@@ -1709,11 +1710,13 @@ class HelperA2GMeasurements(object):
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to STOP measurement")
             self.myrfsoc.stop_thread_receive_meas_data()
+            self.STOP_SEND_SETIRF_FLAG = True
         
     def do_finish_meas_drone_rfsoc(self):
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to FINISH measurement")
             self.myrfsoc.finish_measurement()
+            self.STOP_SEND_SETIRF_FLAG = True
     
     def do_set_irf_action(self, msg_data):
         if self.ID == 'GROUND': # double checj that we are in the gnd
