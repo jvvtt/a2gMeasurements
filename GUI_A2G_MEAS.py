@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QDial, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
         QProgressBar, QPushButton, QRadioButton, QScrollBar, QSizePolicy,
         QSlider, QSpinBox, QStyleFactory, QTableWidget, QTabWidget, QTextEdit,
-        QVBoxLayout, QWidget)
+        QVBoxLayout, QWidget, QPlainTextEdit)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -1205,7 +1205,6 @@ class WidgetGallery(QDialog):
 
         datestr = datetime.datetime.now()
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S')
-        description = {'H': self.height_from_gnd_text_edit.text(), 'D': self.d_tx_rx_text_edit.text()}
         
         with open('description_' + datestr + '.txt', 'a+') as file:
             file.write(self.meas_description_text_edit.text())
@@ -1215,74 +1214,31 @@ class WidgetGallery(QDialog):
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
-    
-    def manual_meas_radio_button_callback(self):
-        self.choose_what_time_is_specified_ComboBox.setEnabled(False)
-        self.time_value_text_edit.setEnabled(False)
-        
-    def auto_meas_radio_button_callback(self):
-        self.choose_what_time_is_specified_ComboBox.setEnabled(True)
-        self.time_value_text_edit.setEnabled(True)
 
     def create_Planning_Measurements_panel(self):
-        self.planningMeasurementsPanel = QGroupBox('Planning measurements')
+        self.planningMeasurementsPanel = QGroupBox('Control measurements')
         
         self.start_meas_togglePushButton = QPushButton("START")
-        #self.start_meas_togglePushButton.setCheckable(True)
         self.start_meas_togglePushButton.setEnabled(False)
         self.start_meas_togglePushButton.clicked.connect(self.start_meas_button_callback)
         
         self.stop_meas_togglePushButton = QPushButton("STOP")
-        #self.stop_meas_togglePushButton.setCheckable(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.clicked.connect(self.stop_meas_button_callback)
         
         self.finish_meas_togglePushButton = QPushButton("FINISH")
-        #self.finish_meas_togglePushButton.setCheckable(True)
         self.finish_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.clicked.connect(self.finish_meas_button_callback)
         
-        self.choose_what_time_is_specified_ComboBox = QComboBox()
-        self.choose_what_time_is_specified_ComboBox.addItems(["Time per edge (TPE)", "Time per stop (TPS)", "Total measurement time (TMT)"])
-
-        self.time_value_text_edit = QLineEdit('')
-        
-        self.meas_description_text_edit = QLineEdit('')
-        #self.height_from_gnd_text_edit = QLineEdit('')
-        #self.d_tx_rx_text_edit = QLineEdit('')
-
-        self.how_trigger_measurements_radio_button_man = QRadioButton("Manual")
-        self.how_trigger_measurements_radio_button_man.clicked.connect(self.manual_meas_radio_button_callback)
-        self.how_trigger_measurements_radio_button_auto = QRadioButton("Automatic") 
-        self.how_trigger_measurements_radio_button_auto.clicked.connect(self.auto_meas_radio_button_callback)
-        self.how_trigger_measurements_radio_button_auto.setChecked(True)
-        
-        choose_what_type_time_label = QLabel('Choose parameter:')
-        value_parameter_label = QLabel('Value:')
-
-        description_label = QLabel('Description:')
-        #height_from_gndl_label = QLabel('Height [m]:')
-        #d_tx_rx_label = QLabel('Distance [m]:')
+        self.meas_description_text_edit = QPlainTextEdit('')
+        self.meas_description_text_edit.insertPlainText("Enter measurement description:\n")
         
         layout = QGridLayout()
-        layout.addWidget(self.how_trigger_measurements_radio_button_man, 0, 0, 1, 2)
-        layout.addWidget(self.how_trigger_measurements_radio_button_auto, 0, 2, 1, 2)
-
-        layout.addWidget(choose_what_type_time_label, 1, 0, 1, 1)
-        layout.addWidget(self.choose_what_time_is_specified_ComboBox, 1, 1, 1, 1)
-        layout.addWidget(value_parameter_label, 1, 2, 1, 1)
-        layout.addWidget(self.time_value_text_edit, 1, 3, 1, 1)
-
-        #layout.addWidget(height_from_gndl_label, 2, 0, 1, 1)
-        #layout.addWidget(self.height_from_gnd_text_edit, 2, 1, 1, 1)
-        #layout.addWidget(d_tx_rx_label, 2, 2, 1, 1)
-        #layout.addWidget(self.d_tx_rx_text_edit, 2, 3, 1, 1)
-        layout.addWidget(description_label, 2, 0, 1, 1)
-        layout.addWidget(self.meas_description_text_edit, 2, 1, 1, 3)
+        layout.addWidget(self.meas_description_text_edit, 0, 0, 3, 6)
         
-        layout.addWidget(self.start_meas_togglePushButton, 3, 0, 1, 1)
-        layout.addWidget(self.stop_meas_togglePushButton, 3, 1, 1, 1)
-        layout.addWidget(self.finish_meas_togglePushButton, 3, 2, 1, 2)
+        layout.addWidget(self.start_meas_togglePushButton, 0, 6, 1, 2)
+        layout.addWidget(self.stop_meas_togglePushButton, 1, 6, 1, 2)
+        layout.addWidget(self.finish_meas_togglePushButton, 2, 6, 1, 2)
         
         self.planningMeasurementsPanel.setLayout(layout)
     
@@ -1371,27 +1327,6 @@ class WidgetGallery(QDialog):
 
         x_ticks = [(i, str(i)) for i in np.arange(self.time_snaps)]
         self.plot_widget.getAxis('bottom').setTicks([x_ticks, []])
-
-    def create_pdp_plot_panel(self):
-        self.pdpPlotPanel = QGroupBox('PDP')
-        
-        fig_pdp = Figure()
-
-        # Create a FigureCanvas widget
-        canvas = FigureCanvas(fig_pdp)
-
-        # Create a QVBoxLayout to hold the canvas
-        layout = QVBoxLayout()
-        layout.addWidget(canvas)
-
-        # Set the layout of the group box
-        self.pdpPlotPanel.setLayout(layout)
-
-        # Create a subplot on the Figure
-        ax_pdp = fig_pdp.add_subplot(111)
-        
-        self.fig_pdp = fig_pdp
-        self.ax_pdp = ax_pdp
     
     def closeEvent(self, event):
         if hasattr(self, 'myhelpera2g'):

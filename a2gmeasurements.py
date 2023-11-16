@@ -3311,7 +3311,7 @@ class RFSoCRemoteControlFromHost():
         datestr = datetime.datetime.now()
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
         
-        with open(datestr + '-' + self.filename_to_save + '.npy', 'wb') as f:
+        with open('../Measurement Files/' + datestr + '-' + self.filename_to_save + '.npy', 'wb') as f:
             #np.save(f, np.stack(self.hest, axis=0))
             np.save(f, np.array(self.hest))
         
