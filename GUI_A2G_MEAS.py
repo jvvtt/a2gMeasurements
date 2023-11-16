@@ -1,3 +1,4 @@
+import threading
 import numpy as np
 import csv
 import json
@@ -25,6 +26,19 @@ from a2gmeasurements import HelperA2GMeasurements, RepeatTimer
 from a2gUtils import GpsOnMap, geocentric2geodetic, geodetic2geocentric
 
 import pyqtgraph as pg
+
+
+class TimerThread(QThread):
+    update = pyqtSignal()
+
+    def __init__(self, event, updatetime):
+        super(TimerThread, self).__init__()
+        self.stopped = event
+        self.updatetime = updatetime
+    
+    def run(self):
+        while not self.stopped.wait(self.updatetime):
+            self.update.emit()
 
 class CustomTextEdit(QTextEdit):
     def write(self, text):
@@ -434,7 +448,6 @@ class WidgetGallery(QDialog):
         if hasattr(self, 'myhelpera2g'):
             if hasattr(self.myhelpera2g, 'PAP_TO_PLOT'):
                 if len(self.myhelpera2g.PAP_TO_PLOT) > 0:
-                    #self.ax_pdp.imshow(self.myhelpera2g.PAP_TO_PLOT)
                     self.plot_widget.clear()
                     img = pg.ImageItem()
                     img.setImage(self.myhelpera2g.PAP_TO_PLOT)
@@ -1097,8 +1110,13 @@ class WidgetGallery(QDialog):
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(True)
         self.finish_meas_togglePushButton.setEnabled(False)
-        self.update_vis_time_pap = 1
-        self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pap_display_callback)
+        self.update_vis_time_pap = 0.5
+
+        #self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pap_display_callback)
+        
+        self.stop_event_pap_display_thread = threading.Event()
+        self.periodical_pap_display_thread = TimerThread(self.stop_event_pap_display_thread, self.update_vis_time_pap)
+        self.periodical_pap_display_thread.update.connect(self.periodical_pap_display_callback)
         self.periodical_pap_display_thread.start()
         #self.periodical_pap_display_thread = QTimer()
         #self.periodical_pap_display_thread.timeout.connect(self.periodical_pap_display_callback)
@@ -1111,7 +1129,8 @@ class WidgetGallery(QDialog):
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(True)
-        self.periodical_pap_display_thread.cancel()
+        self.stop_event_pap_display_thread.set()
+        #self.periodical_pap_display_thread.cancel()
     
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
@@ -1274,6 +1293,7 @@ class WidgetGallery(QDialog):
         csvreader = csv.reader(rx_sivers_beam_index_mapping_file)
         beam_idx_map = [float(i[1]) for cnt,i in enumerate(csvreader) if cnt != 0]
         ticksla = beam_idx_map[::4]
+        self.beam_angs = ticksla
         ticks = np.arange(0,16) 
         y_ticks = [(ticks[cnt], f'{tickla:1.2f}°') for cnt, tickla in enumerate(ticksla)]
         self.plot_widget.getAxis('left').setTicks([y_ticks, []])
@@ -1305,8 +1325,8 @@ class WidgetGallery(QDialog):
     def closeEvent(self, event):
         if hasattr(self, 'myhelpera2g'):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
-        if hasattr(self, 'periodical_pap_display_thread'):
-            self.periodical_pap_display_thread.cancel()
+        #if hasattr(self, 'periodical_pap_display_thread'):
+            #self.periodical_pap_display_thread.cancel()
             #self.periodical_pap_display_thread.stop()
         if hasattr(self, 'periodical_gps_display_thread'):
             self.periodical_gps_display_thread.cancel()
