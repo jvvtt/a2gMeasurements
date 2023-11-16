@@ -6,20 +6,20 @@ import re
 from json import JSONEncoder
 import numpy as np
 
-TIME_SEND_PAP = 1
+TIME_SEND_PAP = 0.5
+FLAG_DRONE_ASKS_FOLLOWGIMBAL = False
+
 pattern_ip_addresses = r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
-print("Welcome to the DRONE client program! You have 60s to input")
 
 def send_pap_for_vis():
     if hasattr(drone_a2g_helper, 'myrfsoc'):
         if hasattr(drone_a2g_helper.myrfsoc, 'data_to_visualize'):
             if len(drone_a2g_helper.myrfsoc.data_to_visualize) > 0:
-                print("[DEBUG]: There is data to visualize and its length is > 0")
+                print(f"[DEBUG]: SETIRF array shape is: {drone_a2g_helper.myrfsoc.data_to_visualize.shape}")
                 drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
-                print("[DEBUG]: Sent PAP data")
 
 def check_devices():
-    Q_GND_ADDRESS = input('Confirm the predefined static GND IP addr is 192.168.0.124: y/n')
+    Q_GND_ADDRESS = input('Confirm the predefined static GND IP addr is 192.168.0.124 (y/n): ')
     if Q_GND_ADDRESS == 'y' or Q_GND_ADDRESS == 'Y':
         GND_ADDRESS = '192.168.0.124'
     elif Q_GND_ADDRESS == 'n' or Q_GND_ADDRESS == 'N':
@@ -31,19 +31,19 @@ def check_devices():
             GND_ADDRESS = input('Enter GND node IP address: ')
             is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))
 
-    is_gps_used = input('GPS at DRONE is going to be used? y/n: ')
+    is_gps_used = input('GPS at DRONE is going to be used? (y/n): ')
     if is_gps_used == 'y' or is_gps_used == 'Y':
         gps_used = True
     elif is_gps_used == 'n' or is_gps_used == 'N':
         gps_used = False
 
-    is_gimbal_used = input('Gimbal at DRONE is going to be used? y/n: ')
+    is_gimbal_used = input('Gimbal at DRONE is going to be used? (y/n): ')
     if is_gimbal_used == 'y' or is_gimbal_used == 'Y':
         gimbal_used = True
     elif is_gimbal_used == 'n' or is_gimbal_used == 'N':
         gimbal_used = False
         
-    is_rfsoc_used = input('RFSoC at DRONE is going to be used? y/n: ')
+    is_rfsoc_used = input('RFSoC at DRONE is going to be used? (y/n): ')
     if is_rfsoc_used == 'y' or is_rfsoc_used == 'Y':
         rfsoc_used = True
     elif is_rfsoc_used == 'n' or is_rfsoc_used == 'N':
@@ -87,8 +87,9 @@ if not_finish_tcp_connection_attempt == False:
     timer_send_pap_for_vis.start()
     while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):        
         time.sleep(1)
-        drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
-        print("[DEBUG]: FOLLOWGIMBAL cmd sent")
-
-timer_send_pap_for_vis.cancel()
-drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
+        if FLAG_DRONE_ASKS_FOLLOWGIMBAL:
+            drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
+    timer_send_pap_for_vis.cancel()
+    drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
+else:
+    print("[DEBUG]: TCP connection attempts failed")

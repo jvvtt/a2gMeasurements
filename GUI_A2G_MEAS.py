@@ -1,3 +1,6 @@
+import threading
+import numpy as np
+import csv
 import json
 import datetime
 import platform
@@ -8,8 +11,7 @@ import ping3
 import time
 import can#from fbs_runtime.application_context.PyQt5 import ApplicationContext
 from serial.tools.list_ports import comports
-import typing
-from PyQt5.QtCore import QDateTime, Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
         QDial, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
         QProgressBar, QPushButton, QRadioButton, QScrollBar, QSizePolicy,
@@ -20,11 +22,23 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import sys
-from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, RFSoCRemoteControlFromHost, RepeatTimer, GimbalGremsyH16, SBUSEncoder
+from a2gmeasurements import HelperA2GMeasurements, RepeatTimer
 from a2gUtils import GpsOnMap, geocentric2geodetic, geodetic2geocentric
 
-import tkinter as tk
-from tkinter import simpledialog, messagebox
+import pyqtgraph as pg
+
+
+class TimerThread(QThread):
+    update = pyqtSignal()
+
+    def __init__(self, event, updatetime):
+        super(TimerThread, self).__init__()
+        self.stopped = event
+        self.updatetime = updatetime
+    
+    def run(self):
+        while not self.stopped.wait(self.updatetime):
+            self.update.emit()
 
 class CustomTextEdit(QTextEdit):
     def write(self, text):
@@ -55,6 +69,8 @@ class WidgetGallery(QDialog):
         self.SUCCESS_GND_GIMBAL = False
         self.SUCCESS_GND_GPS = False
 
+        #self.original_stdout = sys.stdout
+
         self.create_check_connections_panel()
         #self.create_log_terminal()
         self.create_Gimbal_GND_panel()
@@ -62,26 +78,24 @@ class WidgetGallery(QDialog):
         self.create_fpga_and_sivers_panel()
         self.create_Planning_Measurements_panel()
         self.create_GPS_visualization_panel()
-        self.create_pdp_plot_panel()
+        self.create_pap_plot_panel()
 
         mainLayout = QGridLayout()
         mainLayout.addWidget(self.checkConnPanel, 0, 0, 1 , 4)
         mainLayout.addWidget(self.gimbalTXPanel, 1, 0, 3, 1)
         mainLayout.addWidget(self.gimbalRXPanel, 1, 1, 3, 1)
         mainLayout.addWidget(self.fpgaAndSiversSettingsPanel, 1, 2, 3, 2)
-        mainLayout.addWidget(self.pdpPlotPanel, 4, 0, 7, 2)
+        mainLayout.addWidget(self.papPlotPanel, 4, 0, 7, 2)
         mainLayout.addWidget(self.gps_vis_panel, 4, 2, 7, 2)
         mainLayout.addWidget(self.planningMeasurementsPanel, 11, 0, 2, 2)
         #mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
         
         #self.write_to_log_terminal('Welcome to A2G Measurements Center!')
-
-        #self.original_stdout = sys.stdout
                 
         self.setLayout(mainLayout)
 
         self.showMaximized()
-    
+
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
         """
         Checks ssh connection betwwen ground node (running the GUI) and the computer on the drone.
@@ -490,13 +504,15 @@ class WidgetGallery(QDialog):
                 self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd, args=('FOLLOWGIMBAL',))
                 self.periodical_gimbal_follow_thread.start()
         
-    def periodical_pdp_display_callback(self):
-        
+    def periodical_pap_display_callback(self):
         if hasattr(self, 'myhelpera2g'):
             if hasattr(self.myhelpera2g, 'PAP_TO_PLOT'):
                 if len(self.myhelpera2g.PAP_TO_PLOT) > 0:
-                    self.ax_pdp.imshow(self.myhelpera2g.PAP_TO_PLOT)
-                    print("[DEBUG]: Executed plot command at GND")
+                    self.plot_widget.clear()
+                    img = pg.ImageItem()
+                    img.setImage(self.myhelpera2g.PAP_TO_PLOT)
+                    self.plot_widget.addItem(img)
+                    print(f"[DEBUG]: Executed plot command at {self.myhelpera2g.ID}. PAP shape: {self.myhelpera2g.PAP_TO_PLOT.shape}")
         
     def periodical_gps_display_callback(self):
         """
@@ -1157,14 +1173,22 @@ class WidgetGallery(QDialog):
                 'rx_gain_ctrl_bfrf': int(self.rx_bfrf_gain_text_edit.text(), 16)}
         
         self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC', data=data)
-        print("[DEBUG]: SENT REQUEST to START measurement")
 
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(True)
         self.finish_meas_togglePushButton.setEnabled(False)
-        self.update_vis_time_pap = 1
-        self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pdp_display_callback)
+        self.update_vis_time_pap = 0.5
+
+        #self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pap_display_callback)
+        
+        self.stop_event_pap_display_thread = threading.Event()
+        self.periodical_pap_display_thread = TimerThread(self.stop_event_pap_display_thread, self.update_vis_time_pap)
+        self.periodical_pap_display_thread.update.connect(self.periodical_pap_display_callback)
         self.periodical_pap_display_thread.start()
+        #self.periodical_pap_display_thread = QTimer()
+        #self.periodical_pap_display_thread.timeout.connect(self.periodical_pap_display_callback)
+        #self.periodical_pap_display_thread.start(1000)
+        print(f"[DEBUG]: This {self.myhelpera2g.ID} started thread periodical_pap_display")
     
     def stop_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
@@ -1172,7 +1196,8 @@ class WidgetGallery(QDialog):
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(True)
-        self.periodical_pap_display_thread.cancel()
+        self.stop_event_pap_display_thread.set()
+        #self.periodical_pap_display_thread.cancel()
     
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
@@ -1323,7 +1348,30 @@ class WidgetGallery(QDialog):
         mygpsonmap = GpsOnMap('torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
         
         self.mygpsonmap = mygpsonmap
-        
+    
+    def create_pap_plot_panel(self):
+        self.papPlotPanel = QGroupBox('PAP')
+        self.time_snaps = 22
+        self.plot_widget = pg.PlotWidget() 
+        self.plot_widget.setLabel('left', 'Beam steering angle [deg]')
+        self.plot_widget.setLabel('bottom', 'Time snapshot number')
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.plot_widget)
+        self.papPlotPanel.setLayout(layout)
+
+        rx_sivers_beam_index_mapping_file = open('rx_sivers_beam_index_mapping.csv')
+        csvreader = csv.reader(rx_sivers_beam_index_mapping_file)
+        beam_idx_map = [float(i[1]) for cnt,i in enumerate(csvreader) if cnt != 0]
+        ticksla = beam_idx_map[::4]
+        self.beam_angs = ticksla
+        ticks = np.arange(0,16) 
+        y_ticks = [(ticks[cnt], f'{tickla:1.2f}°') for cnt, tickla in enumerate(ticksla)]
+        self.plot_widget.getAxis('left').setTicks([y_ticks, []])
+
+        x_ticks = [(i, str(i)) for i in np.arange(self.time_snaps)]
+        self.plot_widget.getAxis('bottom').setTicks([x_ticks, []])
+
     def create_pdp_plot_panel(self):
         self.pdpPlotPanel = QGroupBox('PDP')
         
@@ -1348,15 +1396,16 @@ class WidgetGallery(QDialog):
     def closeEvent(self, event):
         if hasattr(self, 'myhelpera2g'):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
-        if hasattr(self, 'periodical_pap_display_thread'):
-            self.periodical_pap_display_thread.cancel()
+        #if hasattr(self, 'periodical_pap_display_thread'):
+            #self.periodical_pap_display_thread.cancel()
+            #self.periodical_pap_display_thread.stop()
         if hasattr(self, 'periodical_gps_display_thread'):
             self.periodical_gps_display_thread.cancel()
         if hasattr(self, 'periodical_gimbal_follow_thread'):
             self.periodical_gimbal_follow_thread.cancel()
         
         # Last thing to do is to redirect the stdout
-        sys.stdout = self.original_stdout
+        #sys.stdout = self.original_stdout
             
     def eventFilter(self, source, event):
         if event.type()== event.Close:
