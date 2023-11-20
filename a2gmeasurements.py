@@ -302,6 +302,25 @@ class GimbalRS2(object):
                                     cmd_id='00', data=cmd_data)
 
         self.send_cmd(cmd)
+
+        # Save the current pitch and yaw values
+        if ctrl_byte == 0x00:
+            self.pitch = self.pitch + pitch
+            self.yaw = self.yaw + yaw
+        elif ctrl_byte == 0x01:
+            self.pitch = pitch
+            self.yaw = yaw
+        
+        if self.pitch > 1800 and self.pitch <= 3600:
+            self.pitch = self.pitch - 3600 
+        elif self.pitch < -1800 and self.pitch >= -3600:
+            self.pitch = self.pitch + 3600
+
+        if self.yaw > 1800 and self.yaw <= 3600:
+            self.yaw = self.yaw - 3600
+        elif self.yaw < -1800 and self.yaw >= -3600:
+            self.yaw = self.yaw + 3600
+
         return True    
 
     def setSpeedControl(self, yaw, roll, pitch, ctrl_byte=0x80):

@@ -494,15 +494,21 @@ class WidgetGallery(QDialog):
             if self.gps_display_flag:      
                 print("[DEBUG]: GPS dispplay flag activated")      
                 self.update_vis_time_gps = 1
-                self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
+                #self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
+                self.stop_event_gps_display = threading.Event()
+                self.periodical_gps_display_thread = TimerThread(self.stop_event_gps_display, self.update_vis_time_gps)
+                self.periodical_gps_display_thread.update.connect(self.periodical_gps_display_callback)
                 self.periodical_gps_display_thread.start()
             
             if self.rs2_fm_flag:
                 print("[DEBUG]: Gimbal RS2 FM Flag activated")
                 self.update_time_gimbal_follow = 1
-            #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
-                self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd, args=('FOLLOWGIMBAL',))
+                #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
+                self.stop_event_gimbal_follow_thread = threading.Event()
+                self.periodical_gimbal_follow_thread = TimerThread(self.stop_event_gimbal_follow_thread, self.update_time_gimbal_follow)
+                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
                 self.periodical_gimbal_follow_thread.start()
+                #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd, args=('FOLLOWGIMBAL',))
         
     def periodical_pap_display_callback(self):
         if hasattr(self, 'myhelpera2g'):
@@ -699,7 +705,12 @@ class WidgetGallery(QDialog):
         
     def disconnect_drone_callback(self):
         if hasattr(self, 'periodical_gimbal_follow_thread'):
-            self.periodical_gimbal_follow_thread.cancel()
+            if self.periodical_gimbal_follow_thread.isRunning():
+                self.stop_event_gimbal_follow_thread.set()
+        
+        if hasattr(self, 'periodical_gps_display_thread'):
+            if self.periodical_gps_display_thread.isRunning():
+                self.stop_event_gps_display.set()
 
         if self.stop_meas_togglePushButton.isChecked():
             print("[DEBUG]: Before disconnecting, the ongoing measurement will be stopped")
@@ -1084,7 +1095,16 @@ class WidgetGallery(QDialog):
         layout.addWidget(self.tx_step_manual_move_gimbal_text_edit, 3, 4, 1, 2)
         
         self.gimbalTXPanel.setLayout(layout)
-        
+
+    def change_drone_air_control_panel(self, menu_inputs):
+
+        if menu_inputs == 'Gremsy':
+            1
+        elif menu_inputs == 'Ronin':
+            1
+        else:
+            print("[DEBUG]: Wrong top-down menu items")
+
     def create_Gimbal_AIR_panel(self):
         """
         Creates the panel where the air gimbal can be manually controlled.
@@ -1095,12 +1115,15 @@ class WidgetGallery(QDialog):
         yaw_label = QLabel('Yaw [D]:')
         pitch_label = QLabel('Pitch [D]:')
         
+        self.drone_gimbal_top_down_menu = QComboBox()
+        self.drone_gimbal_top_down_menu.addItems(['Gremsy', 'Ronin'])
         self.rx_lock_mode_radio_button = QRadioButton("Lock")
         self.rx_follow_mode_radio_button = QRadioButton("Follow")        
         self.rx_lock_mode_radio_button.setChecked(True)
         
         self.rx_lock_mode_radio_button.clicked.connect(self.rx_lock_mode_radio_button_callback)
         self.rx_follow_mode_radio_button.clicked.connect(self.rx_follow_mode_radio_button_callback)
+        self.drone_gimbal_top_down_menu.activated[str].connect(self.change_drone_air_control_panel)
 
         self.rx_yaw_value_text_edit = QLineEdit('')
         self.rx_pitch_value_text_edit = QLineEdit('')
@@ -1197,7 +1220,6 @@ class WidgetGallery(QDialog):
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(True)
         self.stop_event_pap_display_thread.set()
-        #self.periodical_pap_display_thread.cancel()
     
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
@@ -1205,15 +1227,22 @@ class WidgetGallery(QDialog):
 
         datestr = datetime.datetime.now()
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S')
-        
+
+        current_text = self.meas_description_text_edit.document().toPlainText()
+        current_text = current_text + f"Yaw at pressing FINISH: {self.myhelpera2g.myGimbal.yaw}" + '\n' + f"Pitch at pressing FINISH: {self.myhelpera2g.myGimbal.pitch}"
         with open('description_' + datestr + '.txt', 'a+') as file:
-            file.write(self.meas_description_text_edit.document().toPlainText())
+            file.write(current_text)
         
         print("[DEBUG]: Saved description file on GND node")
         
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
+
+        if self.periodical_gimbal_follow_thread.isRunning():
+            self.stop_event_gimbal_follow_thread.set()
+        if self.periodical_gps_display_thread.isRunning():
+                self.stop_event_gps_display.set()
 
     def create_Planning_Measurements_panel(self):
         self.planningMeasurementsPanel = QGroupBox('Control measurements')
@@ -1335,9 +1364,11 @@ class WidgetGallery(QDialog):
             #self.periodical_pap_display_thread.cancel()
             #self.periodical_pap_display_thread.stop()
         if hasattr(self, 'periodical_gps_display_thread'):
-            self.periodical_gps_display_thread.cancel()
+            if self.periodical_gps_display_thread.isRunning():
+                self.stop_event_gps_display.set()
         if hasattr(self, 'periodical_gimbal_follow_thread'):
-            self.periodical_gimbal_follow_thread.cancel()
+            if self.periodical_gimbal_follow_thread.isRunning():
+                self.stop_event_gimbal_follow_thread.set()
         
         # Last thing to do is to redirect the stdout
         #sys.stdout = self.original_stdout
