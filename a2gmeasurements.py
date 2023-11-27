@@ -1441,7 +1441,9 @@ class HelperA2GMeasurements(object):
             SERVER_ADDRESS (str): the IP address of the server (the ground station)
             DBG_LVL_0 (bool): provides DEBUG support at the lowest level (i.e printing incoming messages)
             DBG_LVL_1 (bool): provides DEBUG support at the medium level (i.e printing exceptions)
-            IsGimbal (bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A GIMBAL IS CONNECTED.
+            IsGimbal (int/bool): 0/FALSE When NO GIMBAL IS CONNECTED. 
+                                 1 When a Ronin RS2 IS CONNECTED.
+                                 2 When a Gremsy H16 IS CONNECTED. 
             IsGPS (bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A GPS IS CONNECTED.
             IsRFSoC(bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A RFSOC IS CONNECTED.
             SPEED (float): the speed of the node. If the node is GROUND it should be 0 (gnd node does not move) as it is by default.
@@ -1480,15 +1482,16 @@ class HelperA2GMeasurements(object):
         if IsRFSoC:
             self.myrfsoc = RFSoCRemoteControlFromHost(operating_freq=operating_freq, rfsoc_static_ip_address=rfsoc_static_ip_address)
             print("[DEBUG]: Created RFSoC class")
-        if IsGimbal:
-            if self.ID == 'GROUND':
-                self.myGimbal = GimbalRS2()
-                self.myGimbal.start_thread_gimbal()
-                time.sleep(0.5)
-            elif self.ID == 'DRONE':
-                self.myGimbal = GimbalGremsyH16()
-                self.myGimbal.start_conn()
-            print("[DEBUG]: Created Gimbal class")    
+        if IsGimbal == 1: # By default, the TRUE value is GimbalRS2
+            self.myGimbal = GimbalRS2()
+            self.myGimbal.start_thread_gimbal()
+            time.sleep(0.5)
+        elif IsGimbal == 2:
+            self.myGimbal = GimbalGremsyH16()
+            self.myGimbal.start_conn()
+            print("[DEBUG]: Created Gimbal class")
+        else: # IsGimbal = False
+            print("[DEBUG]: No gimbal class is created")
         if IsGPS:
             self.mySeptentrioGPS = GpsSignaling(DBG_LVL_2=True, DBG_LVL_1=False, DBG_LVL_0=False)
             print("[DEBUG]: Created GPS class")
@@ -1657,6 +1660,8 @@ class HelperA2GMeasurements(object):
             
             if self.ID == 'GROUND':
                 frame_to_send = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x03, cmd=0x01, data=data_to_send)
+            elif self.ID == 'DRONE':
+                frame_to_send = self.encode_message(source_id=0x02, destination_id=0x01, message_type=0x03, cmd=0x01, data=data_to_send)
                 
             if self.DBG_LVL_1:
                 print('\n[DEBUG_1]:Received the GETGPS and read the SBF buffer')
@@ -1681,7 +1686,7 @@ class HelperA2GMeasurements(object):
                              'YAW'
         """
 
-        if self.IsGimbal:
+        if self.IsGimbal!=0:
             # Unwrap the dictionary containing the yaw and pitch values to be set.
             #msg_data = json.loads(msg_data)
 
@@ -1689,21 +1694,21 @@ class HelperA2GMeasurements(object):
             #if 'YAW' not in msg_data or 'PITCH' not in msg_data or 'MODE' not in msg_data:
             if 'YAW' not in msg_data or 'PITCH' not in msg_data:
                 if 'MODE' not in msg_data:
-                    print('\n[ERROR]: no YAW or PITCH provided')
+                    print('[ERROR]: no YAW or PITCH provided')
                     return
                 else:
                     self.myGimbal.change_gimbal_mode(mode=msg_data['MODE'])                    
             elif 'YAW' in msg_data and 'PITCH' in msg_data:
-                if float(msg_data['YAW']) > 1800 or float(msg_data['PITCH']) > 400 or float(msg_data['YAW']) < -1800 or float(msg_data['PITCH']) < -600:
-                    print('\n[ERROR]: Yaw or pitch angles are outside of range')
+                if float(msg_data['YAW']) > 1800 or float(msg_data['PITCH']) > 600 or float(msg_data['YAW']) < -1800 or float(msg_data['PITCH']) < -600:
+                    print('[ERROR]: Yaw or pitch angles are outside of range')
                     return
                 else:
-                    if self.ID == 'GROUND':
+                    if self.IsGimbal == 1: # RS2
                         # Cast to int values as a double check, but values are send as numbers and not as strings.
-                        self.myGimbal.setPosControl(yaw=int(msg_data['YAW']), roll=0, pitch=int(msg_data['PITCH']))
-                    if self.ID == 'DRONE':
-                        # Cast to float values as a double check, but values are send as numbers and not as strings.
-                        self.myGimbal.setPosControl(yaw=float(msg_data['YAW']), pitch=float(msg_data['PITCH']))
+                        self.myGimbal.setPosControl(yaw=int(msg_data['YAW']), roll=0, pitch=int(msg_data['PITCH']), ctrl_byte=msg_data['MODE'])
+                    if self.IsGimbal == 2: # Gremsy
+                        # Cast to int values as a double check, but values are send as numbers and not as strings.
+                        self.myGimbal.setPosControl(yaw=float(msg_data['YAW']), pitch=float(msg_data['PITCH']), mode=msg_data['MODE'])
         else:
             print('\n[WARNING]: Action to SET Gimbal not posible cause there is no gimbal: IsGimbal is False')
 
@@ -1816,10 +1821,10 @@ class HelperA2GMeasurements(object):
             print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
             print(f"[DEBUG]: This {self.ID} gimbal will NOT follow its pair node due to ERROR")
         else:
-            print(f"[DEBUG]: YAW to set: {yaw_to_set}, PITCH to set: {pitch_to_set}")
+            print(f"[DEBUG]: This {self.ID} YAW to set is: {yaw_to_set}, and PITCH to set is: {pitch_to_set}")
                     
             if data['FOLLOW_GIMBAL'] == 0x01: # True, Follow gimbal
-                if self.IsGimbal: # There is a gimbal at the node that receives the answer to its command request.
+                if self.IsGimbal!=0: # There is a gimbal at the node that receives the answer to its command request.
                     self.myGimbal.setPosControl(yaw=yaw_to_set, pitch=pitch_to_set) 
                     print(f"[DEBUG]: This {self.ID} gimbal WILL follow its pair node as stated by user")
                 else:
@@ -1840,9 +1845,9 @@ class HelperA2GMeasurements(object):
                 self.do_getgps_action()
             elif cmd == 0x03 and length == 3: # SETGIMBAL
                 print(f"[DEBUG]: THIS {self.ID} receives SETGIMBAL cmd")
-                data_bytes = data_bytes[:12] # 3 float32 array entries
-                yaw, pitch, roll = struct.unpack('fff', data_bytes)
-                self.do_setgimbal_action({'YAW': yaw, 'ROLL': roll, 'PITCH': pitch})
+                data_bytes = data_bytes[:13] # 3 float32 array entries
+                yaw, pitch, roll, mode = struct.unpack('fffB', data_bytes)
+                self.do_setgimbal_action({'YAW': yaw, 'ROLL': roll, 'PITCH': pitch, 'MODE': mode})
             elif cmd == 0x04 and length == 5: # STARTDRONERFSOC
                 print(f"[DEBUG]: THIS {self.ID} receives STARTDRONERFSOC cmd")
                 data_bytes = data_bytes[:12] # 1 float32 and 4 int16
@@ -1915,7 +1920,7 @@ class HelperA2GMeasurements(object):
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
             elif cmd == 0x03 and data and len(data) == 3: # SETGIMBAL
-                data = struct.pack('fff', data['YAW'], data['PITCH'], data['ROLL'])
+                data = struct.pack('fffB', data['YAW'], data['PITCH'], data['ROLL'], data['MODE'])
                 length = 3
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
             elif cmd == 0x04 and data and len(data) == 5: # STARTDRONERFSOC
@@ -2059,7 +2064,7 @@ class HelperA2GMeasurements(object):
         
         aux_ang_buff = []
         file_to_save = []
-        if self.IsGimbal and self.IsGPS:
+        if self.IsGimbal!=0 and self.IsGPS:
             
             if self.DBG_LVL_1:
                 # Remember that reques_current_position is a blocking function
@@ -2200,7 +2205,7 @@ class HelperA2GMeasurements(object):
         
         if type(DISC_WHAT) == list:
             for i in DISC_WHAT:
-                if self.IsGimbal and (i == 'GIMBAL'):  
+                if self.IsGimbal!=0 and (i == 'GIMBAL'):  
                     self.myGimbal.stop_thread_gimbal()
                     print('[DEBUG]: Disconnecting gimbal')
                     time.sleep(0.05)
@@ -2224,7 +2229,7 @@ class HelperA2GMeasurements(object):
                     self.myrfsoc.radio_control.close()
                     self.myrfsoc.radio_data.close()
         else: # backwards compatibility
-            if self.IsGimbal and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
+            if self.IsGimbal!=0 and (DISC_WHAT=='ALL' or DISC_WHAT == 'GIMBAL'):  
                 self.myGimbal.stop_thread_gimbal()
                 print('\n[DEBUG]: Disconnecting gimbal')
                 time.sleep(0.05)
@@ -2825,13 +2830,16 @@ class GimbalGremsyH16:
         self.stop_thread_gimbal()
         self.sbus.stop_updating()
     
-    def setPosControl(self, yaw, pitch, model='linear'):
+    def setPosControl(self, yaw, pitch, roll=0, mode=0x00, model='linear'):
         """
         Set yaw and pitch
 
         Args:
             yaw (float): Angle in degrees. Valid range between [-180, 180]
             pitch (float): Angle in degrees. Valid range between [, ]
+            mode (hex): 0x00 Relative movement
+                        0x01 Absolute movement
+                        THIS OPTION HAS TO BE IMPLEMENTED
         """
         
         if model == 'linear':
