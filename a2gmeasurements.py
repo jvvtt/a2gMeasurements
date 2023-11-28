@@ -1843,9 +1843,9 @@ class HelperA2GMeasurements(object):
             elif cmd == 0x02 and length == 0: # GETGPS
                 print(f"[DEBUG]: THIS {self.ID} receives GETGPS cmd")
                 self.do_getgps_action()
-            elif cmd == 0x03 and length == 3: # SETGIMBAL
+            elif cmd == 0x03 and length == 4: # SETGIMBAL
                 print(f"[DEBUG]: THIS {self.ID} receives SETGIMBAL cmd")
-                data_bytes = data_bytes[:13] # 3 float32 array entries
+                data_bytes = data_bytes[:13] # 3 float32 array entries + 1 byte
                 yaw, pitch, roll, mode = struct.unpack('fffB', data_bytes)
                 self.do_setgimbal_action({'YAW': yaw, 'ROLL': roll, 'PITCH': pitch, 'MODE': mode})
             elif cmd == 0x04 and length == 5: # STARTDRONERFSOC
@@ -1919,9 +1919,9 @@ class HelperA2GMeasurements(object):
             elif cmd == 0x02: # GETGPS
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
-            elif cmd == 0x03 and data and len(data) == 3: # SETGIMBAL
+            elif cmd == 0x03 and data and len(data) == 4: # SETGIMBAL
                 data = struct.pack('fffB', data['YAW'], data['PITCH'], data['ROLL'], data['MODE'])
-                length = 3
+                length = 4
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
             elif cmd == 0x04 and data and len(data) == 5: # STARTDRONERFSOC
                 data = struct.pack('fHHHH', data['carrier_freq'], data['rx_gain_ctrl_bb1'], data['rx_gain_ctrl_bb2'], data['rx_gain_ctrl_bb3'], data['rx_gain_ctrl_bfrf'])

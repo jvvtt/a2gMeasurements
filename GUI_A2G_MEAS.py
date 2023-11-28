@@ -401,28 +401,29 @@ class WidgetGallery(QMainWindow):
         else:
             try:
                 stdin, stdout, stderr = self.remote_drone_conn.exec_command('ssh xilinx@10.1.1.40')
+                print(stderr)
                 stdin.channel.send("xilinx\n")
                 stdin.channel.send("ps aux | grep mmwsdr\n")
                 stdin.channel.shutdown_write()
 
                 if stderr != '':
-                    print("[DEBUG]: Error when trying to ssh DRONE fpga: ", stderr)
+                    print("[DEBUG]: Error when trying to ssh DRONE fpga:\n", stderr)
+                    success_server_drone_fpga = None
                 else:
                     stdin_out = stdout.read().decode('utf-8')
 
                     if 'server.py'in stdin_out and 'run.sh' in stdin_out:
-                        print("[DEBUG]: Server script is running on GND fpga")
+                        print("[DEBUG]: Server script is running on DRONE fpga")
                     else:
-                        print("[DEBUG]: Server script is not running")
+                        print("[DEBUG]: Server script is not running on DRONE fpga")
                         self.remote_drone_conn.exec_command('cd jupyter_notebooks/mmwsdr')
                         stdin, stdout, stderr = self.remote_drone_conn.exec_command('sudo ./run.sh')
                         stdin.channel.send("xilinx\n")
                         stdin.channel.shutdown_write()
-                        print("[DEBUG]: This node has started the Server Daemon in its FPGA")
-
+                        print("[DEBUG]: Drone node has started the Server Daemon in its FPGA")
+                    success_server_drone_fpga = True
                 # Exit the ssh
                 stdin, stdout, stderr = self.remote_drone_conn.exec_command('exit')
-                success_server_drone_fpga = True
             except Exception as e:
                 print(f"This error occurred when trying to check if server is running on drone fpga: {e}")
                 success_server_drone_fpga = False
@@ -445,12 +446,12 @@ class WidgetGallery(QMainWindow):
             if stderr.read().decode() == '' and 'server.py' in output and 'run.sh' in output:
                 print("[DEBUG]: Server script is running on GND fpga")
             else:
-                print("[DEBUG]: Server script not running")
+                print("[DEBUG]: Server script is not running on GND fpga")
                 conn_gnd_fpga.exec_command('cd jupyter_notebooks/mmwsdr')
                 stdin, stdout, stderr = conn_gnd_fpga.exec_command('sudo ./run.sh')
                 stdin.channel.send("xilinx\n")
                 stdin.channel.shutdown_write()
-                print("[DEBUG]: This node has started the Server Daemon in its FPGA")
+                print("[DEBUG]: GND node has started the Server Daemon in its FPGA")
         except Exception as e:
             print("[DEBUG]: Could not check if Server script is running in this node FPGA")
             success_server_gnd_fpga = False
@@ -588,7 +589,7 @@ class WidgetGallery(QMainWindow):
         self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
         self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
         self.server_drone_fpga_label_modifiable.setText(str(SUCCESS_DRONE_SERVER_FPGA))
-        self.server_gnd_fpga_label_modifiable(str(SUCCESS_GND_SERVER_FPGA))
+        self.server_gnd_fpga_label_modifiable.setText(str(SUCCESS_GND_SERVER_FPGA))
         
         if hasattr(self, 'GND_ADDRESS'):
             self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
@@ -811,10 +812,12 @@ class WidgetGallery(QMainWindow):
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
             self.start_meas_togglePushButton.setEnabled(True)
-            self.start_gnd_gimbal_fm_action.setEnabled(True)
-            self.stop_gnd_gimbal_fm_action.setEnabled(False)
-            self.start_gps_visualization_action.setEnabled(True)
-            self.stop_gps_visualization_action.setEnabled(False)
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gnd_gimbal_fm_action.setEnabled(True)
+                self.stop_gnd_gimbal_fm_action.setEnabled(False)
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
             print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")               
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsRFSoC=True)
@@ -1149,9 +1152,9 @@ class WidgetGallery(QMainWindow):
                     incorrect_angle_value = self.checker_gimbal_input_range(yaw)
                     incorrect_angle_value = self.checker_gimbal_input_range(pitch)
                     if self.droneGimbalChoice == "DJI Ronin RS2":
-                        data = {'YAW': yaw*10, 'PITCH': pitch*10, 'MODE': ctrl_byte}
+                        data = {'YAW': yaw*10, 'PITCH': pitch*10, 'ROLL': 0, 'MODE': ctrl_byte}
                     elif self.droneGimbalChoice == "Gremsy H16":
-                        data = {'YAW': yaw, 'PITCH': pitch, 'MODE': ctrl_byte}
+                        data = {'YAW': yaw, 'PITCH': pitch, 'ROLL': 0, 'MODE': ctrl_byte}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved {yaw} degs in YAW and {pitch} in PITCH from application")
                 except Exception as e:
@@ -1171,18 +1174,18 @@ class WidgetGallery(QMainWindow):
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
                     
                     if self.droneGimbalChoice == "DJI Ronin RS2":
-                        data = {'YAW': -tmp*10, 'PITCH': 0, 'MODE': 0x00}
+                        data = {'YAW': -tmp*10, 'PITCH': 0, 'ROLL': 0, 'MODE': 0x00}
                     elif self.droneGimbalChoice == "Gremsy H16":
-                        data = {'YAW': -tmp, 'PITCH': 0, 'MODE': 0x00}
+                        data = {'YAW': -tmp, 'PITCH': 0, 'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
                 if self.droneGimbalChoice == "DJI Ronin RS2":
-                    data = {'YAW': -100, 'PITCH': 0, 'MODE': 0x00}
+                    data = {'YAW': -100, 'PITCH': 0, 'ROLL': 0,'MODE': 0x00}
                 elif self.droneGimbalChoice == "Gremsy H16":
-                    data = {'YAW': -10, 'PITCH': 0, 'MODE': 0x00}
+                    data = {'YAW': -10, 'PITCH': 0, 'ROLL': 0,'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
         else:
@@ -1199,18 +1202,18 @@ class WidgetGallery(QMainWindow):
                         tmp = abs(tmp)
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
                     if self.droneGimbalChoice == "DJI Ronin RS2":
-                        data = {'YAW': tmp*10, 'PITCH': 0, 'MODE': 0x00}
+                        data = {'YAW': tmp*10, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
                     elif self.droneGimbalChoice == "Gremsy H16":
-                        data = {'YAW': tmp, 'PITCH': 0, 'MODE': 0x00}
+                        data = {'YAW': tmp, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
                 if self.droneGimbalChoice == "DJI Ronin RS2":
-                    data = {'YAW': 100, 'PITCH': 0, 'MODE': 0x00}
+                    data = {'YAW': 100, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
                 elif self.droneGimbalChoice == "Gremsy H16":
-                    data = {'YAW': 10, 'PITCH': 0, 'MODE': 0x00}
+                    data = {'YAW': 10, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
         else:
@@ -1227,18 +1230,18 @@ class WidgetGallery(QMainWindow):
                         tmp = abs(tmp)
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
                     if self.droneGimbalChoice == "DJI Ronin RS2":
-                        data = {'YAW': 0, 'PITCH': tmp*10, 'MODE': 0x00}
+                        data = {'YAW': 0, 'PITCH': tmp*10,'ROLL': 0, 'MODE': 0x00}
                     elif self.droneGimbalChoice == "Gremsy H16":    
-                        data = {'YAW': 0, 'PITCH': tmp, 'MODE': 0x00}
+                        data = {'YAW': 0, 'PITCH': tmp,'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
                 if self.droneGimbalChoice == "DJI Ronin RS2":
-                    data = {'YAW': 0, 'PITCH': 100, 'MODE': 0x00}
+                    data = {'YAW': 0, 'PITCH': 100, 'ROLL': 0,'MODE': 0x00}
                 elif self.droneGimbalChoice == "Gremsy H16":
-                    data = {'YAW': 0, 'PITCH': 10, 'MODE': 0x00}
+                    data = {'YAW': 0, 'PITCH': 10, 'ROLL': 0,'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
         else:
@@ -1255,18 +1258,18 @@ class WidgetGallery(QMainWindow):
                         tmp = abs(tmp)
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
                     if self.droneGimbalChoice == "DJI Ronin RS2":
-                        data = {'YAW': 0, 'PITCH': -tmp*10, 'MODE': 0x00}
+                        data = {'YAW': 0, 'PITCH': -tmp*10,'ROLL': 0, 'MODE': 0x00}
                     elif self.droneGimbalChoice == "Gremsy H16":
-                        data = {'YAW': 0, 'PITCH': -tmp, 'MODE': 0x00}
+                        data = {'YAW': 0, 'PITCH': -tmp,'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
                 if self.droneGimbalChoice == "DJI Ronin RS2":
-                    data = {'YAW': 0, 'PITCH': -100, 'MODE': 0x00}
+                    data = {'YAW': 0, 'PITCH': -100,'ROLL': 0, 'MODE': 0x00}
                 elif self.droneGimbalChoice == "Gremsy H16":
-                    data = {'YAW': 0, 'PITCH': -10, 'MODE': 0x00}
+                    data = {'YAW': 0, 'PITCH': -10, 'ROLL': 0,'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
         else:
@@ -1375,6 +1378,7 @@ class WidgetGallery(QMainWindow):
         self.rx_move_according_coords_push_button.clicked.connect(self.rx_move_according_coords_push_button_callback)
         
         self.rx_gimbal_manual_move_push_button = QPushButton('Move')
+        self.rx_gimbal_manual_move_push_button.clicked.connect(self.move_button_gimbal_drone_callback)
         self.rx_gimbal_move_left_push_button = QPushButton('Left')
         self.rx_gimbal_move_left_push_button.clicked.connect(self.left_button_gimbal_drone_callback)
         self.rx_gimbal_move_right_push_button = QPushButton('Right')
@@ -1528,7 +1532,9 @@ class WidgetGallery(QMainWindow):
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S')
 
         current_text = self.meas_description_text_edit.document().toPlainText()
-        current_text = current_text + f"Yaw at pressing FINISH: {self.myhelpera2g.myGimbal.yaw}" + '\n' + f"Pitch at pressing FINISH: {self.myhelpera2g.myGimbal.pitch}"
+        if self.myhelpera2g.IsGimbal!=0:
+            if hasattr(self.myhelpera2g, 'myGimbal'):
+                current_text = current_text + f"\nYaw at pressing FINISH: {self.myhelpera2g.myGimbal.yaw}" + '\n' + f"Pitch at pressing FINISH: {self.myhelpera2g.myGimbal.pitch}"
         with open('description_' + datestr + '.txt', 'a+') as file:
             file.write(current_text)
         
