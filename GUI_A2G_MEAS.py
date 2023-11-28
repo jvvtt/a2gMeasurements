@@ -213,7 +213,7 @@ class WidgetGallery(QMainWindow):
         
         self.start_gps_visualization_action.setEnabled(True)
         self.stop_gps_visualization_action.setEnabled(False)
-    
+
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
         """
         Checks ssh connection betwwen ground node (running the GUI) and the computer on the drone.
@@ -396,8 +396,8 @@ class WidgetGallery(QMainWindow):
             _type_: _description_
         """
         if self.remote_drone_conn is None:
-            success_server_drone_fpga = None
             print('[DEBUG]: No SSH connection to drone detected. The server-running-on-drone check can not be done.')
+            success_server_drone_fpga = False
         else:
             try:
                 stdin, stdout, stderr = self.remote_drone_conn.exec_command('ssh xilinx@10.1.1.40')
@@ -413,38 +413,55 @@ class WidgetGallery(QMainWindow):
                     if 'server.py'in stdin_out and 'run.sh' in stdin_out:
                         print("[DEBUG]: Server script is running on GND fpga")
                     else:
+                        print("[DEBUG]: Server script is not running")
                         self.remote_drone_conn.exec_command('cd jupyter_notebooks/mmwsdr')
                         stdin, stdout, stderr = self.remote_drone_conn.exec_command('sudo ./run.sh')
                         stdin.channel.send("xilinx\n")
                         stdin.channel.shutdown_write()
+                        print("[DEBUG]: This node has started the Server Daemon in its FPGA")
 
                 # Exit the ssh
                 stdin, stdout, stderr = self.remote_drone_conn.exec_command('exit')
+                success_server_drone_fpga = True
             except Exception as e:
                 print(f"This error occurred when trying to check if server is running on drone fpga: {e}")
+                success_server_drone_fpga = False
+        
+        return success_server_drone_fpga
 
     def check_if_server_running_gnd_fpga(self):
-        if self.remote_drone_conn is None:
-            print('[DEBUG]: No SSH connection to drone detected. The server-running-on-drone check can not be done.')
-        else:
-            try:
-                conn_gnd_fpga = paramiko.SSHClient()
-                conn_gnd_fpga.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                conn_gnd_fpga.connect('10.1.1.30', username='xilinx', password='xilinx')
-            except Exception as e:
-                print(f"This error occurred when trying to check if server is running on GND fpga: {e}")
-                success_server_gnd_fpga = False    
-            else:
-                stdin, stdout, stderr = conn_gnd_fpga.exec_command('ps aux | grep mmwsdr')
-                output = stdout.read().decode()
+        try:
+            conn_gnd_fpga = paramiko.SSHClient()
+            conn_gnd_fpga.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            conn_gnd_fpga.connect('10.1.1.30', username='xilinx', password='xilinx')
+        except Exception as e:
+            print(f"This error occurred when trying to check if server is running on GND fpga: {e}")
+            success_server_gnd_fpga = False
+            return success_server_gnd_fpga
+        try:
+            stdin, stdout, stderr = conn_gnd_fpga.exec_command('ps aux | grep mmwsdr')
+            output = stdout.read().decode()
 
-                if stderr.read().decode() == '' and 'server.py' in output and 'run.sh' in output:
-                    print("[DEBUG]: Server script is running on GND fpga")
-                else:
-                    conn_gnd_fpga.exec_command('cd jupyter_notebooks/mmwsdr')
-                    stdin, stdout, stderr = conn_gnd_fpga.exec_command('sudo ./run.sh')
-                    stdin.channel.send("xilinx\n")
-                    stdin.channel.shutdown_write()
+            if stderr.read().decode() == '' and 'server.py' in output and 'run.sh' in output:
+                print("[DEBUG]: Server script is running on GND fpga")
+            else:
+                print("[DEBUG]: Server script not running")
+                conn_gnd_fpga.exec_command('cd jupyter_notebooks/mmwsdr')
+                stdin, stdout, stderr = conn_gnd_fpga.exec_command('sudo ./run.sh')
+                stdin.channel.send("xilinx\n")
+                stdin.channel.shutdown_write()
+                print("[DEBUG]: This node has started the Server Daemon in its FPGA")
+        except Exception as e:
+            print("[DEBUG]: Could not check if Server script is running in this node FPGA")
+            success_server_gnd_fpga = False
+            return success_server_gnd_fpga
+        
+        success_server_gnd_fpga = True
+
+        # Close this connection
+        conn_gnd_fpga.close()
+
+        return success_server_gnd_fpga
 
     def check_if_gnd_gps_connected(self):
         """
@@ -563,11 +580,15 @@ class WidgetGallery(QMainWindow):
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
         SUCCESS_GND_GPS = self.check_if_gnd_gps_connected()
+        SUCCESS_DRONE_SERVER_FPGA = self.check_if_server_running_drone_fpga()
+        SUCCESS_GND_SERVER_FPGA = self.check_if_server_running_gnd_fpga()
         
         self.get_gnd_ip_node_address()
         self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))
         self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
         self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
+        self.server_drone_fpga_label_modifiable.setText(str(SUCCESS_DRONE_SERVER_FPGA))
+        self.server_gnd_fpga_label_modifiable(str(SUCCESS_GND_SERVER_FPGA))
         
         if hasattr(self, 'GND_ADDRESS'):
             self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
@@ -578,7 +599,8 @@ class WidgetGallery(QMainWindow):
         self.SUCCESS_GND_GIMBAL = SUCCESS_GND_GIMBAL
         self.SUCCESS_GND_GPS = SUCCESS_GND_GPS
         
-        self.connect_to_drone.setEnabled(True)
+        if self.SUCCESS_SSH and self.SUCCESS_PING_DRONE:
+            self.connect_to_drone.setEnabled(True)
         
     def create_class_instances(self, IsGPS=False, IsGimbal=False, IsRFSoC=False, GPS_Stream_Interval='sec1'):
         """
@@ -703,6 +725,8 @@ class WidgetGallery(QMainWindow):
         drone_rfsoc_conn_label = QLabel('Drone RFSoC:')
         drone_gps_conn_label = QLabel('Drone GPS:')
         drone_gimbal_conn_label = QLabel('Drone Gimbal:')
+        server_gnd_fpga_label = QLabel('Ground FPGA server?:')
+        server_drone_fpga_label = QLabel('Drone FPGA server?:')
 
         gnd_ip_addr_label = QLabel('Ground IP:')
         air_ip_addr_label = QLabel('Drone IP:')
@@ -736,6 +760,8 @@ class WidgetGallery(QMainWindow):
         self.drone_rfsoc_conn_label_modifiable = QLabel('--')
         self.drone_gps_conn_label_modifiable = QLabel('--')
         self.drone_gimbal_conn_label_modifiable = QLabel('--')
+        self.server_gnd_fpga_label_modifiable = QLabel('--')
+        self.server_drone_fpga_label_modifiable = QLabel('--')
 
         layout = QGridLayout()
 
@@ -759,12 +785,13 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.air_ip_addr_value_text_edit, 1, 1, 1, 2)
         layout.addWidget(drone_gimbal_conn_label, 1, 3, 1, 1)
         layout.addWidget(self.drone_gimbal_conn_label_modifiable, 1, 4, 1, 1) 
-        layout.addWidget(self.check_connections_push_button, 1, 5, 1, 4)
-        #layout.addWidget(self.GndGimbalFollowingCheckBox, 1, 9, 1, 1)
-        #layout.addWidget(self.GpsDisplayCheckBox, 1, 10, 1, 1)
-        #layout.addWidget(self.connect_to_drone, 1, 9, 1, 4)
-        layout.addWidget(self.connect_to_drone, 1, 9, 1, 4)
-        layout.addWidget(self.disconnect_from_drone, 1, 13, 1, 3)
+        layout.addWidget(server_gnd_fpga_label, 1, 5, 1, 1)
+        layout.addWidget(self.server_gnd_fpga_label_modifiable, 1, 6, 1, 1)
+        layout.addWidget(server_drone_fpga_label, 1, 7, 1, 1)
+        layout.addWidget(self.server_drone_fpga_label_modifiable, 1, 8, 1, 1)
+        layout.addWidget(self.check_connections_push_button, 1, 9, 1, 3)
+        layout.addWidget(self.connect_to_drone, 1, 12, 1, 2)
+        layout.addWidget(self.disconnect_from_drone, 1, 14, 1, 2)
         
         self.checkConnPanel.setLayout(layout)
     
@@ -857,49 +884,51 @@ class WidgetGallery(QMainWindow):
         self.fpgaAndSiversSettingsPanel = QGroupBox('Sivers settings')
 
         rf_op_freq_label = QLabel('Freq. Operation [Hz]:')
-        tx_bb_gain_label = QLabel('Tx BB Gain [HEX]:')
-        tx_bb_phase_label = QLabel('Tx BB Phase [HEX]:')
-        tx_bb_iq_gain_label = QLabel('Tx BB IQ Gain [HEX]:')
-        tx_bfrf_gain_label = QLabel('Tx BF & RF Gain [HEX]:')
-        rx_bb_gain_1_label = QLabel('Rx BB Gain 1 [HEX]:')
-        rx_bb_gain_2_label = QLabel('Rx BB Gain 2 [HEX]:')
-        rx_bb_gain_3_label = QLabel('Rx BB Gain 3 [HEX]:')
-        rx_bfrf_gain_label = QLabel('Rx BF & RF Gain [HEX]:')
+        tx_bb_gain_label = QLabel('Tx BB Gain [dB]:')
+        tx_bb_phase_label = QLabel('Tx BB Phase [dB]:')
+        tx_bb_iq_gain_label = QLabel('Tx BB IQ Gain [dB]:')
+        tx_bfrf_gain_label = QLabel('Tx BF & RF Gain [dB]:')
+        rx_bb_gain_1_label = QLabel('Rx BB Gain 1 [dB]:')
+        rx_bb_gain_2_label = QLabel('Rx BB Gain 2 [dB]:')
+        rx_bb_gain_3_label = QLabel('Rx BB Gain 3 [dB]:')
+        rx_bfrf_gain_label = QLabel('Rx BF & RF Gain [dB]:')
         
         tx_bb_gain_label.leaveEvent = lambda e: QToolTip.hideText()
-        tx_bb_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "tx_ctrl bit 3 (BB Ibias set) = 0, 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB\ntx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB")
+        tx_bb_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "Not available to the user for the moment")
         
         #tx_bb_phase_label.leaveEvent = lambda e: QToolTip.hideText()
         #tx_bb_phase_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "Defaults to 0.")
         
         # Luckily lambda functions can help us to re implement QLabel methods leaveEvent and enterEvent in one line
         tx_bb_iq_gain_label.leaveEvent = lambda e: QToolTip.hideText()
-        tx_bb_iq_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "Gain in BB:\n[0:3, I gain]: 0-6 dB, 16 steps\n[4:7, Q gain]: 0-6 dB, 16 steps")
+        tx_bb_iq_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,6] dB\nThis sets the BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,6,16)")
         
         tx_bfrf_gain_label.leaveEvent = lambda e: QToolTip.hideText()
-        tx_bfrf_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "Gain after RF mixer:\n[0:3, RF gain]: 0-15 dB, 16 steps\n[4:7, BF gain]: 0-15 dB, 16 steps")
+        tx_bfrf_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,15] dB\nThis sets the gain after RF mixer for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,15,16)")
         
         rx_bb_gain_1_label.leaveEvent = lambda e: QToolTip.hideText()
-        rx_bb_gain_1_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps\nQ[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps")
+        rx_bb_gain_1_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [-6,0] dB\nThis sets the rx 1st BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(-6,0,4)")
         
         rx_bb_gain_2_label.leaveEvent = lambda e: QToolTip.hideText()
-        rx_bb_gain_2_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps\nQ[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps")
+        rx_bb_gain_2_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [-6,0] dB\nThis sets the rx 2nd BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(-6,0,4)")
         
         rx_bb_gain_3_label.leaveEvent = lambda e: QToolTip.hideText()
-        rx_bb_gain_3_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps\nQ[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps")
+        rx_bb_gain_3_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,6] dB\nThis sets the rx 3rd BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,6,16)")
         
         rx_bfrf_gain_label.leaveEvent = lambda e: QToolTip.hideText()
-        rx_bfrf_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "Gain after RF mixer:\n[0:3,RF gain]: 0-15 dB, 16 steps\n[4:7, BF gain]: 0-15 dB, 16 steps")
+        rx_bfrf_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,15] dB\nThis sets the rx gain before the RF mixer for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,15,16)")
 
         self.rf_op_freq_text_edit = QLineEdit('57.51e9')
         self.tx_bb_gain_text_edit = QLineEdit('3')
         self.tx_bb_phase_text_edit = QLineEdit('0')
-        self.tx_bb_iq_gain_text_edit = QLineEdit('77')
-        self.tx_bfrf_gain_text_edit = QLineEdit('40')
-        self.rx_bb_gain_1_text_edit = QLineEdit('77')
-        self.rx_bb_gain_2_text_edit = QLineEdit('00')
-        self.rx_bb_gain_3_text_edit = QLineEdit('99')
-        self.rx_bfrf_gain_text_edit = QLineEdit('FF')
+        self.tx_bb_iq_gain_text_edit = QLineEdit('1.6')
+        self.tx_bfrf_gain_text_edit = QLineEdit('3')
+        self.rx_bb_gain_1_text_edit = QLineEdit('-1.5')
+        self.rx_bb_gain_2_text_edit = QLineEdit('-4.5')
+        self.rx_bb_gain_3_text_edit = QLineEdit('1.6')
+        self.rx_bfrf_gain_text_edit = QLineEdit('7')
+        self.tx_bb_phase_text_edit.setEnabled(False)
+        self.tx_bb_gain_text_edit.setEnabled(False)
 
         layout = QGridLayout()
 
@@ -1418,22 +1447,54 @@ class WidgetGallery(QMainWindow):
         else:
             print("[DEBUG]: No HelperA2GMeasurements class instance is available")
 
+    def convert_dB_to_valid_hex_sivers_register_values(self):
+        rxbb1 = float(self.rx_bb_gain_1_text_edit.text())
+        rxbb2 = float(self.rx_bb_gain_2_text_edit.text())
+        rxbb3 = float(self.rx_bb_gain_3_text_edit.text())
+        rxbfrf = float(self.rx_bfrf_gain_text_edit.text())
+
+        txbb = self.tx_bb_gain_text_edit.text()
+        txbbiq = float(self.tx_bb_iq_gain_text_edit.text())
+        txbbphase = self.tx_bb_phase_text_edit.text()
+        txbf = float(self.tx_bfrf_gain_text_edit.text())
+        
+        valid_values_rx_bb = [0x00, 0x11, 0x33, 0x77, 0xFF]
+        valid_values_rx_bb_dB = np.linspace(-6, 0, 5)
+
+        valid_values_rx_bb3_bf = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        valid_values_rx_bb3_dB = np.linspace(0,6,16)
+        valid_values_rx_bf_dB = np.linspace(0,15,16)
+
+        valid_values_tx_bbiq_bf = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        valid_values_tx_bbiq_dB = np.linspace(0,6,16)
+        valid_values_tx_bf_dB = np.linspace(0,15,16)        
+
+        tx_signal_values = {'tx_bb_gain':int(txbb,16), 
+                            'tx_bb_iq_gain':valid_values_tx_bbiq_bf[np.abs(txbbiq - valid_values_tx_bbiq_dB).argmin()],
+                            'tx_bb_phase':int(txbbphase,16), 
+                            'tx_bfrf_gain':valid_values_tx_bbiq_bf[np.abs(txbf - valid_values_tx_bf_dB).argmin()]}
+
+        rx_signal_values = {'rx_gain_ctrl_bb1': valid_values_rx_bb[np.abs(rxbb1 - valid_values_rx_bb_dB).argmin()],
+                'rx_gain_ctrl_bb2': valid_values_rx_bb[np.abs(rxbb2 - valid_values_rx_bb_dB).argmin()],
+                'rx_gain_ctrl_bb3': valid_values_rx_bb3_bf[np.abs(rxbb3 - valid_values_rx_bb3_dB).argmin()],
+                'rx_gain_ctrl_bfrf': valid_values_rx_bb3_bf[np.abs(rxbfrf - valid_values_rx_bf_dB).argmin()]}
+        
+        return tx_signal_values, rx_signal_values
+    
     def start_meas_button_callback(self):
+
+        tx_signal_values, rx_signal_values = self.convert_dB_to_valid_hex_sivers_register_values()
 
         # Experiment starts
         self.myhelpera2g.myrfsoc.transmit_signal(carrier_freq=float(self.rf_op_freq_text_edit.text()),
-                                                tx_bb_gain=int(self.tx_bb_gain_text_edit.text(), 16),
-                                                tx_bb_iq_gain=int(self.tx_bb_iq_gain_text_edit.text(), 16),
-                                                tx_bb_phase=int(self.tx_bb_phase_text_edit.text(), 16),
-                                                tx_bfrf_gain=int(self.tx_bfrf_gain_text_edit.text(), 16))
+                                                tx_bb_gain=tx_signal_values['tx_bb_gain'],
+                                                tx_bb_iq_gain=tx_signal_values['tx_bb_iq_gain'],
+                                                tx_bb_phase=tx_signal_values['tx_bb_phase'],
+                                                tx_bfrf_gain=tx_signal_values['tx_bfrf_gain'])
         
-        data = {'carrier_freq': float(self.rf_op_freq_text_edit.text()),
-                'rx_gain_ctrl_bb1': int(self.rx_bb_gain_1_text_edit.text(), 16),
-                'rx_gain_ctrl_bb2': int(self.rx_bb_gain_2_text_edit.text(), 16),
-                'rx_gain_ctrl_bb3': int(self.rx_bb_gain_3_text_edit.text(), 16),
-                'rx_gain_ctrl_bfrf': int(self.rx_bfrf_gain_text_edit.text(), 16)}
+        rx_signal_values['carrier_freq'] = float(self.rf_op_freq_text_edit.text())
         
-        self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC', data=data)
+        self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC', data=rx_signal_values)
 
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(True)
