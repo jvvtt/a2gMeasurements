@@ -6,6 +6,11 @@ import re
 from json import JSONEncoder
 import numpy as np
 
+'''
+For the moment assume always that the drone gimbal will follow the gnd node ONLY in elevation 
+Omit azimuth, since heading info at the drone GPS must not be available'''
+myfmode = {'FMODE': 0x01}
+
 TIME_SEND_PAP = 0.5
 FLAG_DRONE_ASKS_FOLLOWGIMBAL = False
 

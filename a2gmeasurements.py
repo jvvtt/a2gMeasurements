@@ -1517,7 +1517,7 @@ class HelperA2GMeasurements(object):
             time.sleep(0.5)
            
     def gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
-                                    lat_drone=None, lon_drone=None, height_drone=None):
+                                    lat_drone=None, lon_drone=None, height_drone=None, fmode=0x00):
         """
         
         If 'IsGPS' is False (no GPS connected), then heading, lat,lon, height coordinates of both nodes must be provided. 
@@ -1525,30 +1525,46 @@ class HelperA2GMeasurements(object):
 
         Args:
             
-            heading (float): angle between [0, 2*pi]. ONLY provided for debugging.
-            lat_ground (float): Latitude of GROUND station. ONLY provided for debugging if ID is GROUND.
-            lon_ground (float): Longitude of GROUND station. ONLY provided for debugging if ID is GROUND.
-            height_ground (float): Height of the GPS Antenna in GROUND station if ID is GROUND. 
-            lat_drone (float): Latitude of DRONE station. In DDMMS format: i.e: 62.471541 N
-            lon_drone (float): Longitude of DRONE station. In DDMMS format: i.e: 21.471541 E
-            height_drone (float): Height of the GPS Antenna in DRONE station. In meters.
+            heading (float): angle between [0, 2*pi] corresponding of the heading attitude for THIS node. 
+            lat_ground (float): Latitude of GROUND station. 
+            lon_ground (float): Longitude of GROUND station.
+            height_ground (float): Height of the GPS Antenna in GROUND station.
+                                   This parameter is the altitude in meters above sea level of the upper part of the ground GPS antenna.
+            lat_drone (float): Latitude of DRONE station. In DDMMS format: i.e: 62.471541 N (the N/S is given by the sign of the number)
+            lon_drone (float): Longitude of DRONE station. In DDMMS format: i.e: 21.471541 E (the W/E is giben by the sign of the number)
+            height_drone (float): Height of the GPS Antenna in DRONE station. 
+                                  This parameter is the altitude in meters above sea level of the upper part of the drone GPS antenna.
+            fmode (hex): 0x00: Azimuth and elevation. Defaults to 0x00.
+                         0x01: Elevation.
+                         0x02: Azimuth.
 
         Returns:
             yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
         """
 
-        if self.IsGPS:            
-            coords, head_info = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
-            
-            if coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
-                return self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL
-            elif coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ:
-                return self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ
-            else:
-                heading = head_info['Heading']
-                time_tag_heading = head_info['TOW']
-                time_tag_coords = coords['TOW']
-                datum_coordinates = coords['Datum']
+        if self.IsGPS:
+            if fmode == 0x00 or fmode == 0x02:
+                coords, head_info = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
+                
+                if coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+                    return self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL
+                elif coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ:
+                    return self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ
+                else:
+                    heading = head_info['Heading']
+                    time_tag_heading = head_info['TOW']
+                    time_tag_coords = coords['TOW']
+                    datum_coordinates = coords['Datum']
+            elif fmode == 0x01:
+                coords = self.mySeptentrioGPS.get_last_sbf_buffer_info(what='Coordinates')
+
+                if coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
+                    return self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL, self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL
+                elif coords['X'] == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ:
+                    return self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ, self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ
+                else:
+                    time_tag_coords = coords['TOW']
+                    datum_coordinates = coords['Datum']
             
             '''
             Check if the time difference (ms) between the heading and the coordinates info is less
@@ -1588,6 +1604,8 @@ class HelperA2GMeasurements(object):
             # Both coordinates must be provided and must be in geodetic format
             1
         
+        # The caller of this function must guarantee that if self.ID == ground the arguments passed to this function are drone coords
+        # The caller of this function must guarantee that if self.ID == drone the arguments passed to this function are ground coords
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
             print("\n[ERROR]: Either ground or drone coordinates MUST be provided")
             return self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY
@@ -1598,32 +1616,52 @@ class HelperA2GMeasurements(object):
             ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_ground, lat_ground, lon_drone, lat_drone)
         elif self.ID == 'DRONE':
             ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_drone, lat_drone, lon_ground, lat_ground)
-                                
-        pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)
+        
         pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
- 
-        # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
-        if heading > 180:
-            heading = heading - 360
+        
+        if fmode == 0x00 or fmode == 0x02:
+            # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
+            if heading > 180:
+                heading = heading - 360
                     
-        yaw_to_set = ITFA - heading
+            yaw_to_set = ITFA - heading
 
-        if yaw_to_set > 180:
-            yaw_to_set = yaw_to_set - 360
-        elif yaw_to_set < -180:
-            yaw_to_set = yaw_to_set + 360
+            if yaw_to_set > 180:
+                yaw_to_set = yaw_to_set - 360
+            elif yaw_to_set < -180:
+                yaw_to_set = yaw_to_set + 360
             
-        yaw_to_set = int(yaw_to_set*10)
+            yaw_to_set = int(yaw_to_set*10)
+            pitch_to_set = None
+        
+        elif fmode == 0x01: # Elevation
+            yaw_to_set = None
+            if self.ID == 'GROUND':
+                pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)    
+            elif self.ID == 'DRONE':
+                pitch_to_set = np.arctan2(height_ground - height_drone, d_mobile_drone_2D)
         
         return yaw_to_set, pitch_to_set
     
-    def do_follow_mode_gimbal(self):
-        self.do_getgps_action(follow_mode_gimbal=True)
+    def do_follow_mode_gimbal(self, fmode=0x00):
+        """
+
+        Args:
+            fmode (hexadecimal, optional): 0x00: Azimuth and elevation. Defaults to 0x00.
+                                           0x01: Elevation.
+                                           0x02: Azimuth
+        """
+        self.do_getgps_action(follow_mode_gimbal=True, fmode=0x00)
     
-    def do_getgps_action(self, follow_mode_gimbal=False):
+    def do_getgps_action(self, follow_mode_gimbal=False, fmode=0x00):
         """
         Function to execute when the received instruction in the a2g comm link is 'GETGPS'.
 
+        Args:
+            follow_mode_gimbal (bool, optional): True if gimbal of self node has to follow its pair. Defaults to False.
+            fmode (hexadecimal, optional): 0x00: Azimuth and elevation. Defaults to 0x00.
+                                           0x01: Elevation.
+                                           0x02: Azimuth
         """
         if self.DBG_LVL_1:
             print(f"THIS ({self.ID}) receives a GETGPS command")
@@ -1653,6 +1691,7 @@ class HelperA2GMeasurements(object):
             if follow_mode_gimbal:
                 print('[DEBUG]: Last coordinates retrieved and followgimbal flag set to True to be sent')
                 data_to_send['FOLLOW_GIMBAL'] = 0x01
+                data_to_send['FMODE'] = fmode
             
             # data_to_send wont be any of the other error codes, because they are not set for 'what'=='Coordinates'
             else:            
@@ -1771,6 +1810,7 @@ class HelperA2GMeasurements(object):
                 print('[ERROR]: no GPS coordinates received from DRONE through socket link')
                 return
 
+                # THE HEIGHT VALUE IS THE ALTITUDE VALUE OVER THE SEA LEVEL
                 # Z is in geocentric coordinates and does not correspond to the actual height:
                 # Geocentric WGS84
             if datum_coordinates == 0:
@@ -1782,10 +1822,10 @@ class HelperA2GMeasurements(object):
                 print('[ERROR]: Not known geocentric datum')
                 return
 
-            yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)
+            yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd, fmode=data['FMODE'])
             
             while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
-                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd)           
+                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_ground=lat_gnd, lon_ground=lon_gnd, height_ground=height_gnd, fmode=data['FMODE'])
         elif self.ID == 'GROUND':
             y_drone = data['Y']
             x_drone = data['X']
@@ -1800,22 +1840,21 @@ class HelperA2GMeasurements(object):
                 # Geocentric WGS84
             if datum_coordinates == 0:
                 lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'])
-                # This is for GUI GPS panel to show drone coordinates
-                self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
                 # Geocentric ETRS89
             elif datum_coordinates == 30:
                 lat_drone, lon_drone, height_drone = geocentric2geodetic(x_drone, y_drone, data['Z'], EPSG_GEOCENTRIC=4346)
-                # This is for GUI GPS panel to show drone coordinates
-                self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
             else:
                 print('[ERROR]: Not known geocentric datum')
                 return
+            
+            # This is for GUI GPS panel to show drone coordinates
+            self.last_drone_coords_requested = {'LAT': lat_drone, 'LON': lon_drone}
 
-            yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
+            yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, fmode=data['FMODE'])
                 
                 # If error [yaw, pitch] values because not enough gps buffer entries (but gps already has entries, meaning is working), call again the gimbal_follows_drone method
             while ((yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ) or (pitch_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_SMALL_BUFF_SZ)):
-                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone)
+                yaw_to_set, pitch_to_set = self.gimbal_follows_drone(lat_drone=lat_drone, lon_drone=lon_drone, height_drone=height_drone, fmode=data['FMODE'])
                 
         if yaw_to_set == self.ERR_HELPER_CODE_GPS_HEAD_UNRELATED_2_COORD or yaw_to_set == self.ERR_HELPER_CODE_GPS_NOT_KNOWN_DATUM or yaw_to_set == self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY or yaw_to_set == self.mySeptentrioGPS.ERR_GPS_CODE_BUFF_NULL:
             print('[ERROR]: one of the error codes of gimbal_follows_drone persists')
@@ -1837,9 +1876,10 @@ class HelperA2GMeasurements(object):
         data_bytes = data[5:]
 
         if message_type == 0x01: # SHORT cmd type message
-            if cmd == 0x01 and length == 0: # FOLLOWGIMBAL
+            if cmd == 0x01 and length == 1: # FOLLOWGIMBAL
                 print(f"[DEBUG]: THIS {self.ID} receives FOLLOWGIMBAL cmd")
-                self.do_follow_mode_gimbal()
+                data_bytes = data_bytes[:1]
+                self.do_follow_mode_gimbal(fmode=data_bytes)
             elif cmd == 0x02 and length == 0: # GETGPS
                 print(f"[DEBUG]: THIS {self.ID} receives GETGPS cmd")
                 self.do_getgps_action()
@@ -1888,9 +1928,9 @@ class HelperA2GMeasurements(object):
         elif message_type == 0x03: # ANS type
             if cmd == 0x01: # Response to GETGPS
                 print(f'[DEBUG]: THIS ({self.ID}) receives ANS to GETGPS cmd')
-                data_bytes = data_bytes[:26]
-                x,y,z,datum,follow_gimbal = struct.unpack('dddBB', data_bytes)
-                msg_data = {'X': x, 'Y': y, 'Z': z, 'Datum': datum, 'FOLLOW_GIMBAL': follow_gimbal}
+                data_bytes = data_bytes[:27]
+                x,y,z,datum,follow_gimbal, fmode = struct.unpack('dddBBB', data_bytes)
+                msg_data = {'X': x, 'Y': y, 'Z': z, 'Datum': datum, 'FOLLOW_GIMBAL': follow_gimbal, 'FMODE': fmode}
                 self.process_answer_get_gps(msg_data)
             else:
                 print("[WARNING]: cmd not known when decoding.  No action will be done")
@@ -1914,8 +1954,9 @@ class HelperA2GMeasurements(object):
         """
         if message_type == 0x01: # SHORT type of message
             if cmd == 0x01: # FOLLOWGIMBAL
-                length = 0
-                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
+                data = struct.pack('B', data['FMODE'])
+                length = 1
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
             elif cmd == 0x02: # GETGPS
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
@@ -1946,7 +1987,7 @@ class HelperA2GMeasurements(object):
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data_bytes
         elif message_type == 0x03: # ANS message type
             if cmd == 0x01: # Response to GETGPS
-                message = struct.pack('dddBB', data['X'], data['Y'], data['Z'], data['Datum'], data['FOLLOW_GIMBAL'])
+                message = struct.pack('dddBBB', data['X'], data['Y'], data['Z'], data['Datum'], data['FOLLOW_GIMBAL'], data['FMODE'])
         else:
             print("[DEBUG]: message_type not known when encoding.")
             return

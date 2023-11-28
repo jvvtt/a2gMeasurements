@@ -51,7 +51,7 @@ class SetupWindow(QDialog):
     def __init__(self, parent=None):
         super(SetupWindow, self).__init__(parent)
         self.setWindowTitle("Setup")
-        self.setGeometry(100, 100, 300, 150)
+        #self.setGeometry(100, 100, 300, 220)
 
         self.droneGimbalChoiceTDMenu = QComboBox()
         self.droneGimbalChoiceTDMenu.addItems(["DJI Ronin RS2", "Gremsy H16"])
@@ -59,21 +59,121 @@ class SetupWindow(QDialog):
         droneGimbalChoiceLabel = QLabel("&Choose drone gimbal:")
         droneGimbalChoiceLabel.setBuddy(self.droneGimbalChoiceTDMenu)
         
+        self.fm_droneGimbal_TDMenu = QComboBox()
+        self.fm_droneGimbal_TDMenu.addItems(["Only elevation", "Only azimuth", "Elevation and azimuth"])
+
+        fmdroneGimbalChoiceLabel = QLabel("&Choose drone gimbal following mode (if it will be used):")
+        fmdroneGimbalChoiceLabel.setBuddy(self.fm_droneGimbal_TDMenu)
+
+        self.fm_gndGimbal_TDMenu = QComboBox()
+        self.fm_gndGimbal_TDMenu.addItems(["Only elevation", "Only azimuth", "Elevation and azimuth"])
+
+        fmgndGimbalChoiceLabel = QLabel("&Choose ground gimbal following mode (if it will be used):")
+        fmgndGimbalChoiceLabel.setBuddy(self.fm_gndGimbal_TDMenu)
+
+        self.gnd_mobility_TDMenu = QComboBox()
+        self.gnd_mobility_TDMenu.addItems(["Moving", "Static"])
+        self.gnd_mobility_TDMenu.activated[str].connect(self.enable_gnd_coords_callback)
+
+        gnd_mobility_label = QLabel("&Choose ground node mobility:")
+        gnd_mobility_label.setBuddy(self.gnd_mobility_TDMenu)
+
+        self.gnd_lat_textEdit = QLineEdit('')
+        gnd_lat_label = QLabel("Enter lat of static (ground) node:")
+        self.gnd_lon_textEdit = QLineEdit('')
+        gnd_lon_label = QLabel("Enter lon of static (ground) node:")
+        self.gnd_alt_textEdit = QLineEdit('')
+        gnd_alt_label = QLabel("Enter altitude of static (ground) node:")
+        self.gnd_lat_textEdit.setEnabled(False)
+        self.gnd_lon_textEdit.setEnabled(False)
+        self.gnd_alt_textEdit.setEnabled(False)
+
+        self.drone_mobility_TDMenu = QComboBox()
+        self.drone_mobility_TDMenu.addItems(["Moving", "Static"])
+        self.drone_mobility_TDMenu.activated[str].connect(self.enable_drone_coords_callback)
+
+        drone_mobility_label = QLabel("&Choose drone node mobility:")
+        drone_mobility_label.setBuddy(self.drone_mobility_TDMenu)
+
+        self.drone_lat_textEdit = QLineEdit('')
+        drone_lat_label = QLabel("Enter lat of static (drone) node:")
+        self.drone_lon_textEdit = QLineEdit('')
+        drone_lon_label = QLabel("Enter lon of static (drone) node:")
+        self.drone_alt_textEdit = QLineEdit('')
+        drone_alt_label = QLabel("Enter alt of static (drone) node:")
+        self.drone_lat_textEdit.setEnabled(False)
+        self.drone_lon_textEdit.setEnabled(False)
+        self.drone_alt_textEdit.setEnabled(False)
+
         self.ok_button = QPushButton("OK")
         self.ok_button.clicked.connect(self.accept)
 
         layout = QGridLayout()
-        layout.addWidget(droneGimbalChoiceLabel, 0, 0, 1, 1)
-        layout.addWidget(self.droneGimbalChoiceTDMenu, 0, 1, 1, 1)
-        layout.addWidget(self.ok_button, 1, 0, 1, 2)
-        self.setLayout(layout)        
-        
+        layout.addWidget(droneGimbalChoiceLabel, 0, 0, 1, 3)
+        layout.addWidget(self.droneGimbalChoiceTDMenu, 0, 3, 1, 3)
+        layout.addWidget(fmdroneGimbalChoiceLabel, 1, 0, 1, 3)
+        layout.addWidget(self.fm_droneGimbal_TDMenu, 1, 3, 1, 3)
+        layout.addWidget(fmgndGimbalChoiceLabel, 2, 0, 1, 3)
+        layout.addWidget(self.fm_gndGimbal_TDMenu, 2, 3, 1, 3)
+
+        layout.addWidget(gnd_mobility_label, 3, 0, 1, 3)
+        layout.addWidget(self.gnd_mobility_TDMenu, 3, 3, 1, 3)
+        layout.addWidget(gnd_lat_label, 4, 0, 1, 3)
+        layout.addWidget(self.gnd_lat_textEdit, 4, 3, 1, 3)
+        layout.addWidget(gnd_lon_label, 5, 0, 1, 3)
+        layout.addWidget(self.gnd_lon_textEdit, 5, 3, 1, 3)
+        layout.addWidget(gnd_alt_label, 6, 0, 1, 3)
+        layout.addWidget(self.gnd_alt_textEdit, 6, 3, 1, 3)
+
+        layout.addWidget(drone_mobility_label, 7, 0, 1, 3)
+        layout.addWidget(self.drone_mobility_TDMenu, 7, 3, 1, 3)
+        layout.addWidget(drone_lat_label, 8, 0, 1, 3)
+        layout.addWidget(self.drone_lat_textEdit, 8, 3, 1, 3)
+        layout.addWidget(drone_lon_label, 9, 0, 1, 3)
+        layout.addWidget(self.drone_lon_textEdit, 9, 3, 1, 3)
+        layout.addWidget(drone_alt_label, 10, 0, 1, 3)
+        layout.addWidget(self.drone_alt_textEdit, 10, 3, 1, 3)
+
+        layout.addWidget(self.ok_button, 11, 0, 1, 6)
+        self.setLayout(layout)  
+
+    def enable_gnd_coords_callback(self, myinput):
+        if myinput == "Static":
+            self.gnd_lat_textEdit.setEnabled(True)
+            self.gnd_lon_textEdit.setEnabled(True)
+            self.gnd_alt_textEdit.setEnabled(True)
+        elif myinput == "Moving":
+            self.gnd_lat_textEdit.setEnabled(False)
+            self.gnd_lon_textEdit.setEnabled(False)
+            self.gnd_alt_textEdit.setEnabled(False)
+    
+    def enable_drone_coords_callback(self, myinput):
+        if myinput == "Static":
+            self.drone_lat_textEdit.setEnabled(True)
+            self.drone_lon_textEdit.setEnabled(True)
+            self.drone_alt_textEdit.setEnabled(True)
+        elif myinput == "Moving":
+            self.drone_lat_textEdit.setEnabled(False)
+            self.drone_lon_textEdit.setEnabled(False)
+            self.drone_alt_textEdit.setEnabled(False)
+
 class WidgetGallery(QMainWindow):
     def __init__(self, parent=None):
         super(WidgetGallery, self).__init__(parent)
 
         self.setWindowTitle("A2G Measurements Center")
 
+        self.init_constants()
+
+        self.createMenu()
+         
+        self.dummyWidget = QWidget()
+        self.setCentralWidget(self.dummyWidget)
+        #self.setLayout(mainLayout)
+
+        self.showMaximized()
+    
+    def init_constants(self):
         # Parameters of the GUI
         self.STATIC_DRONE_IP_ADDRESS = '192.168.0.157'
         self.number_lines_log_terminal = 100
@@ -89,14 +189,6 @@ class WidgetGallery(QMainWindow):
         self.SUCCESS_GND_GIMBAL = False
         self.SUCCESS_GND_GPS = False
 
-        self.createMenu()
-         
-        self.dummyWidget = QWidget()
-        self.setCentralWidget(self.dummyWidget)
-        #self.setLayout(mainLayout)
-
-        self.showMaximized()
-    
     def showCentralWidget(self):
         #self.original_stdout = sys.stdout
         self.create_check_connections_panel()
@@ -126,7 +218,55 @@ class WidgetGallery(QMainWindow):
         result = setupWin.exec_()
         
         self.droneGimbalChoice = setupWin.droneGimbalChoiceTDMenu.currentText()
+        
+        if setupWin.fm_droneGimbal_TDMenu.currentText() == "Only elevation":
+            self.fm_drone_gimbal = {'FMODE': 0x01}
+        elif setupWin.fm_droneGimbal_TDMenu.currentText() == "Only azimuth":
+            self.fm_drone_gimbal = {'FMODE': 0x02}
+        elif setupWin.fm_droneGimbal_TDMenu.currentText() == "Elevation and azimuth":
+            self.fm_drone_gimbal = {'FMODE': 0x00}
+        
+        if setupWin.fm_gndGimbal_TDMenu.currentText() == "Only elevation":
+            self.fm_gnd_gimbal = {'FMODE': 0x01}
+        elif setupWin.fm_gndGimbal_TDMenu.currentText() == "Only azimuth":
+            self.fm_gnd_gimbal = {'FMODE': 0x02}
+        elif setupWin.fm_gndGimbal_TDMenu.currentText() == "Elevation and azimuth":
+            self.fm_gnd_gimbal = {'FMODE': 0x00}
+
+        if setupWin.gnd_mobility_TDMenu.currentText() == "Static":
+            self.gnd_mobility = "Static"
+            try:
+                self.static_gnd_coords = [float(setupWin.gnd_lat_textEdit.text()), 
+                                          float(setupWin.gnd_lon_textEdit.text()),
+                                          float(setupWin.gnd_alt_textEdit.text())] # lat, lon, altitude above sea level
+            except Exception as e:
+                print("[DEBUG]: Wrong input ground coords OR no input ground coords")
+                print("[DEBUG]: Enter again the ground coordinates correctly")
+                return
+        else: 
+            self.gnd_mobility = "Moving"
+        if setupWin.drone_mobility_TDMenu.currentText() == "Static":
+            self.drone_mobility = "Static"
+            try:
+                self.static_drone_coords = [float(setupWin.drone_lat_textEdit.text()), 
+                                            float(setupWin.drone_lon_textEdit.text()),
+                                            float(setupWin.drone_alt_textEdit.text())] # lat, lon
+            except Exception as e:
+                print("[DEBUG]: Wrong input drone coords OR no input drone coords")
+                print("[DEBUG]: Enter again the drone coordinates correctly")
+                return
+        else:
+            self.drone_mobility = "Moving"
+
+        # Remove a previous layout to set it again
+        if self.dummyWidget.layout() is not None:
+            del self.dummyWidget
+            self.setCentralWidget(None)
+            self.dummyWidget = QWidget()
+            self.setCentralWidget(self.dummyWidget)
+            self.init_constants()
         self.showCentralWidget()
+
         self.setupDevicesAndMoreAction.setDisabled(True)
     
     def createMenu(self):
@@ -165,7 +305,7 @@ class WidgetGallery(QMainWindow):
         self.start_gps_visualization_action.triggered.connect(self.start_thread_gps_visualization)
         self.start_gps_visualization_action.setDisabled(True)
         
-        self.stop_gps_visualization_action = QAction("Stop DRONE gimbal following its pair", self)
+        self.stop_gps_visualization_action = QAction("Stop GPS visualization", self)
         threadsMenu.addAction(self.stop_gps_visualization_action)
         self.stop_gps_visualization_action.triggered.connect(self.stop_thread_gps_visualization)
         self.stop_gps_visualization_action.setDisabled(True)
@@ -175,7 +315,13 @@ class WidgetGallery(QMainWindow):
             self.update_time_gimbal_follow = 1
             self.stop_event_gimbal_follow_thread = threading.Event()
             self.periodical_gimbal_follow_thread = TimerThread(self.stop_event_gimbal_follow_thread, self.update_time_gimbal_follow)
-            self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
+
+            if self.drone_mobility == "Moving":
+                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL', data=self.fm_gnd_gimbal))
+            elif self.drone_mobility == "Static":
+                x,y,z = geodetic2geocentric(self.static_gnd_coords[0], self.static_gnd_coords[1], self.static_gnd_coords[2])
+                data = {'X': x, 'Y': y, 'Z': z, 'FMODE': self.fm_gnd_gimbal['FMODE']}
+                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.process_answer_get_gps(data=data))
             self.periodical_gimbal_follow_thread.start()
             
         self.start_gnd_gimbal_fm_action.setEnabled(False)
@@ -646,7 +792,7 @@ class WidgetGallery(QMainWindow):
                 self.update_time_gimbal_follow = 1
                 self.stop_event_gimbal_follow_thread = threading.Event()
                 self.periodical_gimbal_follow_thread = TimerThread(self.stop_event_gimbal_follow_thread, self.update_time_gimbal_follow)
-                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
+                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL', data=self.fm_gnd_gimbal))
                 self.periodical_gimbal_follow_thread.start()
         
     def periodical_pap_display_callback(self):
@@ -812,12 +958,13 @@ class WidgetGallery(QMainWindow):
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
             self.start_meas_togglePushButton.setEnabled(True)
-            if self.SUCCESS_DRONE_GPS:
-                self.start_gnd_gimbal_fm_action.setEnabled(True)
-                self.stop_gnd_gimbal_fm_action.setEnabled(False)
-            if self.SUCCESS_DRONE_GPS:
+            if self.SUCCESS_DRONE_GPS: 
                 self.start_gps_visualization_action.setEnabled(True)
                 self.stop_gps_visualization_action.setEnabled(False)
+                
+                # Only activate gnd FM actions if GND GIMBAL and GND GPS and DRONE GPS
+                self.start_gnd_gimbal_fm_action.setEnabled(True)
+                self.stop_gnd_gimbal_fm_action.setEnabled(False)                                    
             print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")               
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsRFSoC=True)
@@ -831,10 +978,19 @@ class WidgetGallery(QMainWindow):
             self.create_class_instances(IsGimbal=True, IsGPS=True)
             self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with Gimbal and GPS")
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gnd_gimbal_fm_action.setEnabled(True)
+                self.stop_gnd_gimbal_fm_action.setEnabled(False)
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
         if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGPS=True, IsRFSoC=True)
             self.start_meas_togglePushButton.setEnabled(True)
             print("[DEBUG]: Class created at GND with GPS and RFSoC")
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
         if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsRFSoC=True)
             self.start_meas_togglePushButton.setEnabled(True)
@@ -847,11 +1003,15 @@ class WidgetGallery(QMainWindow):
             self.create_class_instances(IsGPS=True)
             self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with GPS")
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
         
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
         self.connect_to_drone.setEnabled(False)
         self.disconnect_from_drone.setEnabled(True)
+        self.setupDevicesAndMoreAction.setDisabled(True)
         
     def disconnect_drone_callback(self):
         if hasattr(self, 'periodical_gimbal_follow_thread'):
@@ -877,7 +1037,9 @@ class WidgetGallery(QMainWindow):
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
         self.connect_to_drone.setEnabled(True)
-        self.disconnect_from_drone.setEnabled(False)     
+        self.disconnect_from_drone.setEnabled(False)
+
+        self.setupDevicesAndMoreAction.setEnabled(True)
         self.start_gnd_gimbal_fm_action.setEnabled(True)
         self.stop_gnd_gimbal_fm_action.setEnabled(False)
         self.start_gps_visualization_action.setEnabled(True)
