@@ -319,7 +319,7 @@ class WidgetGallery(QMainWindow):
             if self.drone_mobility == "Moving":
                 self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL', data=self.fm_gnd_gimbal))
             elif self.drone_mobility == "Static":
-                x,y,z = geodetic2geocentric(self.static_gnd_coords[0], self.static_gnd_coords[1], self.static_gnd_coords[2])
+                x,y,z = geodetic2geocentric(self.static_drone_coords[0], self.static_drone_coords[1], self.static_drone_coords[2])
                 data = {'X': x, 'Y': y, 'Z': z, 'FMODE': self.fm_gnd_gimbal['FMODE']}
                 self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.process_answer_get_gps(data=data))
             self.periodical_gimbal_follow_thread.start()
@@ -336,11 +336,24 @@ class WidgetGallery(QMainWindow):
         self.stop_gnd_gimbal_fm_action.setEnabled(False)
         
     def start_thread_drone_gimbal_fm(self):
-        1
+        if hasattr(self, 'myhelpera2g'):
+            if self.gnd_mobility == "Moving":
+                data = {'X': 0, 'Y': 0, 'Z': 0, 'FMODE': self.fm_drone_gimbal['FMODE'], 'MOBILITY': 0x00}
+            elif self.gnd_mobility == "Static":
+                x,y,z = geodetic2geocentric(self.static_gnd_coords[0], self.static_gnd_coords[1], self.static_gnd_coords[2])
+                data = {'X': x, 'Y': y, 'Z': z, 'FMODE': self.fm_drone_gimbal['FMODE'], 'MOBILITY': 0x01}
+            self.myhelpera2g.socket_send_cmd(type_cmd='SETREMOTEFMFLAG', data=data)
+        
+        self.start_drone_gimbal_fm_action.setEnabled(False)
+        self.stop_drone_gimbal_fm_action.setEnabled(True)
         
     def stop_thread_drone_gimbal_fm(self):
-        1
-    
+        if hasattr(self, 'myhelpera2g'):
+            self.myhelpera2g.socket_send_cmd(type_cmd='SETREMOTESTOPFM')
+
+        self.start_drone_gimbal_fm_action.setEnabled(True)
+        self.stop_drone_gimbal_fm_action.setEnabled(False)
+        
     def start_thread_gps_visualization(self):
         if hasattr(self, 'myhelpera2g'):   
             self.update_vis_time_gps = 1
@@ -964,7 +977,7 @@ class WidgetGallery(QMainWindow):
                 
                 # Only activate gnd FM actions if GND GIMBAL and GND GPS and DRONE GPS
                 self.start_gnd_gimbal_fm_action.setEnabled(True)
-                self.stop_gnd_gimbal_fm_action.setEnabled(False)                                    
+                self.stop_gnd_gimbal_fm_action.setEnabled(False)
             print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")               
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsRFSoC=True)
@@ -1007,6 +1020,10 @@ class WidgetGallery(QMainWindow):
                 self.start_gps_visualization_action.setEnabled(True)
                 self.stop_gps_visualization_action.setEnabled(False)
         
+        if self.SUCCES_DRONE_GIMBAL and self.SUCCESS_DRONE_GPS:
+            self.start_drone_gimbal_fm_action.setEnabled(True)
+            self.stop_drone_gimbal_fm_action.setEnabled(False)
+        
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
         self.connect_to_drone.setEnabled(False)
@@ -1042,6 +1059,8 @@ class WidgetGallery(QMainWindow):
         self.setupDevicesAndMoreAction.setEnabled(True)
         self.start_gnd_gimbal_fm_action.setEnabled(True)
         self.stop_gnd_gimbal_fm_action.setEnabled(False)
+        self.start_drone_gimbal_fm_action.setEnabled(True)
+        self.stop_drone_gimbal_fm_action.setEnabled(False)        
         self.start_gps_visualization_action.setEnabled(True)
         self.stop_gps_visualization_action.setEnabled(False)
     

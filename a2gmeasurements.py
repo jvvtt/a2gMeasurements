@@ -1476,6 +1476,7 @@ class HelperA2GMeasurements(object):
         self.SPEED_NODE = SPEED # m/s
         self.CONN_MUST_OVER_FLAG = False # Usefull for drone side, as its script will poll for looking if this is True
         self.PAP_TO_PLOT = []
+        self.drone_fm_flag = False
         
         print(IsGPS, self.IsGPS)
 
@@ -1788,6 +1789,15 @@ class HelperA2GMeasurements(object):
     def do_closed_gui_action(self):
         if self.ID == 'DRONE':
             self.CONN_MUST_OVER_FLAG = True
+        
+    def do_set_remote_fm_flag(self, data=None):
+        if self.ID == 'DRONE':
+            self.drone_fm_flag = True
+            self.remote_config_for_drone_fm = data
+    
+    def do_set_remote_stop_fm(self):
+        if self.ID == 'DRONE':
+            self.drone_fm_flag = False
 
     def process_answer_get_gps(self, data):
         """
@@ -1913,6 +1923,15 @@ class HelperA2GMeasurements(object):
             elif cmd == 0x07 and length == 0: # CLOSEDGUI
                 print(f"[DEBUG]: THIS {self.ID} receives CLOSEDGUI cmd")
                 self.do_closed_gui_action()
+            elif cmd == 0x08 and length == 5: # SETREMOTEFMFLAG
+                print(f"[DEBUG]: THIS {self.ID} receives SETFMFLAG cmd")
+                data_bytes = data_bytes[:14] # 3 float32 and 2 hex
+                x,y,z,fmode,mobility = struct.unpack('fffBB', data_bytes)
+                mydata ={'X':x, 'Y':y, 'Z':z, 'FMODE': fmode, 'MOBILITY': mobility}
+                self.do_set_remote_fm_flag(data=mydata)
+            elif cmd == 0x09 and length == 0: # SETREMOTESTOPFM
+                print(f"[DEBUG]: THIS {self.ID} receives SETREMOTESTOPFM cmd")
+                self.do_set_remote_stop_fm()
             else:
                 print("[WARNING]: cmd not known when decoding.  No action will be done")
         elif message_type == 0x02: # LONG cmd type msg
@@ -1975,6 +1994,13 @@ class HelperA2GMeasurements(object):
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
             elif cmd == 0x07: # CLOSEDGUI
+                length = 0
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
+            elif cmd == 0x08: # SETREMOTEFMFLAG
+                data = struct.pack('fffBB', data['X'], data['Y'], data['Z'], data['FMODE'], data['MOBILITY'])
+                length = 5
+                message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
+            elif cmd == 0x09: # SETREMOTESTOPFM
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
         elif message_type == 0x02: #LONG type message
@@ -2069,6 +2095,10 @@ class HelperA2GMeasurements(object):
             frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x06)
         elif type_cmd == 'SETIRF':
             frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x02, cmd=0x01, data=data)
+        elif type_cmd == 'SETREMOTEFMFLAG':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x08, data=data)
+        elif type_cmd == 'SETREMOTESTOPFM':
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x09)
         if self.ID == 'DRONE':
             self.socket.sendall(frame)
         elif self.ID == 'GROUND':

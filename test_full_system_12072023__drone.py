@@ -93,8 +93,12 @@ if not_finish_tcp_connection_attempt == False:
     timer_send_pap_for_vis.start()
     while(drone_a2g_helper.CONN_MUST_OVER_FLAG == False):        
         time.sleep(1)
-        if FLAG_DRONE_ASKS_FOLLOWGIMBAL:
-            drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
+        if drone_a2g_helper.drone_fm_flag:
+        #if FLAG_DRONE_ASKS_FOLLOWGIMBAL:
+            if drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x00:
+                drone_a2g_helper.process_answer_get_gps(data=drone_a2g_helper.remote_config_for_drone_fm)
+            elif drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x01:
+                drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
     timer_send_pap_for_vis.cancel()
     drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
 else:
