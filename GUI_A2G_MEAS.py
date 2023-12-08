@@ -516,13 +516,21 @@ class WidgetGallery(QMainWindow):
                 print("[DEBUG]: ", e)
                 success_drone_gimbal = None
             else:
-                if 'USB Serial Converter' in usb_list_str:
-                    success_drone_gimbal = True
-                    print("[DEBUG]: Gremsy Gimbal is detected at DRONE")
-                else:
-                    success_drone_gimbal = False
-                    print("[DEBUG]: Gremsy Gimbal is NOT detected at DRONE")                
-
+                if self.droneGimbalChoice == "DJI Ronin RS2":
+                    if 'PCAN-USB' in usb_list_str:
+                        success_drone_gimbal = True
+                        print("[DEBUG]: Ronin RS2 is detected at DRONE")
+                    else:
+                        success_drone_gimbal = False
+                        print("[DEBUG]: Ronin RS2 is NOT detected at DRONE")
+                elif self.droneGimbalChoice == "Gremsy H16":
+                    if 'USB Serial Converter' in usb_list_str:
+                        success_drone_gimbal = True
+                        print("[DEBUG]: Gremsy Gimbal is detected at DRONE")
+                    else:
+                        success_drone_gimbal = False
+                        print("[DEBUG]: Gremsy Gimbal is NOT detected at DRONE")
+                
         return success_drone_gimbal
 
     def check_if_gnd_gimbal_connected(self):
@@ -559,34 +567,76 @@ class WidgetGallery(QMainWindow):
             success_server_drone_fpga = False
         else:
             try:
-                stdin, stdout, stderr = self.remote_drone_conn.exec_command('ssh xilinx@10.1.1.40')
-                print(stderr)
-                stdin.channel.send("xilinx\n")
-                stdin.channel.send("ps aux | grep mmwsdr\n")
-                stdin.channel.shutdown_write()
+                shell = self.remote_drone_conn.invoke_shell()
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
+                
+                shell.send("ssh xilinx@10.1.1.40\r\n")
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
 
-                if stderr != '':
-                    print("[DEBUG]: Error when trying to ssh DRONE fpga:\n", stderr)
-                    success_server_drone_fpga = None
-                else:
-                    stdin_out = stdout.read().decode('utf-8')
+                shell.send("xilinx\r\n")
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
+                
+                shell.send("ps aux | grep mmwsdr\r\n")
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
 
-                    if 'server.py'in stdin_out and 'run.sh' in stdin_out:
-                        print("[DEBUG]: Server script is running on DRONE fpga")
-                    else:
-                        print("[DEBUG]: Server script is not running on DRONE fpga")
-                        self.remote_drone_conn.exec_command('cd jupyter_notebooks/mmwsdr')
-                        stdin, stdout, stderr = self.remote_drone_conn.exec_command('sudo ./run.sh')
-                        stdin.channel.send("xilinx\n")
-                        stdin.channel.shutdown_write()
-                        print("[DEBUG]: Drone node has started the Server Daemon in its FPGA")
-                    success_server_drone_fpga = True
-                # Exit the ssh
-                stdin, stdout, stderr = self.remote_drone_conn.exec_command('exit')
+                shell.close()
             except Exception as e:
                 print(f"This error occurred when trying to check if server is running on drone fpga: {e}")
-                success_server_drone_fpga = False
-        
+                success_server_drone_fpga = None
+                return success_server_drone_fpga
+            
+            if 'server.py'in out_now and 'run.sh' in out_now:
+                print("[DEBUG]: Server script is running on DRONE fpga")
+            else:
+                print("[DEBUG]: Server script is not running on DRONE fpga")
+                print("[DEBUG]: Starting server daemon on DRONE fpga")
+                try:
+                    shell = self.remote_drone_conn.invoke_shell()
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+                    
+                    shell.send("ssh xilinx@10.1.1.40\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.send("xilinx\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+                    
+                    shell.send("cd jupyter_notebook/mmwsdr\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.send("sudo ./run.sh\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.send("xilinx\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.close()
+
+                    print("[DEBUG]: Server daemon on drone fpga has started")
+                    success_server_drone_fpga = True
+                except Exception as e:
+                    print(f"This error occurred when trying to init daemon server on drone fpga: {e}")
+                    success_server_drone_fpga = None
+                    return success_server_drone_fpga
         return success_server_drone_fpga
 
     def check_if_server_running_gnd_fpga(self):

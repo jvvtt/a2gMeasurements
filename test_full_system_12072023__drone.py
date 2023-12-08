@@ -95,9 +95,9 @@ if not_finish_tcp_connection_attempt == False:
         time.sleep(1)
         if drone_a2g_helper.drone_fm_flag:
         #if FLAG_DRONE_ASKS_FOLLOWGIMBAL:
-            if drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x00:
+            if drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x00:#Gnd node static
                 drone_a2g_helper.process_answer_get_gps(data=drone_a2g_helper.remote_config_for_drone_fm)
-            elif drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x01:
+            elif drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x01:#Gnd node Moving
                 drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
     timer_send_pap_for_vis.cancel()
     drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')
