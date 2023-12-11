@@ -555,7 +555,7 @@ class GpsSignaling(object):
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
         self.stream_info = []
-        self.MAX_SBF_BUFF_LEN = 20  # Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
+        self.MAX_SBF_BUFF_LEN = 100  # Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
 
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
@@ -832,7 +832,6 @@ class GpsSignaling(object):
         self.SBF_frame_buffer.append(pvt_data_we_care)
         
         if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
-            print("[DEBUG]: Enters saving GPS coordinates")
             with open(self.save_filename + '.txt', 'a+') as file:      
                 file.write(json.dumps(self.SBF_frame_buffer))       
                 print("[DEBUG]: Saved GPS cooridnates file")     
@@ -869,7 +868,6 @@ class GpsSignaling(object):
         self.SBF_frame_buffer.append(pvt_data_we_care)
         
         if len(self.SBF_frame_buffer) > self.MAX_SBF_BUFF_LEN:
-            print("[DEBUG]: Enters saving GPS coordinates")
             with open(self.save_filename + '.txt', 'a+') as file:      
                 file.write(json.dumps(self.SBF_frame_buffer))      
                 print("[DEBUG]: Saved GPS cooridnates file")           
