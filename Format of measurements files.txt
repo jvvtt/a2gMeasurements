@@ -1,0 +1,24 @@
+*Each measurement file has the following format for its name:
+
+year-month-day-hour-minutes-seconds-microseconds-PDPs.npy
+
+
+*The file can be loaded as an NumPy variable. The Numpy variable
+has the following 3 dimensions (in the following order):
+
+1st dimension: time snapshot index
+2nd dimension: beam index
+3rd dimension: 'delay' index
+
+*The 2nd dimension's size is 64 and corresponds to the following angles:
+
+
+*The 3rd dimension's size is 1024
+
+
+*Each time snapshot duration corresponds to an average time of 150 ms (80-150 ms)
+
+
+*In a measurement there might be multiple files recorded. They are recorded sequentially,
+one right after the other (with no pause)
+

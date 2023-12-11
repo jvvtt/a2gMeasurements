@@ -1,3 +1,9 @@
+from enum import Enum
+import threading
+import numpy as np
+import csv
+import json
+import datetime
 import platform
 import re
 import subprocess
@@ -6,23 +12,32 @@ import ping3
 import time
 import can#from fbs_runtime.application_context.PyQt5 import ApplicationContext
 from serial.tools.list_ports import comports
-import typing
-from PyQt5.QtCore import QDateTime, Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
-        QDial, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-        QProgressBar, QPushButton, QRadioButton, QScrollBar, QSizePolicy,
-        QSlider, QSpinBox, QStyleFactory, QTableWidget, QTabWidget, QTextEdit,
-        QVBoxLayout, QWidget)
+from PyQt5.QtCore import Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QGridLayout, QGroupBox, QLabel, QLineEdit,
+        QPushButton, QRadioButton, QTextEdit, QVBoxLayout, QWidget, QPlainTextEdit, QToolTip, QMenu, QMenuBar, QMainWindow, QAction)
+from PyQt5.QtGui import QCursor
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import sys
-from a2gmeasurements import GimbalRS2, GpsSignaling, HelperA2GMeasurements, RFSoCRemoteControlFromHost, RepeatTimer, GimbalGremsyH16, SBUSEncoder
+from a2gmeasurements import HelperA2GMeasurements, RepeatTimer
 from a2gUtils import GpsOnMap, geocentric2geodetic, geodetic2geocentric
 
-import tkinter as tk
-from tkinter import simpledialog, messagebox
+import pyqtgraph as pg
+
+
+class TimerThread(QThread):
+    update = pyqtSignal()
+
+    def __init__(self, event, updatetime):
+        super(TimerThread, self).__init__()
+        self.stopped = event
+        self.updatetime = updatetime
+    
+    def run(self):
+        while not self.stopped.wait(self.updatetime):
+            self.update.emit()
 
 class CustomTextEdit(QTextEdit):
     def write(self, text):
@@ -32,13 +47,135 @@ class CustomTextEdit(QTextEdit):
         self.setTextCursor(cursor)
         self.ensureCursorVisible()
 
-class WidgetGallery(QDialog):
+class SetupWindow(QDialog):
+    def __init__(self, parent=None):
+        super(SetupWindow, self).__init__(parent)
+        self.setWindowTitle("Setup")
+        #self.setGeometry(100, 100, 300, 220)
+
+        self.droneGimbalChoiceTDMenu = QComboBox()
+        self.droneGimbalChoiceTDMenu.addItems(["DJI Ronin RS2", "Gremsy H16"])
+
+        droneGimbalChoiceLabel = QLabel("&Choose drone gimbal:")
+        droneGimbalChoiceLabel.setBuddy(self.droneGimbalChoiceTDMenu)
+        
+        self.fm_droneGimbal_TDMenu = QComboBox()
+        self.fm_droneGimbal_TDMenu.addItems(["Only elevation", "Only azimuth", "Elevation and azimuth"])
+
+        fmdroneGimbalChoiceLabel = QLabel("&Choose drone gimbal following mode (if it will be used):")
+        fmdroneGimbalChoiceLabel.setBuddy(self.fm_droneGimbal_TDMenu)
+
+        self.fm_gndGimbal_TDMenu = QComboBox()
+        self.fm_gndGimbal_TDMenu.addItems(["Only elevation", "Only azimuth", "Elevation and azimuth"])
+
+        fmgndGimbalChoiceLabel = QLabel("&Choose ground gimbal following mode (if it will be used):")
+        fmgndGimbalChoiceLabel.setBuddy(self.fm_gndGimbal_TDMenu)
+
+        self.gnd_mobility_TDMenu = QComboBox()
+        self.gnd_mobility_TDMenu.addItems(["Moving", "Static"])
+        self.gnd_mobility_TDMenu.activated[str].connect(self.enable_gnd_coords_callback)
+
+        gnd_mobility_label = QLabel("&Choose ground node mobility:")
+        gnd_mobility_label.setBuddy(self.gnd_mobility_TDMenu)
+
+        self.gnd_lat_textEdit = QLineEdit('')
+        gnd_lat_label = QLabel("Enter lat of static (ground) node:")
+        self.gnd_lon_textEdit = QLineEdit('')
+        gnd_lon_label = QLabel("Enter lon of static (ground) node:")
+        self.gnd_alt_textEdit = QLineEdit('')
+        gnd_alt_label = QLabel("Enter altitude of static (ground) node:")
+        self.gnd_lat_textEdit.setEnabled(False)
+        self.gnd_lon_textEdit.setEnabled(False)
+        self.gnd_alt_textEdit.setEnabled(False)
+
+        self.drone_mobility_TDMenu = QComboBox()
+        self.drone_mobility_TDMenu.addItems(["Moving", "Static"])
+        self.drone_mobility_TDMenu.activated[str].connect(self.enable_drone_coords_callback)
+
+        drone_mobility_label = QLabel("&Choose drone node mobility:")
+        drone_mobility_label.setBuddy(self.drone_mobility_TDMenu)
+
+        self.drone_lat_textEdit = QLineEdit('')
+        drone_lat_label = QLabel("Enter lat of static (drone) node:")
+        self.drone_lon_textEdit = QLineEdit('')
+        drone_lon_label = QLabel("Enter lon of static (drone) node:")
+        self.drone_alt_textEdit = QLineEdit('')
+        drone_alt_label = QLabel("Enter alt of static (drone) node:")
+        self.drone_lat_textEdit.setEnabled(False)
+        self.drone_lon_textEdit.setEnabled(False)
+        self.drone_alt_textEdit.setEnabled(False)
+
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.accept)
+
+        layout = QGridLayout()
+        layout.addWidget(droneGimbalChoiceLabel, 0, 0, 1, 3)
+        layout.addWidget(self.droneGimbalChoiceTDMenu, 0, 3, 1, 3)
+        layout.addWidget(fmdroneGimbalChoiceLabel, 1, 0, 1, 3)
+        layout.addWidget(self.fm_droneGimbal_TDMenu, 1, 3, 1, 3)
+        layout.addWidget(fmgndGimbalChoiceLabel, 2, 0, 1, 3)
+        layout.addWidget(self.fm_gndGimbal_TDMenu, 2, 3, 1, 3)
+
+        layout.addWidget(gnd_mobility_label, 3, 0, 1, 3)
+        layout.addWidget(self.gnd_mobility_TDMenu, 3, 3, 1, 3)
+        layout.addWidget(gnd_lat_label, 4, 0, 1, 3)
+        layout.addWidget(self.gnd_lat_textEdit, 4, 3, 1, 3)
+        layout.addWidget(gnd_lon_label, 5, 0, 1, 3)
+        layout.addWidget(self.gnd_lon_textEdit, 5, 3, 1, 3)
+        layout.addWidget(gnd_alt_label, 6, 0, 1, 3)
+        layout.addWidget(self.gnd_alt_textEdit, 6, 3, 1, 3)
+
+        layout.addWidget(drone_mobility_label, 7, 0, 1, 3)
+        layout.addWidget(self.drone_mobility_TDMenu, 7, 3, 1, 3)
+        layout.addWidget(drone_lat_label, 8, 0, 1, 3)
+        layout.addWidget(self.drone_lat_textEdit, 8, 3, 1, 3)
+        layout.addWidget(drone_lon_label, 9, 0, 1, 3)
+        layout.addWidget(self.drone_lon_textEdit, 9, 3, 1, 3)
+        layout.addWidget(drone_alt_label, 10, 0, 1, 3)
+        layout.addWidget(self.drone_alt_textEdit, 10, 3, 1, 3)
+
+        layout.addWidget(self.ok_button, 11, 0, 1, 6)
+        self.setLayout(layout)  
+
+    def enable_gnd_coords_callback(self, myinput):
+        if myinput == "Static":
+            self.gnd_lat_textEdit.setEnabled(True)
+            self.gnd_lon_textEdit.setEnabled(True)
+            self.gnd_alt_textEdit.setEnabled(True)
+        elif myinput == "Moving":
+            self.gnd_lat_textEdit.setEnabled(False)
+            self.gnd_lon_textEdit.setEnabled(False)
+            self.gnd_alt_textEdit.setEnabled(False)
+    
+    def enable_drone_coords_callback(self, myinput):
+        if myinput == "Static":
+            self.drone_lat_textEdit.setEnabled(True)
+            self.drone_lon_textEdit.setEnabled(True)
+            self.drone_alt_textEdit.setEnabled(True)
+        elif myinput == "Moving":
+            self.drone_lat_textEdit.setEnabled(False)
+            self.drone_lon_textEdit.setEnabled(False)
+            self.drone_alt_textEdit.setEnabled(False)
+
+class WidgetGallery(QMainWindow):
     def __init__(self, parent=None):
         super(WidgetGallery, self).__init__(parent)
 
         self.setWindowTitle("A2G Measurements Center")
 
+        self.init_constants()
+
+        self.createMenu()
+         
+        self.dummyWidget = QWidget()
+        self.setCentralWidget(self.dummyWidget)
+        #self.setLayout(mainLayout)
+
+        self.showMaximized()
+    
+    def init_constants(self):
         # Parameters of the GUI
+        self.STATIC_DRONE_IP_ADDRESS = '192.168.0.157'
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
         self.remote_drone_conn = None
@@ -52,34 +189,190 @@ class WidgetGallery(QDialog):
         self.SUCCESS_GND_GIMBAL = False
         self.SUCCESS_GND_GPS = False
 
+    def showCentralWidget(self):
+        #self.original_stdout = sys.stdout
         self.create_check_connections_panel()
-        self.create_log_terminal()
+        #self.create_log_terminal()
         self.create_Gimbal_GND_panel()
         self.create_Gimbal_AIR_panel()
-        self.create_FPGA_settings_panel()
-        self.create_Beamsteering_settings_panel()
+        self.create_fpga_and_sivers_panel()
         self.create_Planning_Measurements_panel()
         self.create_GPS_visualization_panel()
-        self.create_pdp_plot_panel()
-
+        self.create_pap_plot_panel()
+        
         mainLayout = QGridLayout()
         mainLayout.addWidget(self.checkConnPanel, 0, 0, 1 , 4)
         mainLayout.addWidget(self.gimbalTXPanel, 1, 0, 3, 1)
         mainLayout.addWidget(self.gimbalRXPanel, 1, 1, 3, 1)
-        mainLayout.addWidget(self.fpgaSettingsPanel, 1, 2, 3, 1)
-        mainLayout.addWidget(self.beamsteeringSettingsPanel, 1, 3, 3, 1)
-        #mainLayout.addWidget(self.gpsPanel, 2, 0)
-        mainLayout.addWidget(self.pdpPlotPanel, 4, 0, 7, 2)
+        mainLayout.addWidget(self.fpgaAndSiversSettingsPanel, 1, 2, 3, 2)
+        mainLayout.addWidget(self.papPlotPanel, 4, 0, 7, 2)
         mainLayout.addWidget(self.gps_vis_panel, 4, 2, 7, 2)
         mainLayout.addWidget(self.planningMeasurementsPanel, 11, 0, 2, 2)
-        mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
-        
-        self.write_to_log_terminal('Welcome to A2G Measurements Center!')
-                
-        self.setLayout(mainLayout)
-
-        self.showMaximized()
+        #mainLayout.addWidget(self.log_widget, 11, 2, 2, 2)
+        #self.write_to_log_terminal('Welcome to A2G Measurements Center!')
     
+        self.dummyWidget.setLayout(mainLayout)
+    
+    def showSetupMenu(self):
+        setupWin = SetupWindow()
+        result = setupWin.exec_()
+        
+        self.droneGimbalChoice = setupWin.droneGimbalChoiceTDMenu.currentText()
+        
+        if setupWin.fm_droneGimbal_TDMenu.currentText() == "Only elevation":
+            self.fm_drone_gimbal = {'FMODE': 0x01}
+        elif setupWin.fm_droneGimbal_TDMenu.currentText() == "Only azimuth":
+            self.fm_drone_gimbal = {'FMODE': 0x02}
+        elif setupWin.fm_droneGimbal_TDMenu.currentText() == "Elevation and azimuth":
+            self.fm_drone_gimbal = {'FMODE': 0x00}
+        
+        if setupWin.fm_gndGimbal_TDMenu.currentText() == "Only elevation":
+            self.fm_gnd_gimbal = {'FMODE': 0x01}
+        elif setupWin.fm_gndGimbal_TDMenu.currentText() == "Only azimuth":
+            self.fm_gnd_gimbal = {'FMODE': 0x02}
+        elif setupWin.fm_gndGimbal_TDMenu.currentText() == "Elevation and azimuth":
+            self.fm_gnd_gimbal = {'FMODE': 0x00}
+
+        if setupWin.gnd_mobility_TDMenu.currentText() == "Static":
+            self.gnd_mobility = "Static"
+            try:
+                self.static_gnd_coords = [float(setupWin.gnd_lat_textEdit.text()), 
+                                          float(setupWin.gnd_lon_textEdit.text()),
+                                          float(setupWin.gnd_alt_textEdit.text())] # lat, lon, altitude above sea level
+            except Exception as e:
+                print("[DEBUG]: Wrong input ground coords OR no input ground coords")
+                print("[DEBUG]: Enter again the ground coordinates correctly")
+                return
+        else: 
+            self.gnd_mobility = "Moving"
+        if setupWin.drone_mobility_TDMenu.currentText() == "Static":
+            self.drone_mobility = "Static"
+            try:
+                self.static_drone_coords = [float(setupWin.drone_lat_textEdit.text()), 
+                                            float(setupWin.drone_lon_textEdit.text()),
+                                            float(setupWin.drone_alt_textEdit.text())] # lat, lon
+            except Exception as e:
+                print("[DEBUG]: Wrong input drone coords OR no input drone coords")
+                print("[DEBUG]: Enter again the drone coordinates correctly")
+                return
+        else:
+            self.drone_mobility = "Moving"
+
+        # Remove a previous layout to set it again
+        if self.dummyWidget.layout() is not None:
+            del self.dummyWidget
+            self.setCentralWidget(None)
+            self.dummyWidget = QWidget()
+            self.setCentralWidget(self.dummyWidget)
+            self.init_constants()
+        self.showCentralWidget()
+
+        self.setupDevicesAndMoreAction.setDisabled(True)
+    
+    def createMenu(self):
+        # Place the menus and actions here
+        menuBar = QMenuBar()
+        self.setMenuBar(menuBar)
+        setupMenu = menuBar.addMenu("&Setup")
+        threadsMenu = menuBar.addMenu("&Threads")
+        
+        self.setupDevicesAndMoreAction = QAction("&Setup devices and more", self)
+        setupMenu.addAction(self.setupDevicesAndMoreAction)        
+        self.setupDevicesAndMoreAction.triggered.connect(self.showSetupMenu)
+        
+        self.start_gnd_gimbal_fm_action = QAction("Start GND gimbal following its pair", self)
+        threadsMenu.addAction(self.start_gnd_gimbal_fm_action)
+        self.start_gnd_gimbal_fm_action.triggered.connect(self.start_thread_gnd_gimbal_fm)
+        self.start_gnd_gimbal_fm_action.setDisabled(True)
+        
+        self.stop_gnd_gimbal_fm_action = QAction("Stop GND gimbal following its pair", self)
+        threadsMenu.addAction(self.stop_gnd_gimbal_fm_action)
+        self.stop_gnd_gimbal_fm_action.triggered.connect(self.stop_thread_gnd_gimbal_fm)
+        self.stop_gnd_gimbal_fm_action.setDisabled(True)
+        
+        self.start_drone_gimbal_fm_action = QAction("Start DRONE gimbal following its pair", self)
+        threadsMenu.addAction(self.start_drone_gimbal_fm_action)
+        self.start_drone_gimbal_fm_action.triggered.connect(self.start_thread_drone_gimbal_fm)
+        self.start_drone_gimbal_fm_action.setDisabled(True)
+        
+        self.stop_drone_gimbal_fm_action = QAction("Stop DRONE gimbal following its pair", self)
+        threadsMenu.addAction(self.stop_drone_gimbal_fm_action)
+        self.stop_drone_gimbal_fm_action.triggered.connect(self.stop_thread_drone_gimbal_fm)
+        self.stop_drone_gimbal_fm_action.setDisabled(True)
+        
+        self.start_gps_visualization_action = QAction("Start GPS visualization", self)
+        threadsMenu.addAction(self.start_gps_visualization_action)
+        self.start_gps_visualization_action.triggered.connect(self.start_thread_gps_visualization)
+        self.start_gps_visualization_action.setDisabled(True)
+        
+        self.stop_gps_visualization_action = QAction("Stop GPS visualization", self)
+        threadsMenu.addAction(self.stop_gps_visualization_action)
+        self.stop_gps_visualization_action.triggered.connect(self.stop_thread_gps_visualization)
+        self.stop_gps_visualization_action.setDisabled(True)
+    
+    def start_thread_gnd_gimbal_fm(self):
+        if hasattr(self, 'myhelpera2g'):
+            self.update_time_gimbal_follow = 1
+            self.stop_event_gimbal_follow_thread = threading.Event()
+            self.periodical_gimbal_follow_thread = TimerThread(self.stop_event_gimbal_follow_thread, self.update_time_gimbal_follow)
+
+            if self.drone_mobility == "Moving":
+                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL', data=self.fm_gnd_gimbal))
+            elif self.drone_mobility == "Static":
+                x,y,z = geodetic2geocentric(self.static_drone_coords[0], self.static_drone_coords[1], self.static_drone_coords[2])
+                data = {'X': x, 'Y': y, 'Z': z, 'FMODE': self.fm_gnd_gimbal['FMODE']}
+                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.process_answer_get_gps(data=data))
+            self.periodical_gimbal_follow_thread.start()
+            
+        self.start_gnd_gimbal_fm_action.setEnabled(False)
+        self.stop_gnd_gimbal_fm_action.setEnabled(True)
+        
+    def stop_thread_gnd_gimbal_fm(self):
+        if hasattr(self, 'periodical_gimbal_follow_thread'):
+            if self.periodical_gimbal_follow_thread.isRunning():
+                self.stop_event_gimbal_follow_thread.set()
+        
+        self.start_gnd_gimbal_fm_action.setEnabled(True)
+        self.stop_gnd_gimbal_fm_action.setEnabled(False)
+        
+    def start_thread_drone_gimbal_fm(self):
+        if hasattr(self, 'myhelpera2g'):
+            if self.gnd_mobility == "Moving":
+                data = {'X': 0, 'Y': 0, 'Z': 0, 'FMODE': self.fm_drone_gimbal['FMODE'], 'MOBILITY': 0x00}
+            elif self.gnd_mobility == "Static":
+                x,y,z = geodetic2geocentric(self.static_gnd_coords[0], self.static_gnd_coords[1], self.static_gnd_coords[2])
+                data = {'X': x, 'Y': y, 'Z': z, 'FMODE': self.fm_drone_gimbal['FMODE'], 'MOBILITY': 0x01}
+            self.myhelpera2g.socket_send_cmd(type_cmd='SETREMOTEFMFLAG', data=data)
+        
+        self.start_drone_gimbal_fm_action.setEnabled(False)
+        self.stop_drone_gimbal_fm_action.setEnabled(True)
+        
+    def stop_thread_drone_gimbal_fm(self):
+        if hasattr(self, 'myhelpera2g'):
+            self.myhelpera2g.socket_send_cmd(type_cmd='SETREMOTESTOPFM')
+
+        self.start_drone_gimbal_fm_action.setEnabled(True)
+        self.stop_drone_gimbal_fm_action.setEnabled(False)
+        
+    def start_thread_gps_visualization(self):
+        if hasattr(self, 'myhelpera2g'):   
+            self.update_vis_time_gps = 1
+            self.stop_event_gps_display = threading.Event()
+            self.periodical_gps_display_thread = TimerThread(self.stop_event_gps_display, self.update_vis_time_gps)
+            self.periodical_gps_display_thread.update.connect(self.periodical_gps_display_callback)
+            self.periodical_gps_display_thread.start()
+        
+        self.start_gps_visualization_action.setEnabled(False)
+        self.stop_gps_visualization_action.setEnabled(True)
+        
+    def stop_thread_gps_visualization(self):
+        if hasattr(self, 'periodical_gps_display_thread'):
+            if self.periodical_gps_display_thread.isRunning():
+                self.stop_event_gps_display.set()
+        
+        self.start_gps_visualization_action.setEnabled(True)
+        self.stop_gps_visualization_action.setEnabled(False)
+
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
         """
         Checks ssh connection betwwen ground node (running the GUI) and the computer on the drone.
@@ -165,8 +458,9 @@ class WidgetGallery(QDialog):
         output = stdout.read().decode('utf-8')
         error = stderr.read().decode('utf-8')
 
+        expected_str_out = "Reply from " + drone_fpga_static_ip_addr
         # Print the output and error, if any
-        if "Reply" in output:
+        if expected_str_out in output:
             print("[DEBUG]: RFSoC detected at DRONE node")
             success_drone_fpga = True
         else:
@@ -222,13 +516,21 @@ class WidgetGallery(QDialog):
                 print("[DEBUG]: ", e)
                 success_drone_gimbal = None
             else:
-                if 'USB Serial Converter' in usb_list_str:
-                    success_drone_gimbal = True
-                    print("[DEBUG]: Gremsy Gimbal is detected at DRONE")
-                else:
-                    success_drone_gimbal = False
-                    print("[DEBUG]: Gremsy Gimbal is NOT detected at DRONE")                
-
+                if self.droneGimbalChoice == "DJI Ronin RS2":
+                    if 'PCAN-USB' in usb_list_str:
+                        success_drone_gimbal = True
+                        print("[DEBUG]: Ronin RS2 is detected at DRONE")
+                    else:
+                        success_drone_gimbal = False
+                        print("[DEBUG]: Ronin RS2 is NOT detected at DRONE")
+                elif self.droneGimbalChoice == "Gremsy H16":
+                    if 'USB Serial Converter' in usb_list_str:
+                        success_drone_gimbal = True
+                        print("[DEBUG]: Gremsy Gimbal is detected at DRONE")
+                    else:
+                        success_drone_gimbal = False
+                        print("[DEBUG]: Gremsy Gimbal is NOT detected at DRONE")
+                
         return success_drone_gimbal
 
     def check_if_gnd_gimbal_connected(self):
@@ -251,6 +553,126 @@ class WidgetGallery(QDialog):
         
         return success_gnd_gimbal
     
+    def check_if_server_running_drone_fpga(self):
+        """
+        Checks if the server.py daemon is running on the ground fpga.
+        
+        ASSUMES GROUND FPGA IP STATIC ADDR (ETH) IS 10.1.1.30 (THIS IS THE DEFAULT SETUP)
+
+        Returns:
+            _type_: _description_
+        """
+        if self.remote_drone_conn is None:
+            print('[DEBUG]: No SSH connection to drone detected. The server-running-on-drone check can not be done.')
+            success_server_drone_fpga = False
+        else:
+            try:
+                shell = self.remote_drone_conn.invoke_shell()
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
+                
+                shell.send("ssh xilinx@10.1.1.40\r\n")
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
+
+                shell.send("xilinx\r\n")
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
+                
+                shell.send("ps aux | grep mmwsdr\r\n")
+                while(shell.recv_ready() == False):
+                    time.sleep(0.1)
+                out_now = shell.recv(65535).decode('utf-8')
+
+                shell.close()
+            except Exception as e:
+                print(f"This error occurred when trying to check if server is running on drone fpga: {e}")
+                success_server_drone_fpga = None
+                return success_server_drone_fpga
+            
+            if 'server.py'in out_now and 'run.sh' in out_now:
+                print("[DEBUG]: Server script is running on DRONE fpga")
+            else:
+                print("[DEBUG]: Server script is not running on DRONE fpga")
+                print("[DEBUG]: Starting server daemon on DRONE fpga")
+                try:
+                    shell = self.remote_drone_conn.invoke_shell()
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+                    
+                    shell.send("ssh xilinx@10.1.1.40\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.send("xilinx\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+                    
+                    shell.send("cd jupyter_notebook/mmwsdr\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.send("sudo ./run.sh\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.send("xilinx\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+
+                    shell.close()
+
+                    print("[DEBUG]: Server daemon on drone fpga has started")
+                    success_server_drone_fpga = True
+                except Exception as e:
+                    print(f"This error occurred when trying to init daemon server on drone fpga: {e}")
+                    success_server_drone_fpga = None
+                    return success_server_drone_fpga
+        return success_server_drone_fpga
+
+    def check_if_server_running_gnd_fpga(self):
+        try:
+            conn_gnd_fpga = paramiko.SSHClient()
+            conn_gnd_fpga.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            conn_gnd_fpga.connect('10.1.1.30', username='xilinx', password='xilinx')
+        except Exception as e:
+            print(f"This error occurred when trying to check if server is running on GND fpga: {e}")
+            success_server_gnd_fpga = False
+            return success_server_gnd_fpga
+        try:
+            stdin, stdout, stderr = conn_gnd_fpga.exec_command('ps aux | grep mmwsdr')
+            output = stdout.read().decode()
+
+            if stderr.read().decode() == '' and 'server.py' in output and 'run.sh' in output:
+                print("[DEBUG]: Server script is running on GND fpga")
+            else:
+                print("[DEBUG]: Server script is not running on GND fpga")
+                conn_gnd_fpga.exec_command('cd jupyter_notebooks/mmwsdr')
+                stdin, stdout, stderr = conn_gnd_fpga.exec_command('sudo ./run.sh')
+                stdin.channel.send("xilinx\n")
+                stdin.channel.shutdown_write()
+                print("[DEBUG]: GND node has started the Server Daemon in its FPGA")
+        except Exception as e:
+            print("[DEBUG]: Could not check if Server script is running in this node FPGA")
+            success_server_gnd_fpga = False
+            return success_server_gnd_fpga
+        
+        success_server_gnd_fpga = True
+
+        # Close this connection
+        conn_gnd_fpga.close()
+
+        return success_server_gnd_fpga
+
     def check_if_gnd_gps_connected(self):
         """
         Function for checking if gps is connected to the ground node.
@@ -368,11 +790,15 @@ class WidgetGallery(QDialog):
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
         SUCCESS_GND_GPS = self.check_if_gnd_gps_connected()
+        SUCCESS_DRONE_SERVER_FPGA = self.check_if_server_running_drone_fpga()
+        SUCCESS_GND_SERVER_FPGA = self.check_if_server_running_gnd_fpga()
         
         self.get_gnd_ip_node_address()
         self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))
         self.gnd_gps_conn_label_modifiable.setText(str(SUCCESS_GND_GPS))
         self.gnd_rfsoc_conn_label_modifiable.setText(str(SUCCESS_GND_FPGA))
+        self.server_drone_fpga_label_modifiable.setText(str(SUCCESS_DRONE_SERVER_FPGA))
+        self.server_gnd_fpga_label_modifiable.setText(str(SUCCESS_GND_SERVER_FPGA))
         
         if hasattr(self, 'GND_ADDRESS'):
             self.gnd_ip_addr_value_label.setText(self.GND_ADDRESS)
@@ -382,6 +808,9 @@ class WidgetGallery(QDialog):
         self.SUCCESS_GND_FPGA = SUCCESS_GND_FPGA
         self.SUCCESS_GND_GIMBAL = SUCCESS_GND_GIMBAL
         self.SUCCESS_GND_GPS = SUCCESS_GND_GPS
+        
+        if self.SUCCESS_SSH and self.SUCCESS_PING_DRONE:
+            self.connect_to_drone.setEnabled(True)
         
     def create_class_instances(self, IsGPS=False, IsGimbal=False, IsRFSoC=False, GPS_Stream_Interval='sec1'):
         """
@@ -397,25 +826,47 @@ class WidgetGallery(QDialog):
         self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, IsRFSoC=IsRFSoC, IsGimbal=IsGimbal, IsGPS=IsGPS, rfsoc_static_ip_address='10.1.1.30', GPS_Stream_Interval=GPS_Stream_Interval, DBG_LVL_0=False, DBG_LVL_1=False)
         self.myhelpera2g.HelperStartA2GCom()
 
+        print("[DEBUG]: Starting GUI threads")
+        time.sleep(1)
+
+        #self.start_GUI_threads()
+
     def start_GUI_threads(self):
         """
         Start GUI related threads. This threads are related only to the display of information
         on the GUI.
         
         """
+        print("[DEBUG]: Starting GUI threads...")
         # Although thus function should be called when a HelperA2GMeasurements class instance has been created, better to do a double check
         if hasattr(self, 'myhelpera2g'):
-            self.update_vis_time_gps = 1
-            self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
-            self.update_time_gimbal_follow = 1
-            self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='GETGPS'))
-            #self.periodical_gimbal_follow_thread = RepeatTimer(self.update_time_gimbal_follow, self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL'))
-
-            self.update_vis_time_pdp = 0.5
-            self.periodical_pdp_display_thread = RepeatTimer(self.update_vis_time_pdp, self.periodical_pdp_display_callback)
+            print("[DEBUG]: Detected helper class at creating GUI threads")
+            if self.gps_display_flag:      
+                print("[DEBUG]: GPS dispplay flag activated")      
+                self.update_vis_time_gps = 1
+                #self.periodical_gps_display_thread = RepeatTimer(self.update_vis_time_gps, self.periodical_gps_display_callback)
+                self.stop_event_gps_display = threading.Event()
+                self.periodical_gps_display_thread = TimerThread(self.stop_event_gps_display, self.update_vis_time_gps)
+                self.periodical_gps_display_thread.update.connect(self.periodical_gps_display_callback)
+                self.periodical_gps_display_thread.start()
+            
+            if self.rs2_fm_flag:
+                print("[DEBUG]: Gimbal RS2 FM Flag activated")
+                self.update_time_gimbal_follow = 1
+                self.stop_event_gimbal_follow_thread = threading.Event()
+                self.periodical_gimbal_follow_thread = TimerThread(self.stop_event_gimbal_follow_thread, self.update_time_gimbal_follow)
+                self.periodical_gimbal_follow_thread.update.connect(lambda: self.myhelpera2g.socket_send_cmd(type_cmd='FOLLOWGIMBAL', data=self.fm_gnd_gimbal))
+                self.periodical_gimbal_follow_thread.start()
         
-    def periodical_pdp_display_callback(self):
-        1
+    def periodical_pap_display_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            if hasattr(self.myhelpera2g, 'PAP_TO_PLOT'):
+                if len(self.myhelpera2g.PAP_TO_PLOT) > 0:
+                    self.plot_widget.clear()
+                    img = pg.ImageItem()
+                    img.setImage(self.myhelpera2g.PAP_TO_PLOT)
+                    self.plot_widget.addItem(img)
+                    print(f"[DEBUG]: Executed plot command at {self.myhelpera2g.ID}. PAP shape: {self.myhelpera2g.PAP_TO_PLOT.shape}")
         
     def periodical_gps_display_callback(self):
         """
@@ -484,16 +935,30 @@ class WidgetGallery(QDialog):
         drone_rfsoc_conn_label = QLabel('Drone RFSoC:')
         drone_gps_conn_label = QLabel('Drone GPS:')
         drone_gimbal_conn_label = QLabel('Drone Gimbal:')
+        server_gnd_fpga_label = QLabel('Ground FPGA server?:')
+        server_drone_fpga_label = QLabel('Drone FPGA server?:')
 
         gnd_ip_addr_label = QLabel('Ground IP:')
         air_ip_addr_label = QLabel('Drone IP:')
         self.gnd_ip_addr_value_label = QLabel('')
-        self.air_ip_addr_value_text_edit = QLineEdit('')
+        self.air_ip_addr_value_text_edit = QLineEdit(self.STATIC_DRONE_IP_ADDRESS)
+
+        #self.GndGimbalFollowingCheckBox = QCheckBox("&RS2 FM")
+        #self.GndGimbalFollowingCheckBox.setChecked(False)
+        #self.GndGimbalFollowingCheckBox.toggled.connect(self.activate_rs2_fm_flag)
+        #self.rs2_fm_flag = False
+
+        #self.GpsDisplayCheckBox = QCheckBox("&GPS Display")
+        #self.GpsDisplayCheckBox.setChecked(False)
+        #self.GpsDisplayCheckBox.toggled.connect(self.activate_gps_display_flag)
+        #self.gps_display_flag = False
+
         self.check_connections_push_button = QPushButton('Check')
         self.connect_to_drone = QPushButton('Connect drone')
         self.disconnect_from_drone = QPushButton('Disconnect drone')
         self.check_connections_push_button.clicked.connect(self.check_status_all_devices)
         self.disconnect_from_drone.setEnabled(False)
+        self.connect_to_drone.setEnabled(False)
         self.connect_to_drone.clicked.connect(self.connect_drone_callback)
         self.disconnect_from_drone.clicked.connect(self.disconnect_drone_callback)
 
@@ -505,6 +970,8 @@ class WidgetGallery(QDialog):
         self.drone_rfsoc_conn_label_modifiable = QLabel('--')
         self.drone_gps_conn_label_modifiable = QLabel('--')
         self.drone_gimbal_conn_label_modifiable = QLabel('--')
+        self.server_gnd_fpga_label_modifiable = QLabel('--')
+        self.server_drone_fpga_label_modifiable = QLabel('--')
 
         layout = QGridLayout()
 
@@ -528,48 +995,110 @@ class WidgetGallery(QDialog):
         layout.addWidget(self.air_ip_addr_value_text_edit, 1, 1, 1, 2)
         layout.addWidget(drone_gimbal_conn_label, 1, 3, 1, 1)
         layout.addWidget(self.drone_gimbal_conn_label_modifiable, 1, 4, 1, 1) 
-        layout.addWidget(self.check_connections_push_button, 1, 5, 1, 4)
-        layout.addWidget(self.connect_to_drone, 1, 9, 1, 4)
-        layout.addWidget(self.disconnect_from_drone, 1, 13, 1, 3)
+        layout.addWidget(server_gnd_fpga_label, 1, 5, 1, 1)
+        layout.addWidget(self.server_gnd_fpga_label_modifiable, 1, 6, 1, 1)
+        layout.addWidget(server_drone_fpga_label, 1, 7, 1, 1)
+        layout.addWidget(self.server_drone_fpga_label_modifiable, 1, 8, 1, 1)
+        layout.addWidget(self.check_connections_push_button, 1, 9, 1, 3)
+        layout.addWidget(self.connect_to_drone, 1, 12, 1, 2)
+        layout.addWidget(self.disconnect_from_drone, 1, 14, 1, 2)
         
         self.checkConnPanel.setLayout(layout)
+    
+    def activate_rs2_fm_flag(self):        
+        if self.rs2_fm_flag:
+            self.rs2_fm_flag = False
+        else:
+            self.rs2_fm_flag = True
+    
+    def activate_gps_display_flag(self):
+        if self.gps_display_flag:
+            self.gps_display_flag = False
+        else:
+            self.gps_display_flag = True
 
     def connect_drone_callback(self):
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True, IsRFSoC=True)
-            print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")
+            self.start_meas_togglePushButton.setEnabled(True)
+            if self.SUCCESS_DRONE_GPS: 
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
+                
+                # Only activate gnd FM actions if GND GIMBAL and GND GPS and DRONE GPS
+                self.start_gnd_gimbal_fm_action.setEnabled(True)
+                self.stop_gnd_gimbal_fm_action.setEnabled(False)
+            print("[DEBUG]: Class created at GND with Gimbal, GPS and RFSoC")               
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsRFSoC=True)
             print("[DEBUG]: Class created at GND with Gimbal and RFSoC")
+            self.start_meas_togglePushButton.setEnabled(True)
         if self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True)
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with Gimbal")
         if self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGimbal=True, IsGPS=True)
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with Gimbal and GPS")
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gnd_gimbal_fm_action.setEnabled(True)
+                self.stop_gnd_gimbal_fm_action.setEnabled(False)
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
         if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGPS=True, IsRFSoC=True)
+            self.start_meas_togglePushButton.setEnabled(True)
             print("[DEBUG]: Class created at GND with GPS and RFSoC")
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
         if not self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances(IsRFSoC=True)
-            print("[DEBUG]: Class created at GND with RFSoC ")
+            self.start_meas_togglePushButton.setEnabled(True)
+            print("[DEBUG]: Class created at GND with RFSoC")
         if not self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and not self.SUCCESS_GND_GPS:
             self.create_class_instances()
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with NO devices")
         if not self.SUCCESS_GND_GIMBAL and not self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
             self.create_class_instances(IsGPS=True)
+            self.start_meas_togglePushButton.setEnabled(False)
             print("[DEBUG]: Class created at GND with GPS")
+            if self.SUCCESS_DRONE_GPS:
+                self.start_gps_visualization_action.setEnabled(True)
+                self.stop_gps_visualization_action.setEnabled(False)
         
-        self.start_meas_togglePushButton.setEnabled(True)
+        if self.SUCCES_DRONE_GIMBAL and self.SUCCESS_DRONE_GPS:
+            self.start_drone_gimbal_fm_action.setEnabled(True)
+            self.stop_drone_gimbal_fm_action.setEnabled(False)
+        
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
-        
         self.connect_to_drone.setEnabled(False)
         self.disconnect_from_drone.setEnabled(True)
+        self.setupDevicesAndMoreAction.setDisabled(True)
         
     def disconnect_drone_callback(self):
+        if hasattr(self, 'periodical_gimbal_follow_thread'):
+            if self.periodical_gimbal_follow_thread.isRunning():
+                self.stop_event_gimbal_follow_thread.set()
+        
+        if hasattr(self, 'periodical_gps_display_thread'):
+            if self.periodical_gps_display_thread.isRunning():
+                self.stop_event_gps_display.set()
+
+        if self.stop_meas_togglePushButton.isChecked():
+            print("[DEBUG]: Before disconnecting, the ongoing measurement will be stopped")
+            self.stop_meas_button_callback()
+        if self.finish_meas_togglePushButton.isChecked():
+            print("[DEBUG]: Before disconnecting, the ongoing measurement will be finished")
+            self.finish_meas_button_callback()
+
+        self.myhelpera2g.socket_send_cmd(type_cmd='CLOSEDGUI')
         self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL') # shutdowns the devices that where passed by parameters as True, when the class instance is created
-        del self.myhelpera2g        
+        del self.myhelpera2g
         
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(False)
@@ -577,11 +1106,89 @@ class WidgetGallery(QDialog):
         self.connect_to_drone.setEnabled(True)
         self.disconnect_from_drone.setEnabled(False)
 
-    def create_FPGA_settings_panel(self):
-        self.fpgaSettingsPanel = QGroupBox('FPGA settings')
+        self.setupDevicesAndMoreAction.setEnabled(True)
+        self.start_gnd_gimbal_fm_action.setEnabled(True)
+        self.stop_gnd_gimbal_fm_action.setEnabled(False)
+        self.start_drone_gimbal_fm_action.setEnabled(True)
+        self.stop_drone_gimbal_fm_action.setEnabled(False)        
+        self.start_gps_visualization_action.setEnabled(True)
+        self.stop_gps_visualization_action.setEnabled(False)
+    
+    def create_fpga_and_sivers_panel(self):
+        self.fpgaAndSiversSettingsPanel = QGroupBox('Sivers settings')
+
+        rf_op_freq_label = QLabel('Freq. Operation [Hz]:')
+        tx_bb_gain_label = QLabel('Tx BB Gain [dB]:')
+        tx_bb_phase_label = QLabel('Tx BB Phase [dB]:')
+        tx_bb_iq_gain_label = QLabel('Tx BB IQ Gain [dB]:')
+        tx_bfrf_gain_label = QLabel('Tx BF & RF Gain [dB]:')
+        rx_bb_gain_1_label = QLabel('Rx BB Gain 1 [dB]:')
+        rx_bb_gain_2_label = QLabel('Rx BB Gain 2 [dB]:')
+        rx_bb_gain_3_label = QLabel('Rx BB Gain 3 [dB]:')
+        rx_bfrf_gain_label = QLabel('Rx BF & RF Gain [dB]:')
         
-    def create_Beamsteering_settings_panel(self):
-        self.beamsteeringSettingsPanel = QGroupBox('Beamsteering settings')
+        tx_bb_gain_label.leaveEvent = lambda e: QToolTip.hideText()
+        tx_bb_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "Not available to the user for the moment")
+        
+        #tx_bb_phase_label.leaveEvent = lambda e: QToolTip.hideText()
+        #tx_bb_phase_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "Defaults to 0.")
+        
+        # Luckily lambda functions can help us to re implement QLabel methods leaveEvent and enterEvent in one line
+        tx_bb_iq_gain_label.leaveEvent = lambda e: QToolTip.hideText()
+        tx_bb_iq_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,6] dB\nThis sets the BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,6,16)")
+        
+        tx_bfrf_gain_label.leaveEvent = lambda e: QToolTip.hideText()
+        tx_bfrf_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,15] dB\nThis sets the gain after RF mixer for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,15,16)")
+        
+        rx_bb_gain_1_label.leaveEvent = lambda e: QToolTip.hideText()
+        rx_bb_gain_1_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [-6,0] dB\nThis sets the rx 1st BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(-6,0,4)")
+        
+        rx_bb_gain_2_label.leaveEvent = lambda e: QToolTip.hideText()
+        rx_bb_gain_2_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [-6,0] dB\nThis sets the rx 2nd BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(-6,0,4)")
+        
+        rx_bb_gain_3_label.leaveEvent = lambda e: QToolTip.hideText()
+        rx_bb_gain_3_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,6] dB\nThis sets the rx 3rd BB gain for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,6,16)")
+        
+        rx_bfrf_gain_label.leaveEvent = lambda e: QToolTip.hideText()
+        rx_bfrf_gain_label.enterEvent = lambda e: QToolTip.showText(QCursor.pos(), "INPUT A VALUE IN: [0,15] dB\nThis sets the rx gain before the RF mixer for the I, Q signals.\nThe actual value in dB is chosen as the closest value in the array linspace(0,15,16)")
+
+        self.rf_op_freq_text_edit = QLineEdit('57.51e9')
+        self.tx_bb_gain_text_edit = QLineEdit('3')
+        self.tx_bb_phase_text_edit = QLineEdit('0')
+        self.tx_bb_iq_gain_text_edit = QLineEdit('1.6')
+        self.tx_bfrf_gain_text_edit = QLineEdit('3')
+        self.rx_bb_gain_1_text_edit = QLineEdit('-1.5')
+        self.rx_bb_gain_2_text_edit = QLineEdit('-4.5')
+        self.rx_bb_gain_3_text_edit = QLineEdit('1.6')
+        self.rx_bfrf_gain_text_edit = QLineEdit('7')
+        self.tx_bb_phase_text_edit.setEnabled(False)
+        self.tx_bb_gain_text_edit.setEnabled(False)
+
+        layout = QGridLayout()
+
+        layout.addWidget(rf_op_freq_label, 0, 0, 1, 2)
+        layout.addWidget(self.rf_op_freq_text_edit, 0, 2, 1, 2)
+        layout.addWidget(tx_bb_gain_label, 1, 0, 1, 1)
+        layout.addWidget(self.tx_bb_gain_text_edit, 1, 1, 1, 1)
+        layout.addWidget(rx_bb_gain_1_label, 1, 2, 1, 1)
+        layout.addWidget(self.rx_bb_gain_1_text_edit, 1, 3, 1, 1)
+
+        layout.addWidget(tx_bb_phase_label, 2, 0, 1, 1)
+        layout.addWidget(self.tx_bb_phase_text_edit, 2, 1, 1, 1)
+        layout.addWidget(rx_bb_gain_2_label, 2, 2, 1, 1)
+        layout.addWidget(self.rx_bb_gain_2_text_edit, 2, 3, 1, 1)
+
+        layout.addWidget(tx_bb_iq_gain_label, 3, 0, 1, 1)
+        layout.addWidget(self.tx_bb_iq_gain_text_edit, 3, 1, 1, 1)
+        layout.addWidget(rx_bb_gain_3_label, 3, 2, 1, 1)
+        layout.addWidget(self.rx_bb_gain_3_text_edit, 3, 3, 1, 1)
+
+        layout.addWidget(tx_bfrf_gain_label, 4, 0, 1, 1)
+        layout.addWidget(self.tx_bfrf_gain_text_edit, 4, 1, 1, 1)
+        layout.addWidget(rx_bfrf_gain_label, 4, 2, 1, 1)
+        layout.addWidget(self.rx_bfrf_gain_text_edit, 4, 3, 1, 1)
+
+        self.fpgaAndSiversSettingsPanel.setLayout(layout)
 
     def checker_gimbal_input_range(self, angle):
 
@@ -759,7 +1366,32 @@ class WidgetGallery(QDialog):
             print("[DEBUG]: No HelperA2GMeasurements class instance is available")
 
     def move_button_gimbal_drone_callback(self):
-        1
+        if hasattr(self, 'myhelpera2g'):
+            yaw = self.rx_yaw_value_text_edit.text()
+            pitch = self.rx_pitch_value_text_edit.text()
+
+            if yaw == '' or pitch == '':
+                print("[DEBUG]: No YAW or PITCH values provided. No gimbal movement will done.")
+            else:
+                if self.rx_abs_radio_button.isChecked():
+                    ctrl_byte = 0x01
+                if self.rx_rel_radio_button.isChecked():
+                    ctrl_byte = 0x00
+                try:
+                    yaw = int(float(yaw))
+                    pitch = int(float(pitch))
+                    incorrect_angle_value = self.checker_gimbal_input_range(yaw)
+                    incorrect_angle_value = self.checker_gimbal_input_range(pitch)
+                    if self.droneGimbalChoice == "DJI Ronin RS2":
+                        data = {'YAW': yaw*10, 'PITCH': pitch*10, 'ROLL': 0, 'MODE': ctrl_byte}
+                    elif self.droneGimbalChoice == "Gremsy H16":
+                        data = {'YAW': yaw, 'PITCH': pitch, 'ROLL': 0, 'MODE': ctrl_byte}
+                    self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                    print(f"[DEBUG]: gimbal moved {yaw} degs in YAW and {pitch} in PITCH from application")
+                except Exception as e:
+                    print("[DEBUG]: Error executing gimbal movement. Most probably wrong angle input, ", e)
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
     def left_button_gimbal_drone_callback(self):
         if hasattr(self, 'myhelpera2g'):
@@ -771,14 +1403,20 @@ class WidgetGallery(QDialog):
                     if tmp < 0:
                         tmp = abs(tmp)
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
-                        
-                    data = {'YAW': -tmp, 'PITCH': 0}
+                    
+                    if self.droneGimbalChoice == "DJI Ronin RS2":
+                        data = {'YAW': -tmp*10, 'PITCH': 0, 'ROLL': 0, 'MODE': 0x00}
+                    elif self.droneGimbalChoice == "Gremsy H16":
+                        data = {'YAW': -tmp, 'PITCH': 0, 'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
-                data = {'YAW': -10, 'PITCH': 0}
+                if self.droneGimbalChoice == "DJI Ronin RS2":
+                    data = {'YAW': -100, 'PITCH': 0, 'ROLL': 0,'MODE': 0x00}
+                elif self.droneGimbalChoice == "Gremsy H16":
+                    data = {'YAW': -10, 'PITCH': 0, 'ROLL': 0,'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
         else:
@@ -794,14 +1432,19 @@ class WidgetGallery(QDialog):
                     if tmp < 0:
                         tmp = abs(tmp)
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
-                        
-                    data = {'YAW': tmp, 'PITCH': 0}
+                    if self.droneGimbalChoice == "DJI Ronin RS2":
+                        data = {'YAW': tmp*10, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
+                    elif self.droneGimbalChoice == "Gremsy H16":
+                        data = {'YAW': tmp, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
-                    print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
+                    print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
-                data = {'YAW': 10, 'PITCH': 0}
+                if self.droneGimbalChoice == "DJI Ronin RS2":
+                    data = {'YAW': 100, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
+                elif self.droneGimbalChoice == "Gremsy H16":
+                    data = {'YAW': 10, 'PITCH': 0,'ROLL': 0, 'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
         else:
@@ -817,14 +1460,19 @@ class WidgetGallery(QDialog):
                     if tmp < 0:
                         tmp = abs(tmp)
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
-                        
-                    data = {'YAW': 0, 'PITCH': tmp}
+                    if self.droneGimbalChoice == "DJI Ronin RS2":
+                        data = {'YAW': 0, 'PITCH': tmp*10,'ROLL': 0, 'MODE': 0x00}
+                    elif self.droneGimbalChoice == "Gremsy H16":    
+                        data = {'YAW': 0, 'PITCH': tmp,'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved {movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
-                data = {'YAW': 0, 'PITCH': 10}
+                if self.droneGimbalChoice == "DJI Ronin RS2":
+                    data = {'YAW': 0, 'PITCH': 100, 'ROLL': 0,'MODE': 0x00}
+                elif self.droneGimbalChoice == "Gremsy H16":
+                    data = {'YAW': 0, 'PITCH': 10, 'ROLL': 0,'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of 10 deg, since no angle was specified")
         else:
@@ -840,24 +1488,31 @@ class WidgetGallery(QDialog):
                     if tmp < 0:
                         tmp = abs(tmp)
                         print("[DEBUG]: The movement step Textbox in the Gimbal Control Panel is always taken as positive. Direction is given by arrows.")
-                        
-                    data = {'YAW': 0, 'PITCH': -tmp}
+                    if self.droneGimbalChoice == "DJI Ronin RS2":
+                        data = {'YAW': 0, 'PITCH': -tmp*10,'ROLL': 0, 'MODE': 0x00}
+                    elif self.droneGimbalChoice == "Gremsy H16":
+                        data = {'YAW': 0, 'PITCH': -tmp,'ROLL': 0, 'MODE': 0x00}
                     self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                     print(f"[DEBUG]: gimbal moved -{movement_step} degs from application")
                 except Exception as e:
                         print("[DEBUG]: Error executing gimbal movement. Most probably wrong MOVEMENT STEP format, ", e)
             else:
-                data = {'YAW': 0, 'PITCH': -10}
+                if self.droneGimbalChoice == "DJI Ronin RS2":
+                    data = {'YAW': 0, 'PITCH': -100,'ROLL': 0, 'MODE': 0x00}
+                elif self.droneGimbalChoice == "Gremsy H16":
+                    data = {'YAW': 0, 'PITCH': -10, 'ROLL': 0,'MODE': 0x00}
                 self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
                 print("[DEBUG]: gimbal moved from application by a predetermined angle of -10 deg, since no angle was specified")
         else:
             print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
+    def tx_move_according_coords_push_button_callback(self):
+        1
+    
+    def rx_move_according_coords_push_button_callback(self):
+        1
+    
     def create_Gimbal_GND_panel(self):
-        """
-        Creates the panel to control the ground gimbal.
-        
-        """
         self.gimbalTXPanel = QGroupBox('GND Gimbal')
         
         yaw_label = QLabel('Yaw [D]:')
@@ -869,38 +1524,59 @@ class WidgetGallery(QDialog):
         
         self.tx_yaw_value_text_edit = QLineEdit('')
         self.tx_pitch_value_text_edit = QLineEdit('')
-        
         self.tx_step_manual_move_gimbal_text_edit = QLineEdit('')
+        
+        thisLatLabel = QLabel('This Lat:')
+        thisLonLabel = QLabel('This Lon:')
+        otherLatLabel = QLabel('Other Lat:')
+        otherLonLabel = QLabel('Other Lon:')
+        
+        self.tx_this_lat_text_edit = QLineEdit('')
+        self.tx_this_lon_text_edit = QLineEdit('')
+        self.tx_other_lat_text_edit = QLineEdit('')
+        self.tx_other_lon_text_edit = QLineEdit('')
+        
+        self.tx_move_according_coords_push_button = QPushButton('Coords Move')
+        self.tx_move_according_coords_push_button.clicked.connect(self.tx_move_according_coords_push_button_callback)
         
         self.tx_gimbal_manual_move_push_button = QPushButton('Move')
         self.tx_gimbal_manual_move_push_button.clicked.connect(self.move_button_gimbal_gnd_callback)
-        self.tx_gimbal_move_left_push_button = QPushButton('<-')
+        self.tx_gimbal_move_left_push_button = QPushButton('Left')
         self.tx_gimbal_move_left_push_button.clicked.connect(self.left_button_gimbal_gnd_callback)
-        self.tx_gimbal_move_right_push_button = QPushButton('->')
+        self.tx_gimbal_move_right_push_button = QPushButton('Right')
         self.tx_gimbal_move_right_push_button.clicked.connect(self.right_button_gimbal_gnd_callback)
-        self.tx_gimbal_move_up_push_button = QPushButton('^')
+        self.tx_gimbal_move_up_push_button = QPushButton('Up')
         self.tx_gimbal_move_up_push_button.clicked.connect(self.up_button_gimbal_gnd_callback)
-        self.tx_gimbal_move_down_push_button = QPushButton('v')
+        self.tx_gimbal_move_down_push_button = QPushButton('Down')
         self.tx_gimbal_move_down_push_button.clicked.connect(self.down_button_gimbal_gnd_callback)
         
         layout = QGridLayout()
-        layout.addWidget(self.tx_abs_radio_button, 0, 0, 1, 3)
-        layout.addWidget(self.tx_rel_radio_button, 0, 3, 1, 3)
-        layout.addWidget(self.tx_gimbal_manual_move_push_button, 0, 6, 1, 4)
+        layout.addWidget(self.tx_gimbal_move_up_push_button, 0, 0, 1, 3)
+        layout.addWidget(self.tx_gimbal_move_left_push_button, 1, 0, 1, 3)
+        layout.addWidget(self.tx_step_manual_move_gimbal_text_edit, 2, 0, 1, 3)
+        layout.addWidget(self.tx_gimbal_move_right_push_button, 3, 0, 1, 3)
+        layout.addWidget(self.tx_gimbal_move_down_push_button, 4, 0, 1, 3)
         
-        layout.addWidget(yaw_label, 1, 0, 1, 1)
-        layout.addWidget(self.tx_yaw_value_text_edit, 1, 1, 1, 4)
-        layout.addWidget(pitch_label, 1, 5, 1, 1)        
-        layout.addWidget(self.tx_pitch_value_text_edit, 1, 6, 1, 4)
+        layout.addWidget(self.tx_abs_radio_button, 0, 3, 1, 3)
+        layout.addWidget(self.tx_rel_radio_button, 1, 3, 1, 3)
+        layout.addWidget(yaw_label, 2, 3, 1, 1)
+        layout.addWidget(self.tx_yaw_value_text_edit, 2, 4, 1, 2)
+        layout.addWidget(pitch_label, 3, 3, 1, 1)        
+        layout.addWidget(self.tx_pitch_value_text_edit, 3, 4, 1, 2)
+        layout.addWidget(self.tx_gimbal_manual_move_push_button, 4, 3, 1, 3)     
         
-        layout.addWidget(self.tx_gimbal_move_left_push_button, 3, 2, 1, 2)
-        layout.addWidget(self.tx_gimbal_move_right_push_button, 3, 6, 1, 2)
-        layout.addWidget(self.tx_gimbal_move_up_push_button, 2, 4, 1, 2)
-        layout.addWidget(self.tx_gimbal_move_down_push_button, 4, 4, 1, 2)
-        layout.addWidget(self.tx_step_manual_move_gimbal_text_edit, 3, 4, 1, 2)
+        layout.addWidget(thisLatLabel, 0, 6, 1, 1)
+        layout.addWidget(self.tx_this_lat_text_edit, 0, 7, 1, 2)
+        layout.addWidget(thisLonLabel, 1, 6, 1, 1)
+        layout.addWidget(self.tx_this_lon_text_edit, 1, 7, 1, 2)
+        layout.addWidget(otherLatLabel, 2, 6, 1, 1)        
+        layout.addWidget(self.tx_other_lat_text_edit, 2, 7, 1, 2)
+        layout.addWidget(otherLonLabel, 3, 6, 1, 1)
+        layout.addWidget(self.tx_other_lon_text_edit, 3, 7, 1, 2)
+        layout.addWidget(self.tx_move_according_coords_push_button, 4, 6, 1, 3)
         
         self.gimbalTXPanel.setLayout(layout)
-        
+
     def create_Gimbal_AIR_panel(self):
         """
         Creates the panel where the air gimbal can be manually controlled.
@@ -911,51 +1587,165 @@ class WidgetGallery(QDialog):
         yaw_label = QLabel('Yaw [D]:')
         pitch_label = QLabel('Pitch [D]:')
         
-        self.rx_abs_radio_button = QRadioButton("Absolute")
-        self.rx_rel_radio_button = QRadioButton("Relative")        
-        self.rx_abs_radio_button.setChecked(True)
+        self.drone_gimbal_top_down_menu = QComboBox()
         
+        if self.droneGimbalChoice == "DJI Ronin RS2":
+            self.rx_abs_radio_button = QRadioButton("Absolute")
+            self.rx_rel_radio_button = QRadioButton("Relative")
+            self.rx_abs_radio_button.setChecked(True)
+        elif self.droneGimbalChoice == "Gremsy H16":
+            self.rx_lock_mode_radio_button = QRadioButton("Lock")
+            self.rx_follow_mode_radio_button = QRadioButton("Follow")
+            self.rx_lock_mode_radio_button.setChecked(True)
+        
+            self.rx_lock_mode_radio_button.clicked.connect(self.rx_lock_mode_radio_button_callback)
+            self.rx_follow_mode_radio_button.clicked.connect(self.rx_follow_mode_radio_button_callback)
+            
         self.rx_yaw_value_text_edit = QLineEdit('')
         self.rx_pitch_value_text_edit = QLineEdit('')
-        
         self.rx_step_manual_move_gimbal_text_edit = QLineEdit('')
         
+        self.rx_move_according_coords_push_button = QPushButton('Coords Move')
+        self.rx_move_according_coords_push_button.clicked.connect(self.rx_move_according_coords_push_button_callback)
+        
         self.rx_gimbal_manual_move_push_button = QPushButton('Move')
-        self.rx_gimbal_move_left_push_button = QPushButton('<-')
+        self.rx_gimbal_manual_move_push_button.clicked.connect(self.move_button_gimbal_drone_callback)
+        self.rx_gimbal_move_left_push_button = QPushButton('Left')
         self.rx_gimbal_move_left_push_button.clicked.connect(self.left_button_gimbal_drone_callback)
-        self.rx_gimbal_move_right_push_button = QPushButton('->')
+        self.rx_gimbal_move_right_push_button = QPushButton('Right')
         self.rx_gimbal_move_right_push_button.clicked.connect(self.right_button_gimbal_drone_callback)
-        self.rx_gimbal_move_up_push_button = QPushButton('^')
-        self.rx_gimbal_move_down_push_button = QPushButton('v')
+        self.rx_gimbal_move_up_push_button = QPushButton('Up')
+        self.rx_gimbal_move_up_push_button.clicked.connect(self.up_button_gimbal_drone_callback)
+        self.rx_gimbal_move_down_push_button = QPushButton('Down')
         self.rx_gimbal_move_down_push_button.clicked.connect(self.down_button_gimbal_drone_callback)
         
+        thisLatLabel = QLabel('This Lat:')
+        thisLonLabel = QLabel('This Lon:')
+        otherLatLabel = QLabel('Other Lat:')
+        otherLonLabel = QLabel('Other Lon:')
+        
+        self.rx_this_lat_text_edit = QLineEdit('')
+        self.rx_this_lon_text_edit = QLineEdit('')
+        self.rx_other_lat_text_edit = QLineEdit('')
+        self.rx_other_lon_text_edit = QLineEdit('')        
+        
         layout = QGridLayout()
-        layout.addWidget(self.rx_abs_radio_button, 0, 0, 1, 3)
-        layout.addWidget(self.rx_rel_radio_button, 0, 3, 1, 3)
-        layout.addWidget(self.rx_gimbal_manual_move_push_button, 0, 6, 1, 4)
+        layout.addWidget(self.rx_gimbal_move_up_push_button, 0, 0, 1, 3)
+        layout.addWidget(self.rx_gimbal_move_left_push_button, 1, 0, 1, 3)
+        layout.addWidget(self.rx_step_manual_move_gimbal_text_edit, 2, 0, 1, 3)
+        layout.addWidget(self.rx_gimbal_move_right_push_button, 3, 0, 1, 3)
+        layout.addWidget(self.rx_gimbal_move_down_push_button, 4, 0, 1, 3)
         
-        layout.addWidget(yaw_label, 1, 0, 1, 1)
-        layout.addWidget(self.rx_yaw_value_text_edit, 1, 1, 1, 4)
-        layout.addWidget(pitch_label, 1, 5, 1, 1)        
-        layout.addWidget(self.rx_pitch_value_text_edit, 1, 6, 1, 4)
+        if self.droneGimbalChoice == "DJI Ronin RS2":
+            layout.addWidget(self.rx_abs_radio_button, 0, 3, 1, 3)
+            layout.addWidget(self.rx_rel_radio_button, 1, 3, 1, 3)
+        elif self.droneGimbalChoice == "Gremsy H16":
+            layout.addWidget(self.rx_lock_mode_radio_button, 0, 3, 1, 3)
+            layout.addWidget(self.rx_follow_mode_radio_button, 1, 3, 1, 3)
+        layout.addWidget(yaw_label, 2, 3, 1, 1)
+        layout.addWidget(self.rx_yaw_value_text_edit, 2, 4, 1, 2)
+        layout.addWidget(pitch_label, 3, 3, 1, 1)        
+        layout.addWidget(self.rx_pitch_value_text_edit, 3, 4, 1, 2)
+        layout.addWidget(self.rx_gimbal_manual_move_push_button, 4, 3, 1, 3)     
         
-        layout.addWidget(self.rx_gimbal_move_left_push_button, 3, 2, 1, 2)
-        layout.addWidget(self.rx_gimbal_move_right_push_button, 3, 6, 1, 2)
-        layout.addWidget(self.rx_gimbal_move_up_push_button, 2, 4, 1, 2)
-        layout.addWidget(self.rx_gimbal_move_down_push_button, 4, 4, 1, 2)
-        layout.addWidget(self.rx_step_manual_move_gimbal_text_edit, 3, 4, 1, 2)
+        layout.addWidget(thisLatLabel, 0, 6, 1, 1)
+        layout.addWidget(self.rx_this_lat_text_edit, 0, 7, 1, 2)
+        layout.addWidget(thisLonLabel, 1, 6, 1, 1)
+        layout.addWidget(self.rx_this_lon_text_edit, 1, 7, 1, 2)
+        layout.addWidget(otherLatLabel, 2, 6, 1, 1)        
+        layout.addWidget(self.rx_other_lat_text_edit, 2, 7, 1, 2)
+        layout.addWidget(otherLonLabel, 3, 6, 1, 1)
+        layout.addWidget(self.rx_other_lon_text_edit, 3, 7, 1, 2)
+        layout.addWidget(self.rx_move_according_coords_push_button, 4, 6, 1, 3)
         
         self.gimbalRXPanel.setLayout(layout)
+
+    def rx_lock_mode_radio_button_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            try:
+                data = {'MODE': 'LOCK'}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print(f"[DEBUG]: gimbal mode set to {data['MODE']} from application")
+            except Exception as e:
+                print("[DEBUG]: An error ocurred in the transmission of the Gremsy gimbal mode, ", e)
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
+    
+    def rx_follow_mode_radio_button_callback(self):
+        if hasattr(self, 'myhelpera2g'):
+            try:
+                data = {'MODE': 'FOLLOW'}
+                self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+                print(f"[DEBUG]: gimbal mode set to {data['MODE']} from application")
+            except Exception as e:
+                print("[DEBUG]: An error ocurred in the transmission of the Gremsy gimbal mode, ", e)
+        else:
+            print("[DEBUG]: No HelperA2GMeasurements class instance is available")
+
+    def convert_dB_to_valid_hex_sivers_register_values(self):
+        rxbb1 = float(self.rx_bb_gain_1_text_edit.text())
+        rxbb2 = float(self.rx_bb_gain_2_text_edit.text())
+        rxbb3 = float(self.rx_bb_gain_3_text_edit.text())
+        rxbfrf = float(self.rx_bfrf_gain_text_edit.text())
+
+        txbb = self.tx_bb_gain_text_edit.text()
+        txbbiq = float(self.tx_bb_iq_gain_text_edit.text())
+        txbbphase = self.tx_bb_phase_text_edit.text()
+        txbf = float(self.tx_bfrf_gain_text_edit.text())
+        
+        valid_values_rx_bb = [0x00, 0x11, 0x33, 0x77, 0xFF]
+        valid_values_rx_bb_dB = np.linspace(-6, 0, 5)
+
+        valid_values_rx_bb3_bf = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        valid_values_rx_bb3_dB = np.linspace(0,6,16)
+        valid_values_rx_bf_dB = np.linspace(0,15,16)
+
+        valid_values_tx_bbiq_bf = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        valid_values_tx_bbiq_dB = np.linspace(0,6,16)
+        valid_values_tx_bf_dB = np.linspace(0,15,16)        
+
+        tx_signal_values = {'tx_bb_gain':int(txbb,16), 
+                            'tx_bb_iq_gain':valid_values_tx_bbiq_bf[np.abs(txbbiq - valid_values_tx_bbiq_dB).argmin()],
+                            'tx_bb_phase':int(txbbphase,16), 
+                            'tx_bfrf_gain':valid_values_tx_bbiq_bf[np.abs(txbf - valid_values_tx_bf_dB).argmin()]}
+
+        rx_signal_values = {'rx_gain_ctrl_bb1': valid_values_rx_bb[np.abs(rxbb1 - valid_values_rx_bb_dB).argmin()],
+                'rx_gain_ctrl_bb2': valid_values_rx_bb[np.abs(rxbb2 - valid_values_rx_bb_dB).argmin()],
+                'rx_gain_ctrl_bb3': valid_values_rx_bb3_bf[np.abs(rxbb3 - valid_values_rx_bb3_dB).argmin()],
+                'rx_gain_ctrl_bfrf': valid_values_rx_bb3_bf[np.abs(rxbfrf - valid_values_rx_bf_dB).argmin()]}
+        
+        return tx_signal_values, rx_signal_values
     
     def start_meas_button_callback(self):
 
+        tx_signal_values, rx_signal_values = self.convert_dB_to_valid_hex_sivers_register_values()
+
         # Experiment starts
-        self.myhelpera2g.myrfsoc.transmit_signal()
-        self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC')
-        print("[DEBUG]: SENT REQUEST to START measurement")
+        self.myhelpera2g.myrfsoc.transmit_signal(carrier_freq=float(self.rf_op_freq_text_edit.text()),
+                                                tx_bb_gain=tx_signal_values['tx_bb_gain'],
+                                                tx_bb_iq_gain=tx_signal_values['tx_bb_iq_gain'],
+                                                tx_bb_phase=tx_signal_values['tx_bb_phase'],
+                                                tx_bfrf_gain=tx_signal_values['tx_bfrf_gain'])
+        
+        rx_signal_values['carrier_freq'] = float(self.rf_op_freq_text_edit.text())
+        
+        self.myhelpera2g.socket_send_cmd(type_cmd='STARTDRONERFSOC', data=rx_signal_values)
+
         self.start_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.setEnabled(True)
         self.finish_meas_togglePushButton.setEnabled(False)
+        self.update_vis_time_pap = 0.5
+
+        #self.periodical_pap_display_thread = RepeatTimer(self.update_vis_time_pap, self.periodical_pap_display_callback)
+        
+        self.stop_event_pap_display_thread = threading.Event()
+        self.periodical_pap_display_thread = TimerThread(self.stop_event_pap_display_thread, self.update_vis_time_pap)
+        self.periodical_pap_display_thread.update.connect(self.periodical_pap_display_callback)
+        self.periodical_pap_display_thread.start()
+        #self.periodical_pap_display_thread = QTimer()
+        #self.periodical_pap_display_thread.timeout.connect(self.periodical_pap_display_callback)
+        #self.periodical_pap_display_thread.start(1000)
+        print(f"[DEBUG]: This {self.myhelpera2g.ID} started thread periodical_pap_display")
     
     def stop_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
@@ -963,65 +1753,57 @@ class WidgetGallery(QDialog):
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(True)
+        self.stop_event_pap_display_thread.set()
     
     def finish_meas_button_callback(self):
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
         print("[DEBUG]: SENT REQUEST to FINISH measurement")
+
+        datestr = datetime.datetime.now()
+        datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S')
+
+        current_text = self.meas_description_text_edit.document().toPlainText()
+        if self.myhelpera2g.IsGimbal!=0:
+            if hasattr(self.myhelpera2g, 'myGimbal'):
+                current_text = current_text + f"\nYaw at pressing FINISH: {self.myhelpera2g.myGimbal.yaw}" + '\n' + f"Pitch at pressing FINISH: {self.myhelpera2g.myGimbal.pitch}"
+        with open('description_' + datestr + '.txt', 'a+') as file:
+            file.write(current_text)
+        
+        print("[DEBUG]: Saved description file on GND node")
+        
         self.start_meas_togglePushButton.setEnabled(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
-    
-    def manual_meas_radio_button_callback(self):
-        self.choose_what_time_is_specified_ComboBox.setEnabled(False)
-        self.time_value_text_edit.setEnabled(False)
-        
-    def auto_meas_radio_button_callback(self):
-        self.choose_what_time_is_specified_ComboBox.setEnabled(True)
-        self.time_value_text_edit.setEnabled(True)
+
+        if self.periodical_gimbal_follow_thread.isRunning():
+            self.stop_event_gimbal_follow_thread.set()
+        if self.periodical_gps_display_thread.isRunning():
+                self.stop_event_gps_display.set()
 
     def create_Planning_Measurements_panel(self):
-        self.planningMeasurementsPanel = QGroupBox('Planning measurements')
+        self.planningMeasurementsPanel = QGroupBox('Control measurements')
         
         self.start_meas_togglePushButton = QPushButton("START")
-        #self.start_meas_togglePushButton.setCheckable(True)
         self.start_meas_togglePushButton.setEnabled(False)
         self.start_meas_togglePushButton.clicked.connect(self.start_meas_button_callback)
         
         self.stop_meas_togglePushButton = QPushButton("STOP")
-        #self.stop_meas_togglePushButton.setCheckable(True)
         self.stop_meas_togglePushButton.setEnabled(False)
         self.stop_meas_togglePushButton.clicked.connect(self.stop_meas_button_callback)
         
         self.finish_meas_togglePushButton = QPushButton("FINISH")
-        #self.finish_meas_togglePushButton.setCheckable(True)
         self.finish_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.clicked.connect(self.finish_meas_button_callback)
         
-        self.choose_what_time_is_specified_ComboBox = QComboBox()
-        self.choose_what_time_is_specified_ComboBox.addItems(["Time per edge (TPE)", "Time per stop (TPS)", "Total measurement time (TMT)"])
-
-        self.time_value_text_edit = QLineEdit('')
-        
-        self.how_trigger_measurements_radio_button_man = QRadioButton("Manual")
-        self.how_trigger_measurements_radio_button_man.clicked.connect(self.manual_meas_radio_button_callback)
-        self.how_trigger_measurements_radio_button_auto = QRadioButton("Automatic") 
-        self.how_trigger_measurements_radio_button_auto.clicked.connect(self.auto_meas_radio_button_callback)
-        self.how_trigger_measurements_radio_button_auto.setChecked(True)
-        
-        choose_what_type_time_label = QLabel('Choose parameter:')
-        value_parameter_label = QLabel('Value:')
+        self.meas_description_text_edit = QPlainTextEdit('')
+        self.meas_description_text_edit.setPlaceholderText("Enter measurement description here")
         
         layout = QGridLayout()
-        layout.addWidget(self.how_trigger_measurements_radio_button_man, 0, 0, 1, 2)
-        layout.addWidget(self.how_trigger_measurements_radio_button_auto, 0, 2, 1, 2)
-        layout.addWidget(choose_what_type_time_label, 1, 0, 1, 1)
-        layout.addWidget(self.choose_what_time_is_specified_ComboBox, 1, 1, 1, 1)
-        layout.addWidget(value_parameter_label, 1, 2, 1, 1)
-        layout.addWidget(self.time_value_text_edit, 1, 3, 1, 1)
+        layout.addWidget(self.meas_description_text_edit, 0, 0, 3, 6)
         
-        layout.addWidget(self.start_meas_togglePushButton, 2, 0, 1, 1)
-        layout.addWidget(self.stop_meas_togglePushButton, 2, 1, 1, 1)
-        layout.addWidget(self.finish_meas_togglePushButton, 2, 2, 1, 2)
+        layout.addWidget(self.start_meas_togglePushButton, 0, 6, 1, 2)
+        layout.addWidget(self.stop_meas_togglePushButton, 1, 6, 1, 2)
+        layout.addWidget(self.finish_meas_togglePushButton, 2, 6, 1, 2)
         
         self.planningMeasurementsPanel.setLayout(layout)
     
@@ -1035,7 +1817,6 @@ class WidgetGallery(QDialog):
 
         # Create a QVBoxLayout to hold the canvas
         #layout = QVBoxLayout()
-        
 
         tx_info_label = QLabel('TX')
         rx_info_label = QLabel('RX')
@@ -1087,48 +1868,55 @@ class WidgetGallery(QDialog):
         mygpsonmap = GpsOnMap('torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
         
         self.mygpsonmap = mygpsonmap
-        
-    def create_pdp_plot_panel(self):
-        self.pdpPlotPanel = QGroupBox('PDP')
-        
-        fig_pdp = Figure()
+    
+    def create_pap_plot_panel(self):
+        self.papPlotPanel = QGroupBox('PAP')
+        self.time_snaps = 22
+        self.plot_widget = pg.PlotWidget() 
+        self.plot_widget.setLabel('left', 'Beam steering angle [deg]')
+        self.plot_widget.setLabel('bottom', 'Time snapshot number')
 
-        # Create a FigureCanvas widget
-        canvas = FigureCanvas(fig_pdp)
-
-        # Create a QVBoxLayout to hold the canvas
         layout = QVBoxLayout()
-        layout.addWidget(canvas)
+        layout.addWidget(self.plot_widget)
+        self.papPlotPanel.setLayout(layout)
 
-        # Set the layout of the group box
-        self.pdpPlotPanel.setLayout(layout)
+        rx_sivers_beam_index_mapping_file = open('rx_sivers_beam_index_mapping.csv')
+        csvreader = csv.reader(rx_sivers_beam_index_mapping_file)
+        beam_idx_map = [float(i[1]) for cnt,i in enumerate(csvreader) if cnt != 0]
+        ticksla = beam_idx_map[::4]
+        self.beam_angs = ticksla
+        ticks = np.arange(0,16) 
+        y_ticks = [(ticks[cnt], f'{tickla:1.2f}°') for cnt, tickla in enumerate(ticksla)]
+        self.plot_widget.getAxis('left').setTicks([y_ticks, []])
 
-        # Create a subplot on the Figure
-        ax_pdp = fig_pdp.add_subplot(111)
-        
-        self.fig_pdp = fig_pdp
-        self.ax_pdp = ax_pdp
+        x_ticks = [(i, str(i)) for i in np.arange(self.time_snaps)]
+        self.plot_widget.getAxis('bottom').setTicks([x_ticks, []])
     
     def closeEvent(self, event):
         if hasattr(self, 'myhelpera2g'):
             self.myhelpera2g.HelperA2GStopCom(DISC_WHAT='ALL')
-    
+        #if hasattr(self, 'periodical_pap_display_thread'):
+            #self.periodical_pap_display_thread.cancel()
+            #self.periodical_pap_display_thread.stop()
+        if hasattr(self, 'periodical_gps_display_thread'):
+            if self.periodical_gps_display_thread.isRunning():
+                self.stop_event_gps_display.set()
+        if hasattr(self, 'periodical_gimbal_follow_thread'):
+            if self.periodical_gimbal_follow_thread.isRunning():
+                self.stop_event_gimbal_follow_thread.set()
+        
+        # Last thing to do is to redirect the stdout
+        #sys.stdout = self.original_stdout
+            
     def eventFilter(self, source, event):
         if event.type()== event.Close:
-            self. closeEvent(event)
+            self.closeEvent(event)
             return True
         
         return super().eventFilter(source,event)
 
 if __name__ == '__main__':
-#    appctxt = ApplicationContext()
     app = QApplication([])
     gallery = WidgetGallery()
     gallery.show()
-
-    #gallery.start_GUI_threads()
-    
-    #sys.exit(appctxt.app.exec())
-    #app.exec_()
-#    gallery.myhelpera2g.HelperA2GStopCom(DISC_WHAT='GIMBAL')
     sys.exit(app.exec())
