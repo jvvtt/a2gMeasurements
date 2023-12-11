@@ -3196,7 +3196,6 @@ class RFSoCRemoteControlFromHost():
         self.filename_to_save = filename
         self.hest = []
         self.meas_time_tag = []
-        self.meas_stops = []
         self.RFSoCSuccessExecutionAns = "Successully executed"
         self.RFSoCSuccessAns = "Success"
         self.n_receive_calls = 0
@@ -3209,7 +3208,6 @@ class RFSoCRemoteControlFromHost():
         self.irfs_per_second = 7 # THIS MUST BE FOUND IN BETTER A WAY
         self.MAX_PAP_BUF_SIZE = 220  
         self.MAX_PAP_BUF_SIZE_BYTES = self.MAX_PAP_BUF_SIZE * self.bytes_per_irf
-        self.idx_last_irf_sent_on_actual_hest = 0
         self.TIME_SNAPS_TO_VIS = 10
         self.TIME_GET_IRF = 0.14
         self.TIME_SAVE_H = 15
@@ -3370,7 +3368,7 @@ class RFSoCRemoteControlFromHost():
                 self.data_to_visualize[-1, :] = tmp 
             
             if len(self.hest) >= self.MAX_PAP_BUF_SIZE:
-                print(f"[DEBUG]: Time between PAP callbacks: {time.time() - self.start_time_pap_callback}")
+                print(f"[DEBUG]: Time between save callbacks: {time.time() - self.start_time_pap_callback}")
                 self.save_hest_buffer()      
     
     def pipeline_operations_rfsoc_rx_ndarray(self, array, axis, each_n_beams=4):
@@ -3404,7 +3402,7 @@ class RFSoCRemoteControlFromHost():
         aux = np.asarray(aux, dtype=np.float32)
         return aux
     
-    def save_hest_buffer(self):
+    def save_hest_buffer(self, register_time=True):
         """
         Save the raw (time-snaps, n_beams, n_delay_taps) array
         
@@ -3412,16 +3410,18 @@ class RFSoCRemoteControlFromHost():
         datestr = datetime.datetime.now()
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
         
-        with open('../Measurement Files/' + datestr + '-' + self.filename_to_save + '.npy', 'wb') as f:
-            #np.save(f, np.stack(self.hest, axis=0))
-            np.save(f, np.array(self.hest))
+        # Double check that there is something in the array
+        if len(self.hest) > 0:
+            with open('../Measurement Files/' + datestr + '-' + self.filename_to_save + '.npy', 'wb') as f:
+                #np.save(f, np.stack(self.hest, axis=0))
+                np.save(f, np.array(self.hest))
+            
+            print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
+            print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
+            self.hest = []
         
-        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
-        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
-        self.hest = []
-        
-        self.idx_last_irf_sent_on_actual_hest = 0
-        self.start_time_pap_callback = time.time()
+        if register_time:
+            self.start_time_pap_callback = time.time()
 
     def start_thread_receive_meas_data(self, msg_data):
         """
@@ -3453,7 +3453,8 @@ class RFSoCRemoteControlFromHost():
         print("[DEBUG]: Received calls: ", self.n_receive_calls)
         print("[DEBUG]: Avg. time of execution of 'receive_signal' callback is ", ((self.time_finish_receive_thread - self.time_begin_receive_thread)/self.n_receive_calls))
         
-        self.meas_stops.append(datetime.datetime.utcnow().timetuple()[3:6])
+        self.save_hest_buffer(self, register_time=False)
+        
         self.n_receive_calls = 0
         
     def finish_measurement(self):
@@ -3461,16 +3462,4 @@ class RFSoCRemoteControlFromHost():
         if self.thread_rx_irf.is_alive():
             self.stop_thread_receive_meas_data()
            
-        datestr = datetime.datetime.now()
-        datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
-
-        hest = np.stack(self.hest, axis=0)
-                
-        with open(datestr + '-' + self.filename_to_save + '.npy', 'wb') as f:
-            np.save(f, hest)
-        
-        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '.npy')
-        print("[DEBUG]: Saved file ", datestr + self.filename_to_save + '-TIMETAGS' + '.npy')
-
-        self.idx_last_irf_sent_on_actual_hest = 0
-        self.hest = []
+        self.save_hest_buffer(self, register_time=False)
