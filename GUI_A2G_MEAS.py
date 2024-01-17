@@ -1864,8 +1864,8 @@ class WidgetGallery(QMainWindow):
         hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
         
         torbacka_point = {'LAT': 60.07850739357558, 'LON': 24.171551864664867}
-        #mygpsonmap = GpsOnMap('planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=hi_q)
-        mygpsonmap = GpsOnMap('torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
+        #mygpsonmap = GpsOnMap('data/planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=hi_q)
+        mygpsonmap = GpsOnMap('data/torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
         
         self.mygpsonmap = mygpsonmap
     
@@ -1880,7 +1880,7 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.plot_widget)
         self.papPlotPanel.setLayout(layout)
 
-        rx_sivers_beam_index_mapping_file = open('rx_sivers_beam_index_mapping.csv')
+        rx_sivers_beam_index_mapping_file = open('data/rx_sivers_beam_index_mapping.csv')
         csvreader = csv.reader(rx_sivers_beam_index_mapping_file)
         beam_idx_map = [float(i[1]) for cnt,i in enumerate(csvreader) if cnt != 0]
         ticksla = beam_idx_map[::4]

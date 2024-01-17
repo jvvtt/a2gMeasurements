@@ -1,0 +1,31 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>Manual Move</h1>
+
+  <p>Input the position you want to set for the gimbal.</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include 'bs4_form.html' with form=form %}
+    <button type="submit" class="btn btn-primary" name="set-button">SET POSITION</button>
+    <button type="submit" class="btn btn-primary" name="get-button">GET POSITION</button>
+  </form>
+
+  <h2>Last position in database:</h2>
+  <p><strong> YAW: </strong>{{last_yaw}}</p>
+  <p><strong> ROLL: </strong>{{last_roll}}</p>
+  <p><strong> PITCH: </strong>{{last_pitch}}</p>
+  <p><strong> TIME TAG: </strong>{{last_date}}</p>
+
+  <h2>Actual position (position request):</h2>
+  {% if actual_position %}
+  {% for key, value in actual_position.items %}
+  <p><strong>{{key}}</strong>: {{value}} </p>
+  {% endfor %}
+  {% else %}
+  <p>Position not requested</p>
+  {% endif %}
+
+{% endblock %}
+

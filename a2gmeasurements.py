@@ -11,7 +11,6 @@ import struct
 import traceback
 from ctypes import *
 import numpy as np
-from check_sum import *
 from pynput import keyboard
 import can
 import socket
@@ -27,7 +26,7 @@ import pyvisa
 import pandas as pd
 from sys import platform
 from crc import Calculator, Configuration, Crc16
-from a2gUtils import geocentric2geodetic, geodetic2geocentric, compute_block_mean_2d_array
+from a2gUtils import geocentric2geodetic, geodetic2geocentric, Checksum
 from pyproj import Transformer, Geod
 from multiprocessing.shared_memory import SharedMemory
 from PyQt5.QtCore import pyqtSignal
@@ -149,11 +148,12 @@ class GimbalRS2(object):
         # # print(len(hex_data))
         # # print(data)
         if len(data_frame) >= 8:
-            if check_sum == calc_crc32(data):
+            crc_obj = Checksum()
+            if check_sum == crc_obj.calc_crc32(data):
                 #         # print("Approved Message: " + str(hex_data))
                 header = ':'.join(data_frame[:10])
                 header_check_sum = ':'.join(data_frame[10:12])
-                if header_check_sum == calc_crc16(header):
+                if header_check_sum == crc_obj.calc_crc16(header):
                     validated = True
         return validated
 
@@ -417,12 +417,14 @@ class GimbalRS2(object):
         can_frame_header += ":" + \
             "{res3:02x}".format(res3=self.res3)  # Reserved 3
         can_frame_header += ":" + seqnum    # Sequence number
-        can_frame_header += ":" + calc_crc16(can_frame_header)
+        
+        crc_obj = Checksum()
+        can_frame_header += ":" + crc_obj.calc_crc16(can_frame_header)
 
         # hex_seq = [eval("0x" + hex_num) for hex_num in can_frame_header.split(":")]
 
         whole_can_frame = can_frame_data.format(prefix=can_frame_header)
-        whole_can_frame += ":" + calc_crc32(whole_can_frame)
+        whole_can_frame += ":" + crc_obj.calc_crc32(whole_can_frame)
         whole_can_frame = whole_can_frame.upper()
         #
         # print("Header: ", can_frame_header)
