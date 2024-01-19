@@ -43,17 +43,36 @@ Organization: VTT
 Version: 1.0
 e-mail: julian.villegas@vtt.fi
 
-*Gimbal control modified and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software.
 *SBUS encoder modified and extended from https://github.com/ljanyst/pipilot
 
 """
 
 class GimbalRS2(object):
+    """
+    Python Class that works as the driver for the gimbal DJI RS2.
+    
+    The gimbal should be connected to the host computer through an USB-to-PCAN bridge (PCAN System). 
+    
+    More info on "Manual A2GMeasurements" (Chapter).
+    
+    Gimbal control modified and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software
+
+    """   
+    
     def __init__(self, speed_yaw=40, speed_pitch=40, speed_roll=40, DBG_LVL_1=False, DBG_LVL_0=False):
-        '''
-        Input speeds are in deg/s
-        
-        '''
+        """
+
+        :param speed_yaw: speed of yaw axis in deg/s, defaults to 40
+        :type speed_yaw: int, optional
+        :param speed_pitch: speed of pitch axis in deg/s, defaults to 40
+        :type speed_pitch: int, optional
+        :param speed_roll: speed of roll axis in deg/s, defaults to 40
+        :type speed_roll: int, optional
+        :param DBG_LVL_1: level of verbose to show at the command line (beta). This shows less verbose than the 0 level.
+        :type DBG_LVL_1: bool, optional
+        :param DBG_LVL_0: level of verbose to show at the command line (beta), defaults to False
+        :type DBG_LVL_0: bool, optional
+        """
 
         self.header = 0xAA
         self.enc = 0x00
@@ -94,10 +113,10 @@ class GimbalRS2(object):
   
     def seq_num(self):
         """
-        Updates the sequence number of the gimbal data.
+         Updates the sequence number of the gimbal data.
 
-        Returns:
-            hex: number in hexadecimal
+        :return: number in hexadecimal
+        :rtype: int
         """
 
         if self.seq >= 0xFFFD:
@@ -109,11 +128,14 @@ class GimbalRS2(object):
 
     def can_buffer_to_full_frame(self):
         """
-        Saves the full DJI R frame message: its format is explaind in the DJI R SDK Protocol and User Interface
+         Parse the full DJI R frame message from the can buffer.
         
-        Returns:
-            list: full frame 
+         Its fields are explained in the DJI R SDK Protocol and User Interface.
+
+        :return: full_msg_frames 
+        :rtype: list
         """
+        
         full_msg_frames = []
         full_frame_counter = 0
         for i in range(len(self.can_recv_msg_buffer)):
@@ -134,14 +156,14 @@ class GimbalRS2(object):
 
     def validate_api_call(self, data_frame):
         """
-        CRC error check.
+         CRC error check.
 
-        Args:
-            data_frame (list): DJI frame message
-
-        Returns:
-            boolean: pass the CRC32 check or not
+        :param data_frame: DJI RS2 frame message
+        :type data_frame: list
+        :return: passed or not the crc check
+        :rtype: boolean
         """
+        
         validated = False
         check_sum = ':'.join(data_frame[-4:])
         data = ':'.join(data_frame[:-4])
@@ -159,11 +181,12 @@ class GimbalRS2(object):
 
     def parse_position_response(self, data_frame):
         """
-        Retrieve the position from the full DJI frame message
+         Retrieve the position from the full DJI frame message.
 
-        Args:
-            data_frame (): DJI frame message
+        :param data_frame: DJI RS2 frame message
+        :type data_frame: list
         """
+        
         pos_data = data_frame[16:-4]
         yaw = int(
             '0x' + pos_data[1] + pos_data[0], base=16)
@@ -196,10 +219,10 @@ class GimbalRS2(object):
         
     def can_callback(self, data):
         """
-        Callback for can recv.
+         Callback for the thread in charge of checking the USB-to-CAN input (receive).
 
-        Args:
-            data (): DJI frame message
+        :param data: DJI RS2 frame message
+        :type data: list
         """
     
         str_data = ['{:02X}'.format(i) for i in data.data]
@@ -274,19 +297,20 @@ class GimbalRS2(object):
 
     def setPosControl(self, yaw, roll, pitch, ctrl_byte=0x01, time_for_action=0x14):
         """
-        Set the gimbal position by providing the yaw, roll and pitch
+         Set the gimbal position by providing the yaw, roll and pitch.
 
-        Args:
-            yaw (int): yaw value. Integer value should be between -1800 and 1800
-            roll (int): roll value. Integer value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this)axis value.
-            pitch (int): pitch value. Integer value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this)axis value.
-            ctrl_byte (hexadecimal, optional): Absolute or relative movement. For absolute use 0x01, while for relative use 0x00. Defaults to 0x01.
-            time_for_action (hexadecimal, optional): Time it takes for the gimbal to move to desired position. Implicitly, this
-                                                     command controls the speed of gimbal. It is given in units of 0.1 s. For example: 
-                                                     a value of 0x14 is 20, which means that the gimbal will take 2s (20*0.1) to reach its destination. Defaults to 0x14.
-
-        Returns:
-            _type_: _description_
+        :param yaw: yaw angle. value should be between -1800 and 1800
+        :type yaw: int
+        :param roll: roll angle. value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this) axis value.
+        :type roll: int
+        :param pitch: value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this)axis value.
+        :type pitch: int
+        :param ctrl_byte: Absolute or relative movement. For absolute use 0x01, while for relative use 0x00.
+        :type ctrl_byte: int
+        :param time_for_action: Time it takes for the gimbal to move to desired position. Implicitly, this command controls the speed of gimbal. It is given in units of 0.1 s. For example: a value of 0x14 is 20, which means that the gimbal will take 2s (20*0.1) to reach its destination. Defaults to 0x14.
+        :type time_for_action: int, optional
+        :return: always returns true
+        :rtype: boolean
         """
         
         # yaw, roll, pitch in 0.1 steps (-1800,1800)
@@ -325,20 +349,21 @@ class GimbalRS2(object):
 
     def setSpeedControl(self, yaw, roll, pitch, ctrl_byte=0x80):
         """
-        
-        Sets speed for each axis of the gimbal.
+         Sets speed for each axis of the gimbal.
 
-        Always after seting the speed the gimbal roll is moved (strange behaviour). 
-        Developer has to send a setPosControl to set again the position of the gimbal where it was previously.
+         Always after seting the speed the gimbal roll is moved (strange behaviour). 
+         Developer has to send a setPosControl to set again the position of the gimbal where it was previously.
 
-        Args:
-            yaw (int): yaw speed in units of 0.1 deg/s
-            roll (int): roll speed in units of 0.1 deg/s
-            pitch (int): pitch speed in units of 0.1 deg/s
-            ctrl_byte (hexadecimal, optional): _description_. Defaults to 0x80.
-
-        Returns:
-            _type_: _description_
+        :param yaw: yaw speed in units of 0.1 deg/s
+        :type yaw: int
+        :param roll: roll speed in units of 0.1 deg/s
+        :type roll: int
+        :param pitch: pitch speed in units of 0.1 deg/s
+        :type pitch: int
+        :param ctrl_byte: defaults to 0x80
+        :type ctrl_byte: int, optional
+        :return: True if provided arguments are within acceptable range. False otherwise.
+        :rtype: boolean
         """
         
         if -3600 <= yaw <= 3600 and -3600 <= roll <= 3600 and -3600 <= pitch <= 3600:
@@ -358,10 +383,9 @@ class GimbalRS2(object):
 
     def request_current_position(self):
         """
-        Sends command to request the current position of the gimbal.
+         Sends command to request the current position of the gimbal.
 
-        BLOCKS for 0.01 s to allow the response to be received
-        
+         BLOCKS thread execution for the time given by attribute "TIME_POS_REQ" to allow the response to be received
         """
         
         hex_data = [0x01]
@@ -377,16 +401,18 @@ class GimbalRS2(object):
 
     def assemble_can_msg(self, cmd_type, cmd_set, cmd_id, data):
         """
-        Builds a DJI message frame based on the command to be sent.
+         Builds a DJI RS2 message frame based on the command to be sent.
 
-        Args:
-            cmd_type (hex): see DJI R SDK Protocol and User Interface document for a description
-            cmd_set (hex): see DJI R SDK Protocol and User Interface document for a description
-            cmd_id (hex): see DJI R SDK Protocol and User Interface document for a description
-            data (hex): see DJI R SDK Protocol and User Interface document for a description
-
-        Returns:
-            hex: the dji frame message 
+        :param cmd_type: see DJI R SDK Protocol and User Interface document for a description
+        :type cmd_type: int
+        :param cmd_set: see DJI R SDK Protocol and User Interface document for a description
+        :type cmd_set: int
+        :param cmd_id: see DJI R SDK Protocol and User Interface document for a description
+        :type cmd_id: int
+        :param data: see DJI R SDK Protocol and User Interface document for a description
+        :type data: int
+        :return: parsed can frame whose fields are separated by ":".
+        :rtype: string
         """
         
         if data == "":
@@ -433,10 +459,10 @@ class GimbalRS2(object):
 
     def send_cmd(self, cmd):
         """
-        Wrapper to send a comand 
+         Wrapper to "send_data" method.
 
-        Args:
-            cmd (str): command fields separated by ':'
+        :param cmd: command fields separated by ':'
+        :type cmd: str
         """
         
         data = [int(i, 16) for i in cmd.split(":")]
@@ -444,11 +470,12 @@ class GimbalRS2(object):
 
     def send_data(self, can_id, data):
         """
-        Sends a command through the can bus
+         Sends a command through the can bus
 
-        Args:
-            can_id (hex): _description_
-            data (list): list with the fields of the frame 
+        :param can_id: static can id.
+        :type can_id: int
+        :param data: fields of the frame
+        :type data: list
         """
         
         data_len = len(data)
@@ -484,13 +511,15 @@ class GimbalRS2(object):
 
     def receive(self, bus, stop_event):
         """
-        Threading callback function. Defined when the Thread is created. This thread is like a 'listener' 
-        for coming (received) can messages. Reads 1 entry of the rx bus buffer at a time.
-        
-        Args:
-            bus (python can object): object pointing to the type of bus (i.e. PCAN)
-            stop_event (boolean): flag to stop receiving messages
+         Threading callback function. Defined when the thread is created. This thread listens 
+         for coming (received) can messages on a USB port. Reads 1 entry of the rx bus buffer at a time.
+
+        :param bus: object pointing to the type of bus (from 'can' python package)
+        :type bus: can.Bus object
+        :param stop_event: works as a flag to stop receiving messages
+        :type stop_event: threading.Event 
         """
+        
         if self.DBG_LVL_0:
             print("Start receiving messages")
         while not stop_event.is_set():
@@ -508,11 +537,12 @@ class GimbalRS2(object):
     
     def start_thread_gimbal(self, bitrate=1000000):
         """
-        Starts the thread for 'listening' the incoming data from pcan
+         Starts the thread for listening the incoming data (if any) from the gimbal.
 
-        Args:
-            bitrate (int, optional): Bitrate used for pcan device. Defaults to 1000000.
+        :param bitrate: Bitrate for the usb-to-can interface. This is a parameter inherited from can.Bus. Defaults to 1000000
+        :type bitrate: int, optional
         """
+        
         try:
             bus = can.interface.Bus(interface="pcan", channel="PCAN_USBBUS1", bitrate=bitrate)
             self.actual_bus = bus
@@ -533,8 +563,7 @@ class GimbalRS2(object):
 
     def stop_thread_gimbal(self):
         """
-        Stops the gimbal thread
-
+         Stops the gimbal thread by setting the threading.Event attribute created in "start_thread_gimbal".
         """
         
         self.event_stop_thread_gimbal.set()        
