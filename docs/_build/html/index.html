@@ -7,7 +7,7 @@
 
     <!-- Generated with Sphinx 7.2.6 and Furo 2023.09.10 -->
         <title>Aerial 1.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=362ab14a" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=135e06be" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
     
@@ -205,6 +205,7 @@ GUI_A2G_MEAS.py has all the functionality related with the GUI</p>
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">a2gmeasurements.</span></span><span class="sig-name descname"><span class="pre">GimbalRS2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">speed_yaw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">40</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">speed_pitch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">40</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">speed_roll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">40</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalRS2" title="Link to this definition">#</a></dt>
 <dd><p>Python Class that works as the driver for the gimbal DJI RS2.</p>
 <p>The gimbal should be connected to the host computer through an USB-to-PCAN bridge (PCAN System).</p>
+<p>It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.</p>
 <p>More info on “Manual A2GMeasurements” (Chapter).</p>
 <p>Gimbal control modified and extended from <a class="reference external" href="https://github.com/ceinem/dji_rs2_ros_controller">https://github.com/ceinem/dji_rs2_ros_controller</a>, based as well on DJI R SDK demo software</p>
 <dl class="py method">
@@ -294,7 +295,7 @@ GUI_A2G_MEAS.py has all the functionality related with the GUI</p>
 <dt class="sig sig-object py" id="a2gmeasurements.GimbalRS2.receive">
 <span class="sig-name descname"><span class="pre">receive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalRS2.receive" title="Link to this definition">#</a></dt>
 <dd><blockquote>
-<div><p>Threading callback function. Defined when the Thread is created. This thread listens 
+<div><p>Threading callback function. Defined when the thread is created. This thread listens 
 for coming (received) can messages on a USB port. Reads 1 entry of the rx bus buffer at a time.</p>
 </div></blockquote>
 <dl class="field-list simple">
@@ -311,14 +312,14 @@ for coming (received) can messages on a USB port. Reads 1 entry of the rx bus bu
 <dt class="sig sig-object py" id="a2gmeasurements.GimbalRS2.request_current_position">
 <span class="sig-name descname"><span class="pre">request_current_position</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalRS2.request_current_position" title="Link to this definition">#</a></dt>
 <dd><p>Sends command to request the current position of the gimbal.</p>
-<p>BLOCKS thread execution for the time given by attribute “TIME_POS_REQ” to allow the response to be received</p>
+<p>Blocks thread execution for the time given by attribute <code class="docutils literal notranslate"><span class="pre">TIME_POS_REQ</span></code> to allow the response to be received</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="a2gmeasurements.GimbalRS2.send_cmd">
 <span class="sig-name descname"><span class="pre">send_cmd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalRS2.send_cmd" title="Link to this definition">#</a></dt>
 <dd><blockquote>
-<div><p>Wrapper to “send_data” method.</p>
+<div><p>Wrapper to <code class="docutils literal notranslate"><span class="pre">send_data</span></code> method.</p>
 </div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -450,6 +451,428 @@ Developer has to send a setPosControl to set again the position of the gimbal wh
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">a2gmeasurements.</span></span><span class="sig-name descname"><span class="pre">GpsSignaling</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">DBG_LVL_1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'GPS'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling" title="Link to this definition">#</a></dt>
+<dd><p>Python class that works as “software” driver for the Septentrio’s GPS receiver (Mosaic-go).</p>
+<p>It implements the commands described in Septentrio’s “mosaic-go Reference Guide”.</p>
+<p>There are commands (sent to the GPS receiver) that control (mainly) what type of information (in the form of what is called in Septentrio’s documentation, NMEA or SBF sentences) is retrieved from the receiver.</p>
+<p>It creates a thread (called here a gps thread) to handle the communication between the receiver and this host computer.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">DBG_LVL_1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'GPS'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.__init__" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Contructor for the GpsSignaling class. Important attributes are:</p>
+<p><code class="docutils literal notranslate"><span class="pre">register_sbf_sentences_by_id</span></code>: list of integers containing the expected SBF sentences that are going to be requested at the receiver. The integer is the ID of the sentence described in Septentrio’s manual.</p>
+<p><code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>: list of dictionaries containing the SBF frames during the execution of the thread responsible for receiving SBF frames.</p>
+<p><code class="docutils literal notranslate"><span class="pre">MAX_SBF_BUFF_LEN</span></code>: Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DBG_LVL_1</strong> (<em>bool</em><em>, </em><em>optional</em>) – used to print less verbose than level 0, defaults to False</p></li>
+<li><p><strong>DBG_LVL_2</strong> (<em>bool</em><em>, </em><em>optional</em>) – used to print less verbose than level 2, defaults to False</p></li>
+<li><p><strong>DBG_LVL_0</strong> (<em>bool</em><em>, </em><em>optional</em>) – prints all the verbose available, defaults to False</p></li>
+<li><p><strong>save_filename</strong> (<em>str</em><em>, </em><em>optional</em>) – name of the file where to save the record of GPS coordinates along an experiment, defaults to ‘GPS’</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.check_coord_closeness">
+<span class="sig-name descname"><span class="pre">check_coord_closeness</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coordinates2compare</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.check_coord_closeness" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks how close is a coordinate with respect to the actual node position.</p>
+<p>It is assumed that both pair of coordinates to be compared lay at the same height.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>coordinates2compare</strong> (<em>dictionary</em>) – keys of the dictionary are ‘LAT’ and ‘LON’, and each of them has ONLY ONE value.</p></li>
+<li><p><strong>tol</strong> (<em>float</em><em>, </em><em>optional</em>) – margin in meters by which the coordinates in comparison are close or not, defaults to 5</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if close , False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>boolean</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.get_last_sbf_buffer_info">
+<span class="sig-name descname"><span class="pre">get_last_sbf_buffer_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">what</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Coordinates'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.get_last_sbf_buffer_info" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Retrieves the last gps coordinates, the last heading information of the receiver, or both things.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>what</strong> (<em>str</em><em>, </em><em>optional</em>) – defines which information wants to be retrieved from <code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>. Options are: ‘Coordinates’, ‘Heading’ or ‘Both’.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>either one or two dictionaries. The first dictionary (always) returned contains either the coordinates or the heading information. If ‘Both’ was specified the first dictionary contains the coordinates and the second dictionary contains the heading information.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dictionary/ies</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.parse_septentrio_msg">
+<span class="sig-name descname"><span class="pre">parse_septentrio_msg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rx_msg</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.parse_septentrio_msg" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Parses the received message and process it depending if it is an SBF or NMEA message</p>
+<p>Raises an exception if <em>any</em> problem is encountered when parsing the message.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>rx_msg</strong> (<em>bytes</em><em> or </em><em>str</em>) – </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.process_atteuler_sbf_data">
+<span class="sig-name descname"><span class="pre">process_atteuler_sbf_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.process_atteuler_sbf_data" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Parses an AttEuler SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.</p>
+<p>The AttEuler SBF sentence provides heading information of the imaginary line formed by the first and second antennas, w.r.t the North. To do so, the heading, pitch, and roll axis are defined.</p>
+<p>The coordinates are stored in <code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>. Each <code class="docutils literal notranslate"><span class="pre">MAX_SBF_BUFF_LEN</span></code> entries of <code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>, the buffer is flushed and its contents are saved on disk.</p>
+<p><em>More about all axis definition, and heading information in “mosaic-go Reference Guide”</em>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>raw_data</strong> (<em>bytes</em>) – received data corresponding to the AttEurler SBF sentence.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.process_gps_nmea_data">
+<span class="sig-name descname"><span class="pre">process_gps_nmea_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.process_gps_nmea_data" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Parses a line of NMEA data retrieved from the gps and coming from the virtual serial port.</p>
+<p>Used NMEA sentences are GGA and HDT.</p>
+<p>The labels of the items of the returned dictionary are the following ones for the GGA sentence: ‘Timestamp’, ‘Latitude’, ‘Longitude’, ‘Latitude Direction’, ‘Longitude’, ‘Longitude Direction’, ‘GPS Quality Indicator’, ‘Number of Satellites in use’, ‘Horizontal Dilution of Precision’, ‘Antenna Alt above sea level (mean)’, ‘Units of altitude (meters)’, ‘Geoidal Separation’, ‘Units of Geoidal Separation (meters)’, ‘Age of Differential GPS Data (secs)’, ‘Differential Reference Station ID’.</p>
+<p><em>The instances of this class created in the GUI and other classes, use SBF sentences as the default type of sentence</em>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>str</em>) – line of read data following the structure of a NMEA frame.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.process_pvtcart_sbf_data">
+<span class="sig-name descname"><span class="pre">process_pvtcart_sbf_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.process_pvtcart_sbf_data" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Parses an PVTCart SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.</p>
+<p>The PVTCart SBF sentence provides geocentric coordinates X, Y, Z for the position of the receiver.</p>
+<p>The coordinates are stored in <code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>. Each <code class="docutils literal notranslate"><span class="pre">MAX_SBF_BUFF_LEN</span></code> entries of <code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>, the buffer is flushed and its contents are saved on disk.</p>
+<p><em>More about the information carried by this block in “mosaic-go Reference Guide”</em>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>raw_data</strong> (<em>bytes</em>) – received data corresponding to the PVTCart SBF block</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.process_pvtgeodetic_sbf_data">
+<span class="sig-name descname"><span class="pre">process_pvtgeodetic_sbf_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.process_pvtgeodetic_sbf_data" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Parses an PVTGeodetic SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.</p>
+<p>The PVTGeodetic SBF sentence provides geodetic coordinates lat, lon, h for the position of the receiver.</p>
+<p>The coordinates are stored in <code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>. Each <code class="docutils literal notranslate"><span class="pre">MAX_SBF_BUFF_LEN</span></code> entries of <code class="docutils literal notranslate"><span class="pre">SBF_frame_buffer</span></code>, the buffer is flushed and its contents are saved on disk.</p>
+<p><em>More about the information carried by this block in “mosaic-go Reference Guide”</em>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>raw_data</strong> (<em>bytes</em>) – received data corresponding to the PVTGeodetic SBF block</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.sendCommandGps">
+<span class="sig-name descname"><span class="pre">sendCommandGps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'USB'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.sendCommandGps" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Sends a command to the Septentrio mosaic-go receiver.</p>
+<p>Blocks this thread execution for 500 ms.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cmd</strong> (<em>str</em>) – command to be sent to the Septentrio mosaic-go receiver. The available list of commands is defined in “mosaic-go Reference Guide”.</p></li>
+<li><p><strong>interface</strong> (<em>str</em><em>, </em><em>optional</em>) – is one of the allowed Septentrio interfaces. Current implementation only uses ‘USB’ interface.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.serial_connect">
+<span class="sig-name descname"><span class="pre">serial_connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serial_port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.serial_connect" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Open a serial connection. The Septentrio mosaic-go provides 2 virtual serial ports.</p>
+<p>In Windows the name of the virtual serial ports are typically: COM# (Virtual serial port 1), COM# (Virtual serial port 2).</p>
+<p>In Linux the name of the virtual serial ports (controlled by the standard Linux CDC-ACM driver) are: /dev/ttyACM0 (Virtual serial port 1), /dev/ttyACM1 (Virtual serial port 2).</p>
+<p>Septentrio has different interfaces to use with its receiver. Among other interfaces are: IP (using Ethernet-over-USB), USB.</p>
+<p>For the virtual serial ports the interface name in Septentrio receiver is ‘USB’ as their
+communication is made through the USB connection with the host computer.</p>
+<p>Additionally there is an actual (not virtual) serial port in the mosaic-go device. Under Linux, the name of this port is ‘/dev/serial0’ which is the symbolic link to either ‘dev/ttyS#’ or ‘/dev/ttyAMA#’.</p>
+<p>For information about all available interfaces check the Septentrio “mosaic-go Reference Guide”.</p>
+<p><em>It is important to note that only the USB interface has been implemented in this class</em>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>serial_port</strong> (<em>str</em><em>, </em><em>optional</em>) – serial port or virtual serial port name, defaults to None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.serial_receive">
+<span class="sig-name descname"><span class="pre">serial_receive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serial_instance_actual</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.serial_receive" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function invoked by the thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.</p>
+<p>Most of all messages sent by Septentrio mosaic-go receiver start with an “$” character.</p>
+<p>The next character depends if the message is an echo of a command sent by the host computer, or if the message is an answer to a command sent by the host computer.</p>
+<p>Echoes of commands sent by the host computer, don’t follow the “$” character with any predefined character. This messages are discarded by the method <code class="docutils literal notranslate"><span class="pre">parse_septentrio_msg</span></code>.</p>
+<p>Messages that answer a command sent by the host computer, DO start with a predefined character. The predefined character depends wheter the answer arises from a NMEA sentence or an SBF sentence. This messages are parsed by the method <code class="docutils literal notranslate"><span class="pre">parse_septentrio_msg</span></code>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>serial_instance_actual</strong> (<em>Serial</em>) – serial connection instance.</p></li>
+<li><p><strong>stop_event</strong> (<em>threading.Event</em>) – Event to be used to stop the reading of the serial port.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.start_gps_data_retrieval">
+<span class="sig-name descname"><span class="pre">start_gps_data_retrieval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stream_number</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'USB'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sec1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'SBF'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nmea_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'+GGA+HDT'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sbf_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'+PVTCartesian+AttEuler'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.start_gps_data_retrieval" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Starts the streaming of the NMEA/SBF sentences.</p>
+<p>Wrapper of <code class="docutils literal notranslate"><span class="pre">sendCommandGps</span></code>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>stream_number</strong> (<em>int</em><em>, </em><em>optional</em>) – each interface can have multiple data streams. This parameter defined which is the number of the stream for the given <code class="docutils literal notranslate"><span class="pre">interface</span></code>, defaults to 1</p></li>
+<li><p><strong>interface</strong> (<em>str</em><em>, </em><em>optional</em>) – is one of the allowed Septentrio interfaces. Current implementation only uses ‘USB’ interface.</p></li>
+<li><p><strong>interval</strong> (<em>str</em><em>, </em><em>optional</em>) – time regularity used by the Septentrio receiver to sense the given SBF/NMEA sentence. Can be any of the following self-explanatory names: ‘msec10’, ‘msec20’, ‘msec40’, ‘msec50’, ‘msec100’, ‘msec200’, ‘msec500’, ‘sec1’, ‘sec2’, ‘sec5’, ‘sec10’, ‘sec15’, ‘sec30’, ‘sec60’, ‘min2’, ‘min5’, ‘min10’, ‘min15’, ‘min30’, ‘min60’.</p></li>
+<li><p><strong>msg_type</strong> (<em>str</em><em>, </em><em>optional</em>) – ‘NMEA’ or ‘SBF’, defaults to ‘SBF’</p></li>
+<li><p><strong>nmea_type</strong> (<em>str</em><em>, </em><em>optional</em>) – name/s of the NMEA sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by ‘+’, and all the string should be concatenated in one single string (i.e. ‘+HDT+GGA’) , defaults to ‘+GGA+HDT’</p></li>
+<li><p><strong>sbf_type</strong> (<em>str</em><em>, </em><em>optional</em>) – name/s of the SBF sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by ‘+’, and all the string should be concatenated in one single string (i.e. ‘+PVTCartesian+AttEuler’). Each sentence needs to have a parsing function that is called in <code class="docutils literal notranslate"><span class="pre">parse_septentrio_msg</span></code> in the part corresponding to the id of the sentence. defaults to ‘+PVTCartesian+AttEuler’.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.start_thread_gps">
+<span class="sig-name descname"><span class="pre">start_thread_gps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'USB'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.start_thread_gps" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Starts the GPS thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.</p>
+<p>Creates the threading Event that is set when the I/O communication must be closed.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>interface</strong> (<em>str</em><em>, </em><em>optional</em>) – is one of the allowed Septentrio interfaces. Current implementation only uses ‘USB’ interface.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.stop_gps_data_retrieval">
+<span class="sig-name descname"><span class="pre">stop_gps_data_retrieval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stream_number</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'USB'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'+NMEA+SBF'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.stop_gps_data_retrieval" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Stops the streaming of the NMEA/SBF sentences initiated by calling <code class="docutils literal notranslate"><span class="pre">start_gps_data_retrieval</span></code>.</p>
+<p>Wrapper of <code class="docutils literal notranslate"><span class="pre">sendCommandGps</span></code>.</p>
+<p><em>Unexpected behaviour to be noted by</em> <strong>developers</strong>: <em>it seems that if the stream is not stopped by the time the serial connection is closed, then, when the user opens a new serial connection, Septentrio will start sending all the SBF or NMEA messages that were produced between the last time the serial connection was closed and the time it is opened again</em>.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>Args:</dt><dd><p>stream_number (int, optional): _description_. Defaults to 1.
+interface (str, optional): _description_. Defaults to ‘USB’.
+msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>stream_number</strong> (<em>int</em><em>, </em><em>optional</em>) – number of the stream to be stopped, defaults to 1</p></li>
+<li><p><strong>interface</strong> (<em>str</em><em>, </em><em>optional</em>) – is one of the allowed Septentrio interfaces. Current implementation only uses ‘USB’ interface.</p></li>
+<li><p><strong>msg_type</strong> (<em>str</em><em>, </em><em>optional</em>) – the message type corresponding to the stream <code class="docutils literal notranslate"><span class="pre">stream_number</span></code>. Options: ‘SBF’, ‘NMEA’ or ‘+NMEA+SBF’ or ‘+SBF+NMEA’ (the last two are the same), defaults to ‘+NMEA+SBF’</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.stop_thread_gps">
+<span class="sig-name descname"><span class="pre">stop_thread_gps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">interface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'USB'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.stop_thread_gps" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Stops the GPS thread.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>interface</strong> (<em>str</em><em>, </em><em>optional</em>) – is one of the allowed Septentrio interfaces. Current implementation only uses ‘USB’ interface.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="a2gmeasurements.myAnritsuSpectrumAnalyzer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">a2gmeasurements.</span></span><span class="sig-name descname"><span class="pre">myAnritsuSpectrumAnalyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">is_debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer" title="Link to this definition">#</a></dt>
+<dd><p>Python class to interact with the MS2760A Anritsu spectrum analyzer.</p>
+<p>Functionality implemented retrieves the peak (power and frequency) of the spectrum of the system under test.</p>
+<p>The spectrum analyzer also outputs xml files. Developer has to implement a method/s to parse the output of such files if they are used. In the commit history of the github of this project a parser was partially implemented (if the developer wants to check that).</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.myAnritsuSpectrumAnalyzer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">is_debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.__init__" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Defines attributes of the class.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>is_debug</strong> (<em>bool</em><em>, </em><em>optional</em>) – print debug messages, defaults to True</p></li>
+<li><p><strong>is_config</strong> (<em>bool</em><em>, </em><em>optional</em>) – true if you want to configure the Spectrum Analyzer, defaults to True</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.myAnritsuSpectrumAnalyzer.retrieve_max_pow">
+<span class="sig-name descname"><span class="pre">retrieve_max_pow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.retrieve_max_pow" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Retrieves the maximum power and its correspondent frequency of the spectrum of the system under test.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>method</strong> (<em>int</em><em>, </em><em>optional</em>) – how to get the maximum peak and corresponding frequency. This is for developer. It is indisctintive for user. Defaults to 2.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – when method is outside of available methods to compute the peak and corresponding frequency.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dictionary with self-explanatory keys ‘MAG’, ‘MAG_UNITS’, ‘FREQ’, ‘FREQ_UNITS’</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dictionary</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.myAnritsuSpectrumAnalyzer.spectrum_analyzer_close">
+<span class="sig-name descname"><span class="pre">spectrum_analyzer_close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.spectrum_analyzer_close" title="Link to this definition">#</a></dt>
+<dd><p>Closes the socket.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.myAnritsuSpectrumAnalyzer.spectrum_analyzer_connect">
+<span class="sig-name descname"><span class="pre">spectrum_analyzer_connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">HOST</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'127.0.0.1'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PORT</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9001</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.spectrum_analyzer_connect" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Creates a socket to connect to the spectrum analyzer.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>HOST</strong> (<em>str</em><em>, </em><em>optional</em>) – ip address of the spectrum analyzer, defaults to ‘127.0.0.1’</p></li>
+<li><p><strong>PORT</strong> (<em>int</em><em>, </em><em>optional</em>) – TCP/IP port, defaults to 9001</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">a2gmeasurements.</span></span><span class="sig-name descname"><span class="pre">HelperA2GMeasurements</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ID</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SERVER_ADDRESS</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsGimbal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsGPS</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsSignalGenerator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsRFSoC</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rfsoc_static_ip_address</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">F0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SPEED</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">GPS_Stream_Interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'msec500'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operating_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">57510000000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements" title="Link to this definition">#</a></dt>
+<dd><p>Python class for handling the interaction between the multiple devices available in the system: gps, gimbal and rfsoc.</p>
+<p>It creates instances of each class handling one of those devices (i.e. GimbalRS2, GpsSignaling).</p>
+<p>It creates a wireless TCP connection between the host computers of both nodes (air and ground node) to control devices and retrieve information from them.</p>
+<p>It creates a thread (called here communication thread) to handle the communication between the host computers of both nodes.</p>
+<p><code class="docutils literal notranslate"><span class="pre">MAX_TIME_EMPTY_SOCKETS`</span></code>: the maximum allowed time to wait if no information was sent over a socket.</p>
+<p><code class="docutils literal notranslate"><span class="pre">CONN_MUST_OVER_FLAG</span></code>: a (boolean) flag indicating whether to close or not the connection between the host computers.</p>
+<p><code class="docutils literal notranslate"><span class="pre">drone_fm_flag</span></code>: a (boolean) flag set at the GUI indicating whether the air node’s gimbal should follow the ground node. In all our documentation, a gimbal is said to be in “follow mode” (don’t confuse with DJI’s RS2 camera-based follow mode) if it follows the other node.</p>
+<p><code class="docutils literal notranslate"><span class="pre">PAP_TO_PLOT</span></code>: a numpy array (of size defined in the method <code class="docutils literal notranslate"><span class="pre">pipeline_operations_rfsoc_rx_ndarray``of</span> <span class="pre">the</span> <span class="pre">class</span> <span class="pre">``RFSoCRemoteControlFromHost</span></code>) used to plot the Power Angular Profile (PAP) of the wireless channel in GUI’s PAP Panel.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ID</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SERVER_ADDRESS</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsGimbal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsGPS</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsSignalGenerator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsRFSoC</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rfsoc_static_ip_address</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">F0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SPEED</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">GPS_Stream_Interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'msec500'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operating_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">57510000000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.__init__" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Creates instances of classes <code class="docutils literal notranslate"><span class="pre">GimbalRS2</span></code> (or <code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16</span></code>), <code class="docutils literal notranslate"><span class="pre">GpsSignaling</span></code>, <code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost</span></code> to control these devices.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ID</strong> (<em>str</em>) – either ‘DRONE’ or ‘GND’.</p></li>
+<li><p><strong>SERVER_ADDRESS</strong> (<em>str</em>) – the IP address of the ground station.</p></li>
+<li><p><strong>DBG_LVL_0</strong> (<em>bool</em><em>, </em><em>optional</em>) – if set, prints some low-level messages usefull for debugging, defaults to False.</p></li>
+<li><p><strong>DBG_LVL_1</strong> (<em>bool</em><em>, </em><em>optional</em>) – if set, prints some higher-level messages usefull for debugging, defaults to False.</p></li>
+<li><p><strong>IsGimbal</strong> (<em>int</em><em> or </em><em>bool</em><em>, </em><em>optional</em>) – 0 or FALSE, when no gimbal is physically connected to this host computer; 1, when a Ronin RS2 is physically connected; 2, when a Gremsy H16 is physically connected. Defaults to False.</p></li>
+<li><p><strong>IsGPS</strong> (<em>bool</em><em>, </em><em>optional</em>) – True if a gps is physically connected to this host computer. False otherwise, defaults to False.</p></li>
+<li><p><strong>IsSignalGenerator</strong> (<em>bool</em><em>, </em><em>optional</em>) – True if a signal generator controlled by pyvisa commands is physically connected to this host computer. False otherwise, defaults to False.</p></li>
+<li><p><strong>IsRFSoC</strong> (<em>bool</em><em>, </em><em>optional</em>) – True if an RFSoC is physically connected to this host computer. False otherwise, defaults to False.</p></li>
+<li><p><strong>rfsoc_static_ip_address</strong> (<em>str</em><em>, </em><em>optional</em>) – IP address of the RFSoC connected to this host computer, defaults to None</p></li>
+<li><p><strong>L0</strong> (<em>float</em><em>, </em><em>optional</em>) – parameter of the signal generator, defaults to None</p></li>
+<li><p><strong>SPEED</strong> (<em>int</em><em>, </em><em>optional</em>) – the speed of the node in m/s. If this node is GROUND it should be 0 (gnd node does not move) as it is by default. This parameter ONLY incides in raising a warning debug print when the speed of the node is higher than the time difference between consecutive SBF sentences. NOT a crutial parameter at all.</p></li>
+<li><p><strong>GPS_Stream_Interval</strong> (<em>str</em><em>, </em><em>optional</em>) – time interval used for the retrieving of the configured SBF sentences in Septentrio’s receiver connected to this host computer. A list of available options is shown in <code class="docutils literal notranslate"><span class="pre">start_gps_data_retrieval</span></code> of class <code class="docutils literal notranslate"><span class="pre">GpsSignaling</span></code>, defaults to ‘msec500’.</p></li>
+<li><p><strong>AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN</strong> (<em>float</em><em>, </em><em>optional</em>) – approximated time between calls of the communication thread. This parameter is used in conjunction with <code class="docutils literal notranslate"><span class="pre">MAX_TIME_EMPTY_SOCKETS</span></code> to raise an exception when neither side of the communication link is sending any message. Unfortunately, this is a very simple estimate, since the actual time between calls depends on many factors and is does not remain constant between calls. Defaults to 0.001</p></li>
+<li><p><strong>operating_freq</strong> (<em>int</em><em>, </em><em>optional</em>) – operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the “User Manual EVK06002” of the Sivers EVK (57-71 GHz) , defaults to 57.51e9</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.gimbal_follows_drone">
+<span class="sig-name descname"><span class="pre">gimbal_follows_drone</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">heading</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_ground</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_ground</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height_ground</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_drone</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_drone</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height_drone</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.gimbal_follows_drone" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Computes the yaw, pitch and roll angles required to move the gimbal in this node towards the other node.</p>
+<p>The caller of this function must guarantee that if <code class="docutils literal notranslate"><span class="pre">self.ID</span> <span class="pre">==</span> <span class="pre">'GROUND'</span></code>, the arguments passed to this function are drone coords. The ground coords SHOULD NOT be passed as they will be obtained from this node Septentrio’s receiver.</p>
+<p>The caller of this function must guarantee that if <code class="docutils literal notranslate"><span class="pre">self.ID</span> <span class="pre">==</span> <span class="pre">'DRONE'</span></code>, the arguments passed to this function are ground coords. The drone coords SHOULD NOT be passed as they will be obtained from this node Septentrio’s receiver.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">IsGPS</span></code> is False (no GPS connected), then <code class="docutils literal notranslate"><span class="pre">heading</span></code>, <code class="docutils literal notranslate"><span class="pre">lat_ground</span></code>, <code class="docutils literal notranslate"><span class="pre">lon_ground</span></code>, <code class="docutils literal notranslate"><span class="pre">height_ground</span></code>, <code class="docutils literal notranslate"><span class="pre">lat_drone</span></code>, <code class="docutils literal notranslate"><span class="pre">lon_drone</span></code>, <code class="docutils literal notranslate"><span class="pre">height_drone</span></code> must be provided.</p>
+<p>In that case, all coordinates provided must be geodetic (lat, lon, alt).</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>heading</strong> (<em>float</em><em>, </em><em>optional</em>) – angle between [0, 2*pi] (rads) corresponding to the heading of the line between the two antennas connected to Septentrio’s receiver in this node, defaults to None</p></li>
+<li><p><strong>lat_ground</strong> (<em>float</em><em>, </em><em>optional</em>) – latitude of the GPS antenna 1 connected to Septentrio’s receiver at the GROUND node, defaults to None</p></li>
+<li><p><strong>lon_ground</strong> (<em>float</em><em>, </em><em>optional</em>) – longitude of the GPS antenna 1 connected to Septentrio’s receiver at the GROUND node, defaults to None</p></li>
+<li><p><strong>height_ground</strong> (<em>float</em><em>, </em><em>optional</em>) – height of the GPS antenna 1 connected to Septentrio’s receiver at the GROUND node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas, defaults to None</p></li>
+<li><p><strong>lat_drone</strong> (<em>float</em><em>, </em><em>optional</em>) – latitude of the GPS antenna 1 connected to Septentrio’s receiver at the DRONE node, defaults to None</p></li>
+<li><p><strong>lon_drone</strong> (<em>float</em><em>, </em><em>optional</em>) – longitude of the GPS antenna 1 connected to Septentrio’s receiver at the DRONE node, defaults to None</p></li>
+<li><p><strong>height_drone</strong> (<em>float</em><em>, </em><em>optional</em>) – height of the GPS antenna 1 connected to Septentrio’s receiver at the DRONE node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas, defaults to None</p></li>
+<li><p><strong>fmode</strong> (<em>int</em><em>, </em><em>optional</em>) – defines if the gimbal will follow the other node in Azimuth, elevation or both of them. Options are: 0x00, for Azimuth and elevation; 0x01, for Elevation, 0x02, for Azimuth. Defaults to 0x00.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>returns either the yaw, pitch or both to be set at the gimbal of this node, to follow the other node. The actual value is the angle value in degrees multiplied by 10 and rounded to the closest integer (i.e. a yaw to set of 45.78 degrees is returned as the yaw value 458).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </section>
 </section>
 
@@ -509,6 +932,36 @@ Developer has to send a setPosControl to set again the position of the gimbal wh
 <li><a class="reference internal" href="#a2gmeasurements.GimbalRS2.start_thread_gimbal"><code class="docutils literal notranslate"><span class="pre">GimbalRS2.start_thread_gimbal()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GimbalRS2.stop_thread_gimbal"><code class="docutils literal notranslate"><span class="pre">GimbalRS2.stop_thread_gimbal()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GimbalRS2.validate_api_call"><code class="docutils literal notranslate"><span class="pre">GimbalRS2.validate_api_call()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling"><code class="docutils literal notranslate"><span class="pre">GpsSignaling</span></code></a><ul>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.__init__"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.check_coord_closeness"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.check_coord_closeness()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.get_last_sbf_buffer_info"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.get_last_sbf_buffer_info()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.parse_septentrio_msg"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.parse_septentrio_msg()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.process_atteuler_sbf_data"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.process_atteuler_sbf_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.process_gps_nmea_data"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.process_gps_nmea_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.process_pvtcart_sbf_data"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.process_pvtcart_sbf_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.process_pvtgeodetic_sbf_data"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.process_pvtgeodetic_sbf_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.sendCommandGps"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.sendCommandGps()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.serial_connect"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.serial_connect()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.serial_receive"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.serial_receive()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.start_gps_data_retrieval"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.start_gps_data_retrieval()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.start_thread_gps"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.start_thread_gps()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.stop_gps_data_retrieval"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.stop_gps_data_retrieval()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.stop_thread_gps"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.stop_thread_gps()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer"><code class="docutils literal notranslate"><span class="pre">myAnritsuSpectrumAnalyzer</span></code></a><ul>
+<li><a class="reference internal" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.__init__"><code class="docutils literal notranslate"><span class="pre">myAnritsuSpectrumAnalyzer.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.retrieve_max_pow"><code class="docutils literal notranslate"><span class="pre">myAnritsuSpectrumAnalyzer.retrieve_max_pow()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.spectrum_analyzer_close"><code class="docutils literal notranslate"><span class="pre">myAnritsuSpectrumAnalyzer.spectrum_analyzer_close()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.myAnritsuSpectrumAnalyzer.spectrum_analyzer_connect"><code class="docutils literal notranslate"><span class="pre">myAnritsuSpectrumAnalyzer.spectrum_analyzer_connect()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements</span></code></a><ul>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.__init__"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.gimbal_follows_drone"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.gimbal_follows_drone()</span></code></a></li>
 </ul>
 </li>
 </ul>

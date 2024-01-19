@@ -49,13 +49,15 @@ e-mail: julian.villegas@vtt.fi
 
 class GimbalRS2(object):
     """
-    Python Class that works as the driver for the gimbal DJI RS2.
+     Python Class that works as the driver for the gimbal DJI RS2.
     
-    The gimbal should be connected to the host computer through an USB-to-PCAN bridge (PCAN System). 
+     The gimbal should be connected to the host computer through an USB-to-PCAN bridge (PCAN System). 
+     
+     It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.
     
-    More info on "Manual A2GMeasurements" (Chapter).
+     More info on "Manual A2GMeasurements" (Chapter).
     
-    Gimbal control modified and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software
+     Gimbal control modified and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software
 
     """   
     
@@ -385,7 +387,7 @@ class GimbalRS2(object):
         """
          Sends command to request the current position of the gimbal.
 
-         BLOCKS thread execution for the time given by attribute "TIME_POS_REQ" to allow the response to be received
+         Blocks thread execution for the time given by attribute ``TIME_POS_REQ`` to allow the response to be received
         """
         
         hex_data = [0x01]
@@ -459,7 +461,7 @@ class GimbalRS2(object):
 
     def send_cmd(self, cmd):
         """
-         Wrapper to "send_data" method.
+         Wrapper to ``send_data`` method.
 
         :param cmd: command fields separated by ':'
         :type cmd: str
@@ -569,14 +571,35 @@ class GimbalRS2(object):
         self.event_stop_thread_gimbal.set()        
             
 class GpsSignaling(object):
+    """
+     Python class that works as "software" driver for the Septentrio's GPS receiver (Mosaic-go). 
+     
+     It implements the commands described in Septentrio's "mosaic-go Reference Guide".
+     
+     There are commands (sent to the GPS receiver) that control (mainly) what type of information (in the form of what is called in Septentrio's documentation, NMEA or SBF sentences) is retrieved from the receiver. 
+     
+     It creates a thread (called here a gps thread) to handle the communication between the receiver and this host computer.
+    
+    """
+    
     def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False, save_filename='GPS'):
         """
-
-        Args:
-            DBG_LVL_1 (bool, optional): _description_. Defaults to False.
-            DBG_LVL_2 (bool, optional): _description_. Defaults to False.
-            DBG_LVL_0 (bool, optional): _description_. Defaults to False.
-            save_filename (str, optional): _description_. Defaults to 'GPS'.
+         Contructor for the GpsSignaling class. Important attributes are:
+        
+         ``register_sbf_sentences_by_id``: list of integers containing the expected SBF sentences that are going to be requested at the receiver. The integer is the ID of the sentence described in Septentrio's manual.
+                                          
+         ``SBF_frame_buffer``: list of dictionaries containing the SBF frames during the execution of the thread responsible for receiving SBF frames.
+        
+         ``MAX_SBF_BUFF_LEN``: Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
+        
+        :param DBG_LVL_1: used to print less verbose than level 0, defaults to False
+        :type DBG_LVL_1: bool, optional
+        :param DBG_LVL_2: used to print less verbose than level 2, defaults to False
+        :type DBG_LVL_2: bool, optional
+        :param DBG_LVL_0: prints all the verbose available, defaults to False
+        :type DBG_LVL_0: bool, optional
+        :param save_filename: name of the file where to save the record of GPS coordinates along an experiment, defaults to 'GPS'
+        :type save_filename: str, optional
         """
         
         # Initializations
@@ -586,7 +609,7 @@ class GpsSignaling(object):
         self.SBF_frame_buffer = []
         self.NMEA_buffer = []
         self.stream_info = []
-        self.MAX_SBF_BUFF_LEN = 100  # Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
+        self.MAX_SBF_BUFF_LEN = 100
 
         self.DBG_LVL_1 = DBG_LVL_1
         self.DBG_LVL_2 = DBG_LVL_2
@@ -603,57 +626,28 @@ class GpsSignaling(object):
         self.ERR_GPS_CODE_NO_COORD_AVAIL = -4.5e3 
         self.ERR_GPS_CODE_NO_HEAD_AVAIL = -5.5e3
         
-    def socket_connect(self, HOST="192.168.3.1", PORT=28784, time='sec1', ip_port_number='IP11'):
-        """
-        Creates a socket to connect to the command-line terminal provided by Septentrio receiver. 
-        Sends the first command (in Septentrio-defined 'language') to set-up a regular retrieve of gps info
-
-        Args:
-            HOST (str, optional): IP address where the server is allocated. Defaults to "192.168.3.1".
-            PORT (int, optional): PORT number of the application. Defaults to 28784.
-            time (str, optional): How regular get updates of the gps data. Defaults to 'sec1'.
-            ip_port_number (str, optional): the number of the IP terminal emulator port. 
-        """
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket = s
-        
-        self.socket.connect((HOST, PORT))
-     
-    def socket_receive(self, stop_event):
-        """
-        OUTDATED. TO BE IMPLEMENTED. OR SIMPLY USE THE SERIAL CONNECTION. MAINTAINED FOR BACKWARDS COMPATIBILITY.
-
-        Args:
-            stop_event (threading): the threading event that stops the TCP/IP com
-        """
-
-        while not stop_event.is_set():
-            data = self.socket.recv(64)
-            self.process_gps_nmea_data(data)
-            
     def serial_connect(self, serial_port=None):
         """
-        Open a serial connection. The Septentrio mosaic-go provides 2 virtual serial ports.
+         Open a serial connection. The Septentrio mosaic-go provides 2 virtual serial ports.
         
-        In Windows the name of the virtual serial ports are typically: 
-        -COM# (Virtual serial port 1)
-        -COM# (Virtual serial port 2)
+         In Windows the name of the virtual serial ports are typically: COM# (Virtual serial port 1), COM# (Virtual serial port 2).
 
-        In Linux the name of the virtual serial ports (controlled by the standard Linux CDC-ACM driver) are:
-        -/dev/ttyACM0 (Virtual serial port 1)
-        -/dev/ttyACM1 (Virtual serial port 2)
+         In Linux the name of the virtual serial ports (controlled by the standard Linux CDC-ACM driver) are: /dev/ttyACM0 (Virtual serial port 1), /dev/ttyACM1 (Virtual serial port 2).
 
-        For the virtual serial ports the interface name in Septentrio receiver is 'USB' as their
-        communication is made through the USB connection with the host computer. 
+         Septentrio has different interfaces to use with its receiver. Among other interfaces are: IP (using Ethernet-over-USB), USB.
         
-        Additionally there is an actual serial port in the mosaic-go device. Under Linux,
-        the name of this port is '/dev/serial0' which is the symbolic link
-        to either 'dev/ttyS#' or '/dev/ttyAMA#'.
+         For the virtual serial ports the interface name in Septentrio receiver is 'USB' as their
+         communication is made through the USB connection with the host computer. 
         
-        Args:
-            serial_port (str, optional): serial port or virtual serial port name. 
+         Additionally there is an actual (not virtual) serial port in the mosaic-go device. Under Linux, the name of this port is '/dev/serial0' which is the symbolic link to either 'dev/ttyS#' or '/dev/ttyAMA#'.
+        
+         For information about all available interfaces check the Septentrio "mosaic-go Reference Guide".
+        
+         *It is important to note that only the USB interface has been implemented in this class*.
+        
+        :param serial_port: serial port or virtual serial port name, defaults to None
+        :type serial_port: str, optional
         """
-        
         
         self.serial_port = None
         # Look for the first Virtual Com in Septentrio receiver. It is assumed that it is available, 
@@ -707,20 +701,16 @@ class GpsSignaling(object):
 
     def process_gps_nmea_data(self, data):
         """
-        Process the received data of the gps coming from the virtual serial port.
+         Parses a line of NMEA data retrieved from the gps and coming from the virtual serial port.
+         
+         Used NMEA sentences are GGA and HDT.
         
-        The labels of the items of the returned dictionary are the following ones for the GGA sentence:
-        
-        'Timestamp', 'Latitude', 'Longitude', 'Latitude Direction', 'Longitude'
-        'Longitude Direction', 'GPS Quality Indicator', 'Number of Satellites in use'
-        'Horizontal Dilution of Precision', 'Antenna Alt above sea level (mean)'
-        'Units of altitude (meters)', 'Geoidal Separation'
-        'Units of Geoidal Separation (meters)', 'Age of Differential GPS Data (secs)'
-        'Differential Reference Station ID'
-        
+         The labels of the items of the returned dictionary are the following ones for the GGA sentence: 'Timestamp', 'Latitude', 'Longitude', 'Latitude Direction', 'Longitude', 'Longitude Direction', 'GPS Quality Indicator', 'Number of Satellites in use', 'Horizontal Dilution of Precision', 'Antenna Alt above sea level (mean)', 'Units of altitude (meters)', 'Geoidal Separation', 'Units of Geoidal Separation (meters)', 'Age of Differential GPS Data (secs)', 'Differential Reference Station ID'.
+         
+         *The instances of this class created in the GUI and other classes, use SBF sentences as the default type of sentence*.
 
-        Args:
-            data (str): line of read data. We assume that the format followed by the data retrieved (the string) is the NMEA.
+        :param data: line of read data following the structure of a NMEA frame.
+        :type data: str
         """
         
         try:
@@ -807,15 +797,20 @@ class GpsSignaling(object):
 
     def process_pvtcart_sbf_data(self, raw_data):
         """
-        Process the PVTCart data type
-        
-        Args:
-            raw_data (bytes): received raw data
+         Parses an PVTCart SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
+         
+         The PVTCart SBF sentence provides geocentric coordinates X, Y, Z for the position of the receiver.
+         
+         The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
+         
+         *More about the information carried by this block in "mosaic-go Reference Guide"*.  
+
+        :param raw_data: received data corresponding to the PVTCart SBF block
+        :type raw_data: bytes
         """
         
         format_before_padd = '<1c3H1I1H2B3d5f1d1f4B2H1I2B4H1B' 
         format_after_padd = format_before_padd + str(sys.getsizeof(raw_data)-struct.calcsize(format_before_padd)) + 'B'
-        #print('\nFormat: ', format_after_padd, ' Size of format: ', struct.calcsize(format_after_padd))
         
         TOW = struct.unpack('<1I', raw_data[7:11])[0]
         WNc = struct.unpack('<1H', raw_data[11:13])[0]        
@@ -870,10 +865,16 @@ class GpsSignaling(object):
     
     def process_pvtgeodetic_sbf_data(self, raw_data):
         """
-        Process the PVTGeodetic data type
-        
-        Args:
-            raw_data (bytes): received raw data
+         Parses an PVTGeodetic SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
+         
+         The PVTGeodetic SBF sentence provides geodetic coordinates lat, lon, h for the position of the receiver.
+         
+         The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
+         
+         *More about the information carried by this block in "mosaic-go Reference Guide"*.
+
+        :param raw_data: received data corresponding to the PVTGeodetic SBF block
+        :type raw_data: bytes
         """
         
         TOW = struct.unpack('<1I', raw_data[7:11])[0]
@@ -906,14 +907,18 @@ class GpsSignaling(object):
             
     def process_atteuler_sbf_data(self, raw_data):
         """
-        Parse the AttEuler SBF sentence.
+         Parses an AttEuler SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
 
-        Args:
-            raw_data (bytes): received raw data
-            synch_w_pvt (boolean): this flag tells if the PVTCart and AttEuler are requested
-                                   at the same time, so that they can be merged in the same
-                                   database or array entry.
+         The AttEuler SBF sentence provides heading information of the imaginary line formed by the first and second antennas, w.r.t the North. To do so, the heading, pitch, and roll axis are defined.
+         
+         The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
+         
+         *More about all axis definition, and heading information in "mosaic-go Reference Guide"*.
+
+        :param raw_data: received data corresponding to the AttEurler SBF sentence.
+        :type raw_data: bytes
         """
+        
         TOW = struct.unpack('<1I', raw_data[7:11])[0]
         WNc = struct.unpack('<1H', raw_data[11:13])[0]        
         NrSV = struct.unpack('<1B', raw_data[13:14])[0]
@@ -947,14 +952,14 @@ class GpsSignaling(object):
         
     def parse_septentrio_msg(self, rx_msg):
         """
-        Parse the received message and process it depending if it is a SBF or NMEA message
+         Parses the received message and process it depending if it is an SBF or NMEA message
         
-        Args:
-            rx_msg (bytes or str): received message
-
-        Raises:
-            Exception: _description_
-        """                
+         Raises an exception if *any* problem is encountered when parsing the message.
+        
+        :param rx_msg: 
+        :type rx_msg: bytes or str
+        """
+        
         try:
             if self.DBG_LVL_1:
                 print('\nPARSING RX DATA')
@@ -1060,6 +1065,14 @@ class GpsSignaling(object):
                 logging.exception("\nError occurred: ")
     
     def get_last_sbf_buffer_info(self, what='Coordinates'):
+        """
+         Retrieves the last gps coordinates, the last heading information of the receiver, or both things.
+
+        :param what: defines which information wants to be retrieved from ``SBF_frame_buffer``. Options are: 'Coordinates', 'Heading' or 'Both'.
+        :type what: str, optional
+        :return: either one or two dictionaries. The first dictionary (always) returned contains either the coordinates or the heading information. If 'Both' was specified the first dictionary contains the coordinates and the second dictionary contains the heading information.
+        :rtype: dictionary/ies
+        """
         
         # Coordinates
         data_to_return = []       
@@ -1149,17 +1162,18 @@ class GpsSignaling(object):
     
     def check_coord_closeness(self, coordinates2compare, tol=5):
         """
-        Checks how close is a coordinate with respect to the actual node position.
+         Checks how close is a coordinate with respect to the actual node position.
         
-        It is assumed that both pair of coordinates to be compared lay at the same height.
+         It is assumed that both pair of coordinates to be compared lay at the same height.
 
-        Args:
-            coordinates2compare (dict): keys of the dictionary are 'LAT' and 'LON', and each of them has
-                                        ONLY ONE value.
-            tol (float): margin by which the coordinates in comparison are close or not
-        Returns:
-            close (bool): True if close, False if not. None if error.
+        :param coordinates2compare: keys of the dictionary are 'LAT' and 'LON', and each of them has ONLY ONE value.
+        :type coordinates2compare: dictionary
+        :param tol: margin in meters by which the coordinates in comparison are close or not, defaults to 5
+        :type tol: float, optional
+        :return: True if close , False otherwise.
+        :rtype: boolean
         """
+        
         coords, head_info = self.get_last_sbf_buffer_info(what='Both')
             
         if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
@@ -1177,11 +1191,20 @@ class GpsSignaling(object):
        
     def serial_receive(self, serial_instance_actual, stop_event):
         """
-        The callback function invoked by the serial thread.
+         Callback function invoked by the thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.
 
-        Args:
-            serial_instance_actual (Serial): serial connection.
-            stop_event (threading): stop event for stop reading the serial com port.
+         Most of all messages sent by Septentrio mosaic-go receiver start with an "$" character.
+        
+         The next character depends if the message is an echo of a command sent by the host computer, or if the message is an answer to a command sent by the host computer.
+        
+         Echoes of commands sent by the host computer, don't follow the "$" character with any predefined character. This messages are discarded by the method ``parse_septentrio_msg``.
+        
+         Messages that answer a command sent by the host computer, DO start with a predefined character. The predefined character depends wheter the answer arises from a NMEA sentence or an SBF sentence. This messages are parsed by the method ``parse_septentrio_msg``.
+        
+        :param serial_instance_actual: serial connection instance.
+        :type serial_instance_actual: Serial
+        :param stop_event: Event to be used to stop the reading of the serial port.
+        :type stop_event: threading.Event
         """
         
         while not stop_event.is_set():
@@ -1198,8 +1221,12 @@ class GpsSignaling(object):
     
     def start_thread_gps(self, interface='USB'):
         """
-        Starts the serial read thread.
+         Starts the GPS thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.
         
+         Creates the threading Event that is set when the I/O communication must be closed.
+
+        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
+        :type interface: str, optional
         """
         
         self.event_stop_thread_gps = threading.Event()
@@ -1207,8 +1234,8 @@ class GpsSignaling(object):
         if interface == 'USB' or interface == 'COM':
             t_receive = threading.Thread(target=self.serial_receive, args=(self.serial_instance, self.event_stop_thread_gps))
             
-        elif interface == 'IP':
-            t_receive = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_gps))
+        #elif interface == 'IP':
+        #    t_receive = threading.Thread(target=self.socket_receive, args=(self.event_stop_thread_gps))
 
         t_receive.start()
         print('\n[DEBUG]: Septentrio GPS thread opened')
@@ -1216,8 +1243,10 @@ class GpsSignaling(object):
         
     def stop_thread_gps(self, interface='USB'):
         """
-        Stops the serial read thread.
-        
+         Stops the GPS thread.
+
+        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
+        :type interface: str, optional
         """
         
         self.event_stop_thread_gps.set()
@@ -1233,32 +1262,44 @@ class GpsSignaling(object):
         
     def sendCommandGps(self, cmd, interface='USB'):
         """
-        Send a command to the Septentrio gps, following their command format.
+         Sends a command to the Septentrio mosaic-go receiver.
 
-        Args:
-            cmd (_type_): _description_
-        """        
+         Blocks this thread execution for 500 ms.
+        
+        :param cmd: command to be sent to the Septentrio mosaic-go receiver. The available list of commands is defined in "mosaic-go Reference Guide".
+        :type cmd: str
+        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
+        :type interface: str, optional
+        """
         
         cmd_eof = cmd + '\n'
         
         if interface =='USB':
             self.serial_instance.write(cmd_eof.encode('utf-8'))
-        elif interface == 'IP':
-            self.socket.sendall(cmd_eof.encode('utf-8'))
+        #elif interface == 'IP':
+        #    self.socket.sendall(cmd_eof.encode('utf-8'))
             
         time.sleep(0.5)
             
-    def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='NMEA', 
+    def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='SBF', 
                                  nmea_type='+GGA+HDT', sbf_type='+PVTCartesian+AttEuler'):
         """
-        Wrapper to sendCommandGps for a specific command to send.
+         Starts the streaming of the NMEA/SBF sentences.
+         
+         Wrapper of ``sendCommandGps``.
 
-        Args:
-            stream_number(int, optional): stream number. Defaults to 1.
-            interface (str, optional): Interface: can be 'USB#', 'COM#' or 'IP#'. Defaults to 'USB1'. 
-            interval (str, optional): can be any of: 'msec10', 'msec20', 'msec40', 'msec50', 'msec100', 'msec200', 'msec500',
-                                                     'sec1', 'sec2', 'sec5', 'sec10', 'sec15', 'sec30', 'sec60', 
-                                                     'min2', 'min5', 'min10', 'min15', 'min30', 'min60'
+        :param stream_number: each interface can have multiple data streams. This parameter defined which is the number of the stream for the given ``interface``, defaults to 1
+        :type stream_number: int, optional
+        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
+        :type interface: str, optional
+        :param interval: time regularity used by the Septentrio receiver to sense the given SBF/NMEA sentence. Can be any of the following self-explanatory names: 'msec10', 'msec20', 'msec40', 'msec50', 'msec100', 'msec200', 'msec500', 'sec1', 'sec2', 'sec5', 'sec10', 'sec15', 'sec30', 'sec60', 'min2', 'min5', 'min10', 'min15', 'min30', 'min60'.
+        :type interval: str, optional
+        :param msg_type: 'NMEA' or 'SBF', defaults to 'SBF'
+        :type msg_type: str, optional
+        :param nmea_type: name/s of the NMEA sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by '+', and all the string should be concatenated in one single string (i.e. '+HDT+GGA') , defaults to '+GGA+HDT'
+        :type nmea_type: str, optional
+        :param sbf_type: name/s of the SBF sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by '+', and all the string should be concatenated in one single string (i.e. '+PVTCartesian+AttEuler'). Each sentence needs to have a parsing function that is called in ``parse_septentrio_msg`` in the part corresponding to the id of the sentence. defaults to '+PVTCartesian+AttEuler'.
+        :type sbf_type: str, optional
         """
         
         if interface == 'USB' or interface == 'COM':
@@ -1280,16 +1321,23 @@ class GpsSignaling(object):
      
     def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='+NMEA+SBF'):   
         """
-        Stop the streaming of data using septentrio commands. 
+         Stops the streaming of the NMEA/SBF sentences initiated by calling ``start_gps_data_retrieval``. 
+         
+         Wrapper of ``sendCommandGps``.
         
-        DEVELOPER NOTE: it seems that if the stream is not stopped by the time the serial connection is closed, then when the
-        user opens a new serial connection, Septentrio will start sending all the SBF or NMEA messages that were produced
-        between the last time the serial connection was closed and the time it is opened again.
+         *Unexpected behaviour to be noted by* **developers**: *it seems that if the stream is not stopped by the time the serial connection is closed, then, when the user opens a new serial connection, Septentrio will start sending all the SBF or NMEA messages that were produced between the last time the serial connection was closed and the time it is opened again*.
 
         Args:
             stream_number (int, optional): _description_. Defaults to 1.
             interface (str, optional): _description_. Defaults to 'USB'.
             msg_type (str, optional): _description_. Defaults to 'NMEA'.
+
+        :param stream_number: number of the stream to be stopped, defaults to 1
+        :type stream_number: int, optional
+        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
+        :type interface: str, optional
+        :param msg_type: the message type corresponding to the stream ``stream_number``. Options: 'SBF', 'NMEA' or '+NMEA+SBF' or '+SBF+NMEA' (the last two are the same), defaults to '+NMEA+SBF'
+        :type msg_type: str, optional
         """
         
         if interface == 'USB' or interface == 'COM':
@@ -1317,19 +1365,35 @@ class GpsSignaling(object):
                 self.sendCommandGps(cmd4)       
            
 class myAnritsuSpectrumAnalyzer(object):
+    """
+     Python class to interact with the MS2760A Anritsu spectrum analyzer.
+     
+     Functionality implemented retrieves the peak (power and frequency) of the spectrum of the system under test.
+    
+     The spectrum analyzer also outputs xml files. Developer has to implement a method/s to parse the output of such files if they are used. In the commit history of the github of this project a parser was partially implemented (if the developer wants to check that).
+     
+    """
     def __init__(self, is_debug=True, is_config=True):
+        """
+         Defines attributes of the class.
+
+        :param is_debug: print debug messages, defaults to True
+        :type is_debug: bool, optional
+        :param is_config: true if you want to configure the Spectrum Analyzer, defaults to True
+        :type is_config: bool, optional
+        """
         self.model = 'MS2760A'
-        self.is_debug = is_debug # Print debug messages
-        self.is_config = is_config # True if you want to configure the Spectrum Analyzer
-        self.XML_file = {'Timestamp': 0, 'Data': [], 'NSamp': []}
+        self.is_debug = is_debug 
+        self.is_config = is_config
         
     def spectrum_analyzer_connect(self, HOST='127.0.0.1', PORT=9001):
         """
-        Create a socket and connect to the spectrum analyzer
+         Creates a socket to connect to the spectrum analyzer.
 
-        Args:
-            HOST (str, optional): IP address. Defaults to '127.0.0.1'.
-            PORT (int, optional): TCP/IP port. Defaults to 9001.
+        :param HOST: ip address of the spectrum analyzer, defaults to '127.0.0.1'
+        :type HOST: str, optional
+        :param PORT: TCP/IP port, defaults to 9001
+        :type PORT: int, optional
         """
                 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -1338,16 +1402,13 @@ class myAnritsuSpectrumAnalyzer(object):
         
     def retrieve_max_pow(self, method=2):
         """
-        Obtain the maximum power and its correspondent frequency
+         Retrieves the maximum power and its correspondent frequency of the spectrum of the system under test.
 
-        Args:
-            method (int, optional): for developer. It is indisctintive for user. Defaults to 2.
-
-        Raises:
-            Exception: _description_
-
-        Returns:
-            dictionary: magnitude of power, units of magnitude, frequency, units of frequency
+        :param method: how to get the maximum peak and corresponding frequency. This is for developer. It is indisctintive for user. Defaults to 2.
+        :type method: int, optional
+        :raises Exception: when method is outside of available methods to compute the peak and corresponding frequency.
+        :return: dictionary with self-explanatory keys 'MAG', 'MAG_UNITS', 'FREQ', 'FREQ_UNITS'
+        :rtype: dictionary
         """
 
         # Read the ID of the Spectrum Analyzer.
@@ -1396,64 +1457,33 @@ class myAnritsuSpectrumAnalyzer(object):
         
         return {'MAG': float(pwr), 'MAG_UNITS': 'dBm', 'FREQ': float(freq), 'FREQ_UNITS': 'Hz'}
 
-    def parse_xml_file(self, filename):
-        """
-        Wrapper for function 'iterate_xml_file'. This function is the one the user needs to use.
-        
-        Args:
-            filename (string): absolute path
-        """
-        
-        with open(filename, 'r') as fd:
-            doc = xmltodict.parse(fd.read(), process_namespaces=True)
-            self.iterate_xml_file(doc)
-    
-    def iterate_xml_file(self, iterable):
-        """
-        [NOT TESTED  DEPRECATED MAINTAINED ONLY FOR HISTORY BACKUP]
-        Extracts timestamp, sample number and sample value of the Anritsu MS276XA Spectrum Analyzer, from
-        the .rsm file generated by the device. This file is similar in structure to a XML file.
-
-        Args:
-            iterable (_type_): _description_
-        """
-        if isinstance(iterable, dict):
-            for key, value in iterable.items():
-                if key == 'TimeStamp':
-                    if value['@year']:
-                            meas_date = datetime.datetime(year=int(value['@year']), 
-                                                month=int(value['@month']),
-                                                day=int(value['@day']),
-                                                hour=int(value['@hour']),
-                                                minute=int(value['@minute']),
-                                                second=int(value['@second']))
-                            self.XML_file['Timestamp'] = datetime.datetime.timestamp(meas_date)
-                if not (isinstance(value, dict) or isinstance(value, list)):
-                    # We know when the key '@id' is an integer then we are in a data point
-                    if key == '@id':
-                        try:
-                            tmp = int(value)
-                            if iterable['@value'] != 'nan':
-                                self.XML_file['NSamp'].append(int(value))
-                                self.XML_file['Data'].append(float(iterable['@value']))
-                        except:
-                            1
-                else:
-                    self.iterate_xml_file(value)
-
-        elif isinstance(iterable, list):
-            for i in iterable:
-                self.iterate_xml_file(i)
-
     def spectrum_analyzer_close(self):
         """
-        Wrapper to close the spectrum analyzer socket
-        
+         Closes the socket.
         """
         
         self.anritsu_con_socket.close()
 
 class HelperA2GMeasurements(object):
+    """
+    Python class for handling the interaction between the multiple devices available in the system: gps, gimbal and rfsoc.
+    
+    It creates instances of each class handling one of those devices (i.e. GimbalRS2, GpsSignaling).
+    
+    It creates a wireless TCP connection between the host computers of both nodes (air and ground node) to control devices and retrieve information from them.
+    
+    It creates a thread (called here communication thread) to handle the communication between the host computers of both nodes.
+    
+    ``MAX_TIME_EMPTY_SOCKETS```: the maximum allowed time to wait if no information was sent over a socket.
+    
+    ``CONN_MUST_OVER_FLAG``: a (boolean) flag indicating whether to close or not the connection between the host computers.
+    
+    ``drone_fm_flag``: a (boolean) flag set at the GUI indicating whether the air node's gimbal should follow the ground node. In all our documentation, a gimbal is said to be in "follow mode" (don't confuse with DJI's RS2 camera-based follow mode) if it follows the other node. 
+
+    ``PAP_TO_PLOT``: a numpy array (of size defined in the method ``pipeline_operations_rfsoc_rx_ndarray``of the class ``RFSoCRemoteControlFromHost``) used to plot the Power Angular Profile (PAP) of the wireless channel in GUI's PAP Panel.
+
+    """
+    
     def __init__(self, ID, SERVER_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, 
                  IsGimbal=False, IsGPS=False, IsSignalGenerator=False, IsRFSoC=False,
@@ -1462,28 +1492,38 @@ class HelperA2GMeasurements(object):
                  SPEED=0,
                  GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.001,
                  operating_freq=57.51e9):
-        """        
-        GROUND station is the server and AIR station is the client.
+        """
+         Creates instances of classes ``GimbalRS2`` (or ``GimbalGremsyH16``), ``GpsSignaling``, ``RFSoCRemoteControlFromHost`` to control these devices.
 
-        Args:
-            ID (str): 'DRONE' or 'GND'
-            SERVER_ADDRESS (str): the IP address of the server (the ground station)
-            DBG_LVL_0 (bool): provides DEBUG support at the lowest level (i.e printing incoming messages)
-            DBG_LVL_1 (bool): provides DEBUG support at the medium level (i.e printing exceptions)
-            IsGimbal (int/bool): 0/FALSE When NO GIMBAL IS CONNECTED. 
-                                 1 When a Ronin RS2 IS CONNECTED.
-                                 2 When a Gremsy H16 IS CONNECTED. 
-            IsGPS (bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A GPS IS CONNECTED.
-            IsRFSoC(bool): TRUE ONLY WHEN IT IS KNOWN FOR SURE THAT A RFSOC IS CONNECTED.
-            SPEED (float): the speed of the node. If the node is GROUND it should be 0 (gnd node does not move) as it is by default.
-            GPS_Stream_Interval (str): check the GPS manual for the list of strings available. This is used to set the regularity at which 
-                                       the gps receiver asks its gps coordinates.
-            AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN (float): this is an estimation of the average time betweel calls of the socket_receive function 
-                                                          of this class. It is heavily dependent on the computer hardware. This value is not critical
-                                                          and is used to determine a maximum timeout of not receiving socket messages. Specifically,
-                                                          this parameter is used in conjunction with MAX_TIME_EMPTY_SOCKETS to determine the timeout 
-                                                          in terms of the number of empty sockets during a part of the connection.
-        """                                               
+        :param ID: either 'DRONE' or 'GND'.
+        :type ID: str
+        :param SERVER_ADDRESS: the IP address of the ground station.
+        :type SERVER_ADDRESS: str
+        :param DBG_LVL_0: if set, prints some low-level messages usefull for debugging, defaults to False.
+        :type DBG_LVL_0: bool, optional
+        :param DBG_LVL_1: if set, prints some higher-level messages usefull for debugging, defaults to False.
+        :type DBG_LVL_1: bool, optional
+        :param IsGimbal: 0 or FALSE, when no gimbal is physically connected to this host computer; 1, when a Ronin RS2 is physically connected; 2, when a Gremsy H16 is physically connected. Defaults to False.
+        :type IsGimbal: int or bool, optional
+        :param IsGPS: True if a gps is physically connected to this host computer. False otherwise, defaults to False.
+        :type IsGPS: bool, optional
+        :param IsSignalGenerator: True if a signal generator controlled by pyvisa commands is physically connected to this host computer. False otherwise, defaults to False.
+        :type IsSignalGenerator: bool, optional
+        :param IsRFSoC: True if an RFSoC is physically connected to this host computer. False otherwise, defaults to False.
+        :type IsRFSoC: bool, optional
+        :param rfsoc_static_ip_address: IP address of the RFSoC connected to this host computer, defaults to None
+        :type rfsoc_static_ip_address: str, optional
+        :param L0: parameter of the signal generator, defaults to None
+        :type L0: float, optional
+        :param SPEED: the speed of the node in m/s. If this node is GROUND it should be 0 (gnd node does not move) as it is by default. This parameter ONLY incides in raising a warning debug print when the speed of the node is higher than the time difference between consecutive SBF sentences. NOT a crutial parameter at all.
+        :type SPEED: int, optional
+        :param GPS_Stream_Interval: time interval used for the retrieving of the configured SBF sentences in Septentrio's receiver connected to this host computer. A list of available options is shown in ``start_gps_data_retrieval`` of class ``GpsSignaling``, defaults to 'msec500'.
+        :type GPS_Stream_Interval: str, optional
+        :param AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN: approximated time between calls of the communication thread. This parameter is used in conjunction with ``MAX_TIME_EMPTY_SOCKETS`` to raise an exception when neither side of the communication link is sending any message. Unfortunately, this is a very simple estimate, since the actual time between calls depends on many factors and is does not remain constant between calls. Defaults to 0.001
+        :type AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN: float, optional
+        :param operating_freq: operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the "User Manual EVK06002" of the Sivers EVK (57-71 GHz) , defaults to 57.51e9
+        :type operating_freq: int, optional
+        """
         
         self.AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN = AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN
         self.MAX_TIME_EMPTY_SOCKETS = 20 # in [s]
@@ -1549,27 +1589,34 @@ class HelperA2GMeasurements(object):
     def gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
                                     lat_drone=None, lon_drone=None, height_drone=None, fmode=0x00):
         """
-        
-        If 'IsGPS' is False (no GPS connected), then heading, lat,lon, height coordinates of both nodes must be provided. 
-        In that case, all coordinates provided must be geodetic (lat, lon alt).
+         Computes the yaw, pitch and roll angles required to move the gimbal in this node towards the other node.
+         
+         The caller of this function must guarantee that if ``self.ID == 'GROUND'``, the arguments passed to this function are drone coords. The ground coords SHOULD NOT be passed as they will be obtained from this node Septentrio's receiver.
+         
+         The caller of this function must guarantee that if ``self.ID == 'DRONE'``, the arguments passed to this function are ground coords. The drone coords SHOULD NOT be passed as they will be obtained from this node Septentrio's receiver.
+         
+         If ``IsGPS`` is False (no GPS connected), then ``heading``, ``lat_ground``, ``lon_ground``, ``height_ground``, ``lat_drone``, ``lon_drone``, ``height_drone`` must be provided. 
+         
+         In that case, all coordinates provided must be geodetic (lat, lon, alt).
 
-        Args:
-            
-            heading (float): angle between [0, 2*pi] corresponding of the heading attitude for THIS node. 
-            lat_ground (float): Latitude of GROUND station. 
-            lon_ground (float): Longitude of GROUND station.
-            height_ground (float): Height of the GPS Antenna in GROUND station.
-                                   This parameter is the altitude in meters above sea level of the upper part of the ground GPS antenna.
-            lat_drone (float): Latitude of DRONE station. In DDMMS format: i.e: 62.471541 N (the N/S is given by the sign of the number)
-            lon_drone (float): Longitude of DRONE station. In DDMMS format: i.e: 21.471541 E (the W/E is giben by the sign of the number)
-            height_drone (float): Height of the GPS Antenna in DRONE station. 
-                                  This parameter is the altitude in meters above sea level of the upper part of the drone GPS antenna.
-            fmode (hex): 0x00: Azimuth and elevation. Defaults to 0x00.
-                         0x01: Elevation.
-                         0x02: Azimuth.
-
-        Returns:
-            yaw_to_set, roll_to_set (int): yaw and roll angles (in DEGREES*10) to set in GROUND gimbal.
+        :param heading: angle between [0, 2*pi] (rads) corresponding to the heading of the line between the two antennas connected to Septentrio's receiver in this node, defaults to None
+        :type heading: float, optional
+        :param lat_ground: latitude of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node, defaults to None
+        :type lat_ground: float, optional
+        :param lon_ground: longitude of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node, defaults to None
+        :type lon_ground: float, optional
+        :param height_ground: height of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas, defaults to None
+        :type height_ground: float, optional
+        :param lat_drone: latitude of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node, defaults to None
+        :type lat_drone: float, optional
+        :param lon_drone: longitude of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node, defaults to None
+        :type lon_drone: float, optional
+        :param height_drone: height of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas, defaults to None
+        :type height_drone: float, optional
+        :param fmode: defines if the gimbal will follow the other node in Azimuth, elevation or both of them. Options are: 0x00, for Azimuth and elevation; 0x01, for Elevation, 0x02, for Azimuth. Defaults to 0x00.
+        :type fmode: int, optional
+        :return: returns either the yaw, pitch or both to be set at the gimbal of this node, to follow the other node. The actual value is the angle value in degrees multiplied by 10 and rounded to the closest integer (i.e. a yaw to set of 45.78 degrees is returned as the yaw value 458).
+        :rtype: int
         """
 
         if self.IsGPS:
@@ -1634,8 +1681,6 @@ class HelperA2GMeasurements(object):
             # Both coordinates must be provided and must be in geodetic format
             1
         
-        # The caller of this function must guarantee that if self.ID == ground the arguments passed to this function are drone coords
-        # The caller of this function must guarantee that if self.ID == drone the arguments passed to this function are ground coords
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
             print("\n[ERROR]: Either ground or drone coordinates MUST be provided")
             return self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY
