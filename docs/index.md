@@ -3,8 +3,17 @@
 a2gMeasurements.py comprises multiple (drivers for gimbal and gps, among others)
 GUI_A2G_MEAS.py has all the functionality related with the GUI
 
+## Quick definitions for documentation
+There are only two types of nodes in the system: the ground node or the drone node. A node is just an abstraction of a system (either the drone or the ground) having as one of its components a host computer. 
+
+Each node has multiple components (including as mentioned above a host computer). More information about the components is available in "Manual A2GMeasurements".
+
+When we refer to "this node" in the documentation, it means the node where the attribute/method/class is being executed (whether is set, get, call or create an instance).
+
+Equivalently, the "other node" in the documentation, refers to the node where the attribute/method/class is NOT being executed.
+
 ## Use
-To use this software, execute in the ground node:
+To use this software, execute in a terminal of the host computer of the ground node:
 
 ```{code-block}
 ---
@@ -22,5 +31,5 @@ $ python GUI_A2G_MEAS.py
 .. autoclass:: a2gmeasurements.myAnritsuSpectrumAnalyzer
     :members: __init__, spectrum_analyzer_connect, retrieve_max_pow, spectrum_analyzer_close
 .. autoclass:: a2gmeasurements.HelperA2GMeasurements
-    :members: __init__, gimbal_follows_drone
+    :members: __init__, gimbal_follows_drone, do_follow_mode_gimbal, do_getgps_action, do_setgimbal_action, do_start_meas_drone_rfsoc, do_stop_meas_drone_rfsoc, do_finish_meas_drone_rfsoc, do_set_irf_action, do_closed_gui_action, do_set_remote_fm_flag, do_set_remote_stop_fm, process_answer_get_gps, decode_message, encode_message, socket_receive, socket_send_cmd, HelperStartA2GCom, HelperA2GStopCom
 ```

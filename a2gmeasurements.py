@@ -1720,23 +1720,25 @@ class HelperA2GMeasurements(object):
     
     def do_follow_mode_gimbal(self, fmode=0x00):
         """
+         Callback function when this node receives a ``FOLLOWGIMBAL`` command.
+        
+         The ``FOLLOWGIMBAL`` command is sent when the other node asks for this node's GPS information to be able to follow this node's movement.        
 
-        Args:
-            fmode (hexadecimal, optional): 0x00: Azimuth and elevation. Defaults to 0x00.
-                                           0x01: Elevation.
-                                           0x02: Azimuth
+        :param fmode: specifies whether the other node shall follow this node's movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth, defaults to 0x00.
+        :type fmode: int (hexadecimal), optional
         """
         self.do_getgps_action(follow_mode_gimbal=True, fmode=0x00)
     
     def do_getgps_action(self, follow_mode_gimbal=False, fmode=0x00):
         """
-        Function to execute when the received instruction in the a2g comm link is 'GETGPS'.
+         Callback function when this node receives a ``GETGPS`` command.
+        
+         The ``GETGPS`` commmand differentiates from ``FOLLOWGIMBAL`` in that when the other node only request GPS information from this node (i.e. for display the coordinates on a panel of the GUI), the ``follow_mode_gimbal`` is False as well as the ``FMODE`` key of the sent dictionary.
 
-        Args:
-            follow_mode_gimbal (bool, optional): True if gimbal of self node has to follow its pair. Defaults to False.
-            fmode (hexadecimal, optional): 0x00: Azimuth and elevation. Defaults to 0x00.
-                                           0x01: Elevation.
-                                           0x02: Azimuth
+        :param follow_mode_gimbal: True if other node's gimbal must follow this node's movement, defaults to False
+        :type follow_mode_gimbal: bool, optional
+        :param fmode: specifies whether the other node shall follow this node's movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth, defaults to 0x00.
+        :type fmode: int (hex), optional
         """
         if self.DBG_LVL_1:
             print(f"THIS ({self.ID}) receives a GETGPS command")
@@ -1793,11 +1795,10 @@ class HelperA2GMeasurements(object):
     
     def do_setgimbal_action(self, msg_data):
         """
-        Function to execute when the received instruction in the a2g comm link is 'SETGIMBAL'.
+         Callback function when this node receives a ``SETGIMBAL`` command.
 
-        Args:
-            msg_data (dict): The dictionary is expected to contain the following keys:
-                             'YAW'
+        :param msg_data: dictionary with keys 'YAW', 'PITCH' and 'MODE'. The 'YAW' values range between [-1800, 1800]. The 'PITCH' values are restricted (by software) to the interval [-600, 600] to avoid hits between the case and the gimbal. The 'MODE' values are: 0x00, consider 'YAW' and/or 'PITCH' values as relative to the actual position of the gimbal; 0x01, consider 'YAW' and/or 'PITCH' values as relative to the absolute 0 (in both azimuth and elevation) position.
+        :type msg_data: dictionary
         """
 
         if self.IsGimbal!=0:
@@ -1828,11 +1829,18 @@ class HelperA2GMeasurements(object):
 
     def do_start_meas_drone_rfsoc(self, msg_data):
         """
-        This comand is unidirectional. It is sent by the ground station (where the GUI resides) to the drone station.
-        The purpose is to START the drone rfsoc measurement (call to 'receive_data').
-        It is assumed that the ground rfsoc sending (tx) has been initiated previously and is working correctly.
+         Callback function when this node receives a ``STARTDRONERFSOC`` command.
         
-        """
+         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        
+         The purpose is to start the RFSoC thread (created in ``RFSoCRemoteControlFromHost`` class) responsible for retrieving the measured Channel Impulse Response from the RFSoC.
+        
+         It is assumed that prior to this callback, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.
+
+        :param msg_data: dictionary with keys 'carrier_freq', 'rx_gain_ctrl_bb1', 'rx_gain_ctrl_bb2', 'rx_gain_ctrl_bb3', 'rx_gain_ctrl_bfrf'. More information about these keys can be found in method ``set_rx_rf`` from ``RFSoCRemoteControlFromHost`` class.
+        :type msg_data: dictionary
+        """        
+        
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to START measurement")
             self.myrfsoc.start_thread_receive_meas_data(msg_data)
@@ -1840,9 +1848,13 @@ class HelperA2GMeasurements(object):
     
     def do_stop_meas_drone_rfsoc(self):
         """
-        This comand is unidirectional. It is sent by the ground station (where the GUI resides) to the drone station.
-        The purpose is to STOP the drone rfsoc measurement (call to 'receive_data').
-        It is assumed that the ground rfsoc sending (tx) has been initiated previously and is working correctly.
+         Callback function when this node receives a ``STOPDRONERFSOC`` command.
+        
+         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        
+         The purpose is to stop the RFSoC thread.
+        
+         It is assumed that prior to this function, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.
         
         """
         if self.ID == 'DRONE': # double check that we are in the drone
@@ -1851,35 +1863,78 @@ class HelperA2GMeasurements(object):
             self.STOP_SEND_SETIRF_FLAG = True
         
     def do_finish_meas_drone_rfsoc(self):
+        """
+         Callback function when this node receives a ``FINISHDRONERFSOC`` command.
+        
+         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        
+         The purpose is to finish the experiment (as defined in "Manual A2GMeasurements"). When the experiment is finished the GUI allows the user to end (disconnect) the connection between both nodes.
+        
+        """
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to FINISH measurement")
             self.myrfsoc.finish_measurement()
             self.STOP_SEND_SETIRF_FLAG = True
     
     def do_set_irf_action(self, msg_data):
+        """
+         Callback function when this node receives a ``SETIRF`` command.
+        
+         This comand is unidirectional. It is always sent by the drone node to the ground node.
+        
+        Receives from the drone a subsampled version of the Power Angular Profile for it to be used by the GUI to continuously plot it in its PAP panel.
+        
+        :param msg_data: attribute value ``data_to_visualize`` from ``RFSoCRemoteControlFromHost`` class.
+        :type msg_data: numpy array
+        """
         if self.ID == 'GROUND': # double checj that we are in the gnd
             self.PAP_TO_PLOT = np.asarray(msg_data)
     
     def do_closed_gui_action(self):
+        """
+         Callback function when this node receives a ``CLOSEDGUI`` command.
+        
+         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        
+        Sets a flag indicating (the drone node) that it can end its main script, since the GUI was closed by the user at the ground node.
+        """
+        
         if self.ID == 'DRONE':
             self.CONN_MUST_OVER_FLAG = True
         
     def do_set_remote_fm_flag(self, data=None):
+        """
+         Callback function when this node receives a ``SETFMFLAG`` command.
+        
+         This comand is unidirectional. It is always sent by the ground node to the drone node.
+
+         Sets the ``drone_fm_flag``. When this flag is set, the drone node can start sending ``FOLLOWGIMBALL`` commands to the ground node to get ground node's coordinates and be able to follow (drone node) it (ground node).
+        
+        :param data: dictionary with keys 'X', 'Y', 'Z', 'FMODE', 'MOBILITY', corresponding to geocentric coordinates, fo
+        :type data: dictionary, optional
+        """
         if self.ID == 'DRONE':
             self.drone_fm_flag = True
             self.remote_config_for_drone_fm = data
     
     def do_set_remote_stop_fm(self):
+        """
+         Callback function when this node receives a ``SETFMFLAG`` command.
+        
+         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        
+         Unsets the ``drone_fm_flag`` flag.
+        """
+        
         if self.ID == 'DRONE':
             self.drone_fm_flag = False
 
     def process_answer_get_gps(self, data):
         """
-        This function is in charge of processing the answer message received. So far, the only message that requires
-        an answer is the "GETGPS" command type message. The "GETGPS" command is used to update the gimbal orientation.
+         Callback function when this node receives an ``ANS`` type of message (the equivalent to an acknowledment) from the other node, after this node sent to the other node a ``GETGPS`` or a ``FOLLOWGIMBAL`` command.
 
-        Args:
-            msg (dictionary): 
+        :param data: dictionary with keys 'X', 'Y', 'Z', 'FMODE', 'FOLLOW_GIMBAL'. The values of 'X', 'Y', 'Z' are the geocentric coordinates from the other node. 'FMODE' is either 0x00 (Elevation and Azimuth), 0x01 (Elevation) or 0x02 (Azimuth). 'FOLLOW_GIMBAL' is either True (when the sent command by this node was ``FOLLOWGIMBAL``) or False (when the sent command by this node was ``GETGPS``)
+        :type data: dictionary
         """
         if self.DBG_LVL_1:
             print(f"THIS ({self.ID}) receives protocol ANS")
@@ -1956,6 +2011,14 @@ class HelperA2GMeasurements(object):
                 print(f"[DEBUG]: This {self.ID} gimbal will NOT follow its pair node as stated by user")
         
     def decode_message(self, data):
+        """
+         Parses an incoming TCP message and calls the appropriate function to handle it. 
+         
+         This function is called by ``socket_receive`` (the communication thread callback).
+
+        :param data: raw data to be decoded
+        :type data: bytes
+        """
         source_id, destination_id, message_type, cmd, length = struct.unpack('BBBBB', data[:5])
         data_bytes = data[5:]
 
@@ -2031,20 +2094,23 @@ class HelperA2GMeasurements(object):
             print("[WARNING]: message_type not known when decoding. No action will be done")
 
     def encode_message(self, source_id, destination_id, message_type, cmd, data=None):
-        """_summary_
-
-        Args:
-            source_id (_type_): _description_
-            destination_id (_type_): _description_
-            message_type (_type_): _description_
-            cmd (_type_): _description_
-            data (list of lists, list or dict, optional): SETGIMBAL is a dict.
-                                                          STARTDRONERFOSC is a list. 
-                                                          SETIRF is an 2D array .
-                                                          Response to GPS is a dict.
-        Returns:
-            _type_: _description_
         """
+         Encodes a TCP message to be sent.         
+
+        :param source_id: identifies the sender node with a number (this parameter is provided for -potential- future improvements but does not have any functionality)
+        :type source_id: int
+        :param destination_id: identifies the receiver node with a numer (this parameter is provided for -potential- future improvements but does not have any functionality)
+        :type destination_id: int
+        :param message_type: 0x01, for a short type of message; 0x02, for a long type of message; 0x03, to answer/acknowledge a received request. More information about this is in "Manual A2GMeasurements".
+        :type message_type: int
+        :param cmd: one of the supported requests/commands for each ``message_type``. The list of commands is provided in "Manual A2GMeasurements" (Communication Protocl chapter).
+        :type cmd: int
+        :param data: additional data required by the request/command. The particular data sent depends on the ``message_type`` and the ``cmd``. More information on "Manual A2GMeasurements" (Communication Protocl chapter).
+        :type data: dictionary, optional
+        :return: the bytes object representing the message to be sent.
+        :rtype: bytes
+        """
+        
         if message_type == 0x01: # SHORT type of message
             if cmd == 0x01: # FOLLOWGIMBAL
                 data = struct.pack('B', data['FMODE'])
@@ -2096,10 +2162,14 @@ class HelperA2GMeasurements(object):
 
     def socket_receive(self, stop_event):
         """
-        Callback for when receiveing an incoming socket message.
+         The communication thread callback. Calls the parser to decode the most recent TCP message received.
+          
+         The time between calls of this function is OS and hardware dependent.
+          
+         As both nodes can send and receive messages, this thread
 
-        Args:
-            stop_event (Event thread): event thread used to stop the callback
+        :param stop_event: when this is set, this function has nothing to execute.
+        :type stop_event: threading.Event
         """
 
         # Polling policy for detecting if there has been any message sent.
@@ -2142,15 +2212,12 @@ class HelperA2GMeasurements(object):
          
     def socket_send_cmd(self, type_cmd=None, data=None):
         """
-        Wrapper to send a command through the socket between ground and drone connection (or viceversa).
-        
-        *If 'type_cmd' is 'SETGIMBAL', the 'data' argument SHOULD BE a dictionary as follows:
-        
-        {'YAW': yaw_value, 'PITCH', pitch_value}, where yaw_value and pitch_value are integers (between -1800, 1800).
+         Creates a message by the name of the request/command. Wrapper to ``encode_message``. 
 
-        Args:
-            type_cmd (_type_, optional): _description_. Defaults to None.
-            data (object, optional): _description_. Defaults to None.
+        :param type_cmd: refers to the ``cmd`` parameter in ``encode_message`` , defaults to None
+        :type type_cmd: int, optional
+        :param data: refers to the ``data`` parameter in ``encode_message``, defaults to None
+        :type data: int, optional
         """
 
         if type_cmd == 'SETGIMBAL':
@@ -2272,11 +2339,12 @@ class HelperA2GMeasurements(object):
         
     def HelperStartA2GCom(self, PORT=10000):
         """
-        Starts the socket binding, listening and accepting for server side, or connecting for client side. 
-        Starts the thread handling the socket messages.
-        
-        Args:
-            PORT (int, optional): _description_. Defaults to 12000.
+         Starts the socket binding, listening and accepting for server side, or connecting for client side. The ground node works as the server while the drone as the client.
+         
+         Creates and starts the thread handling the socket messages.
+
+        :param PORT: TCP port, defaults to 10000
+        :type PORT: int, optional
         """
         socket_poll_cnt = 1
         
@@ -2301,7 +2369,7 @@ class HelperA2GMeasurements(object):
             # Bind the socket to the port
             self.socket.bind(('', PORT))
 
-            # Listen for incoming connections
+            # Listen for incoming connections. As there is one and only one client, we don't need a loop of ``socket.listen()`` calls.
             self.socket.listen()
 
             # There is no need for an endless loop
@@ -2330,11 +2398,14 @@ class HelperA2GMeasurements(object):
         
     def HelperA2GStopCom(self, DISC_WHAT='ALL', stream=1):
         """
-        Stops communications with all the devices or the specified ones in the variable 'DISC_WHAT
+         Stops connection with all the devices or the specified ones in the variable 'DISC_WHAT.
+        
+         When called, no matter which is the value of ``DISC_WHAT``, always close the TCP socket.
 
-        Args:
-            DISC_WHAT (str or list, optional): specifies what to disconnect. Defaults to 'ALL'. 
-                                               Options are: 'SG', 'GIMBAL', 'GPS', 'ALL'
+        :param DISC_WHAT: specifies with which/s device/s the connection must be ended. Options are: 'GIMBAL', 'GPS', 'RFSOC', 'SG', 'ALL'. Defaults to 'ALL'.
+        :type DISC_WHAT: list or str, optional
+        :param stream: gps stream to be closed, defaults to 1. Assuming there is only one gps stream created at ``__init__`` of this class (which is the default operation) when creating the instance of the ``GpsSignaling`` class, this will close all the gps streams.
+        :type stream: int, optional
         """
         try:   
             self.event_stop_thread_helper.set()

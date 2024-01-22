@@ -191,9 +191,16 @@
 <h1>A2GMeasurements<a class="headerlink" href="#a2gmeasurements" title="Link to this heading">#</a></h1>
 <p>a2gMeasurements.py comprises multiple (drivers for gimbal and gps, among others)
 GUI_A2G_MEAS.py has all the functionality related with the GUI</p>
+<section id="quick-definitions-for-documentation">
+<h2>Quick definitions for documentation<a class="headerlink" href="#quick-definitions-for-documentation" title="Link to this heading">#</a></h2>
+<p>There are only two types of nodes in the system: the ground node or the drone node. A node is just an abstraction of a system (either the drone or the ground) having as one of its components a host computer.</p>
+<p>Each node has multiple components (including as mentioned above a host computer). More information about the components is available in “Manual A2GMeasurements”.</p>
+<p>When we refer to “this node” in the documentation, it means the node where the attribute/method/class is being executed (whether is set, get, call or create an instance).</p>
+<p>Equivalently, the “other node” in the documentation, refers to the node where the attribute/method/class is NOT being executed.</p>
+</section>
 <section id="use">
 <h2>Use<a class="headerlink" href="#use" title="Link to this heading">#</a></h2>
-<p>To use this software, execute in the ground node:</p>
+<p>To use this software, execute in a terminal of the host computer of the ground node:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="hll">$ python GUI_A2G_MEAS.py
 </span></pre></div>
 </div>
@@ -812,6 +819,37 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <p><code class="docutils literal notranslate"><span class="pre">drone_fm_flag</span></code>: a (boolean) flag set at the GUI indicating whether the air node’s gimbal should follow the ground node. In all our documentation, a gimbal is said to be in “follow mode” (don’t confuse with DJI’s RS2 camera-based follow mode) if it follows the other node.</p>
 <p><code class="docutils literal notranslate"><span class="pre">PAP_TO_PLOT</span></code>: a numpy array (of size defined in the method <code class="docutils literal notranslate"><span class="pre">pipeline_operations_rfsoc_rx_ndarray``of</span> <span class="pre">the</span> <span class="pre">class</span> <span class="pre">``RFSoCRemoteControlFromHost</span></code>) used to plot the Power Angular Profile (PAP) of the wireless channel in GUI’s PAP Panel.</p>
 <dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.HelperA2GStopCom">
+<span class="sig-name descname"><span class="pre">HelperA2GStopCom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">DISC_WHAT</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ALL'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stream</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.HelperA2GStopCom" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Stops connection with all the devices or the specified ones in the variable ‘DISC_WHAT.</p>
+<p>When called, no matter which is the value of <code class="docutils literal notranslate"><span class="pre">DISC_WHAT</span></code>, always close the TCP socket.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>DISC_WHAT</strong> (<em>list</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – specifies with which/s device/s the connection must be ended. Options are: ‘GIMBAL’, ‘GPS’, ‘RFSOC’, ‘SG’, ‘ALL’. Defaults to ‘ALL’.</p></li>
+<li><p><strong>stream</strong> (<em>int</em><em>, </em><em>optional</em>) – gps stream to be closed, defaults to 1. Assuming there is only one gps stream created at <code class="docutils literal notranslate"><span class="pre">__init__</span></code> of this class (which is the default operation) when creating the instance of the <code class="docutils literal notranslate"><span class="pre">GpsSignaling</span></code> class, this will close all the gps streams.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.HelperStartA2GCom">
+<span class="sig-name descname"><span class="pre">HelperStartA2GCom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">PORT</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.HelperStartA2GCom" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Starts the socket binding, listening and accepting for server side, or connecting for client side. The ground node works as the server while the drone as the client.</p>
+<p>Creates and starts the thread handling the socket messages.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>PORT</strong> (<em>int</em><em>, </em><em>optional</em>) – TCP port, defaults to 10000</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ID</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SERVER_ADDRESS</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DBG_LVL_1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsGimbal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsGPS</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsSignalGenerator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsRFSoC</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rfsoc_static_ip_address</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">F0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SPEED</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">GPS_Stream_Interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'msec500'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operating_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">57510000000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.__init__" title="Link to this definition">#</a></dt>
 <dd><blockquote>
@@ -835,6 +873,170 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <li><p><strong>AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN</strong> (<em>float</em><em>, </em><em>optional</em>) – approximated time between calls of the communication thread. This parameter is used in conjunction with <code class="docutils literal notranslate"><span class="pre">MAX_TIME_EMPTY_SOCKETS</span></code> to raise an exception when neither side of the communication link is sending any message. Unfortunately, this is a very simple estimate, since the actual time between calls depends on many factors and is does not remain constant between calls. Defaults to 0.001</p></li>
 <li><p><strong>operating_freq</strong> (<em>int</em><em>, </em><em>optional</em>) – operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the “User Manual EVK06002” of the Sivers EVK (57-71 GHz) , defaults to 57.51e9</p></li>
 </ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.decode_message">
+<span class="sig-name descname"><span class="pre">decode_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.decode_message" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Parses an incoming TCP message and calls the appropriate function to handle it.</p>
+<p>This function is called by <code class="docutils literal notranslate"><span class="pre">socket_receive</span></code> (the communication thread callback).</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>bytes</em>) – raw data to be decoded</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_closed_gui_action">
+<span class="sig-name descname"><span class="pre">do_closed_gui_action</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_closed_gui_action" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">CLOSEDGUI</span></code> command.</p>
+<p>This comand is unidirectional. It is always sent by the ground node to the drone node.</p>
+</div></blockquote>
+<p>Sets a flag indicating (the drone node) that it can end its main script, since the GUI was closed by the user at the ground node.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_finish_meas_drone_rfsoc">
+<span class="sig-name descname"><span class="pre">do_finish_meas_drone_rfsoc</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_finish_meas_drone_rfsoc" title="Link to this definition">#</a></dt>
+<dd><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">FINISHDRONERFSOC</span></code> command.</p>
+<p>This comand is unidirectional. It is always sent by the ground node to the drone node.</p>
+<p>The purpose is to finish the experiment (as defined in “Manual A2GMeasurements”). When the experiment is finished the GUI allows the user to end (disconnect) the connection between both nodes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_follow_mode_gimbal">
+<span class="sig-name descname"><span class="pre">do_follow_mode_gimbal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fmode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_follow_mode_gimbal" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code> command.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code> command is sent when the other node asks for this node’s GPS information to be able to follow this node’s movement.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>fmode</strong> (<em>int</em><em> (</em><em>hexadecimal</em><em>)</em><em>, </em><em>optional</em>) – specifies whether the other node shall follow this node’s movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth, defaults to 0x00.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_getgps_action">
+<span class="sig-name descname"><span class="pre">do_getgps_action</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">follow_mode_gimbal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_getgps_action" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">GETGPS</span></code> command.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">GETGPS</span></code> commmand differentiates from <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code> in that when the other node only request GPS information from this node (i.e. for display the coordinates on a panel of the GUI), the <code class="docutils literal notranslate"><span class="pre">follow_mode_gimbal</span></code> is False as well as the <code class="docutils literal notranslate"><span class="pre">FMODE</span></code> key of the sent dictionary.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>follow_mode_gimbal</strong> (<em>bool</em><em>, </em><em>optional</em>) – True if other node’s gimbal must follow this node’s movement, defaults to False</p></li>
+<li><p><strong>fmode</strong> (<em>int</em><em> (</em><em>hex</em><em>)</em><em>, </em><em>optional</em>) – specifies whether the other node shall follow this node’s movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth, defaults to 0x00.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_set_irf_action">
+<span class="sig-name descname"><span class="pre">do_set_irf_action</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_set_irf_action" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">SETIRF</span></code> command.</p>
+<p>This comand is unidirectional. It is always sent by the drone node to the ground node.</p>
+</div></blockquote>
+<p>Receives from the drone a subsampled version of the Power Angular Profile for it to be used by the GUI to continuously plot it in its PAP panel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg_data</strong> (<em>numpy array</em>) – attribute value <code class="docutils literal notranslate"><span class="pre">data_to_visualize</span></code> from <code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost</span></code> class.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_set_remote_fm_flag">
+<span class="sig-name descname"><span class="pre">do_set_remote_fm_flag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_set_remote_fm_flag" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">SETFMFLAG</span></code> command.</p>
+<p>This comand is unidirectional. It is always sent by the ground node to the drone node.</p>
+<p>Sets the <code class="docutils literal notranslate"><span class="pre">drone_fm_flag</span></code>. When this flag is set, the drone node can start sending <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBALL</span></code> commands to the ground node to get ground node’s coordinates and be able to follow (drone node) it (ground node).</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>dictionary</em><em>, </em><em>optional</em>) – dictionary with keys ‘X’, ‘Y’, ‘Z’, ‘FMODE’, ‘MOBILITY’, corresponding to geocentric coordinates, fo</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_set_remote_stop_fm">
+<span class="sig-name descname"><span class="pre">do_set_remote_stop_fm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_set_remote_stop_fm" title="Link to this definition">#</a></dt>
+<dd><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">SETFMFLAG</span></code> command.</p>
+<p>This comand is unidirectional. It is always sent by the ground node to the drone node.</p>
+<p>Unsets the <code class="docutils literal notranslate"><span class="pre">drone_fm_flag</span></code> flag.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_setgimbal_action">
+<span class="sig-name descname"><span class="pre">do_setgimbal_action</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_setgimbal_action" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">SETGIMBAL</span></code> command.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg_data</strong> (<em>dictionary</em>) – dictionary with keys ‘YAW’, ‘PITCH’ and ‘MODE’. The ‘YAW’ values range between [-1800, 1800]. The ‘PITCH’ values are restricted (by software) to the interval [-600, 600] to avoid hits between the case and the gimbal. The ‘MODE’ values are: 0x00, consider ‘YAW’ and/or ‘PITCH’ values as relative to the actual position of the gimbal; 0x01, consider ‘YAW’ and/or ‘PITCH’ values as relative to the absolute 0 (in both azimuth and elevation) position.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_start_meas_drone_rfsoc">
+<span class="sig-name descname"><span class="pre">do_start_meas_drone_rfsoc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_start_meas_drone_rfsoc" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">STARTDRONERFSOC</span></code> command.</p>
+<p>This comand is unidirectional. It is always sent by the ground node to the drone node.</p>
+<p>The purpose is to start the RFSoC thread (created in <code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost</span></code> class) responsible for retrieving the measured Channel Impulse Response from the RFSoC.</p>
+<p>It is assumed that prior to this callback, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg_data</strong> (<em>dictionary</em>) – dictionary with keys ‘carrier_freq’, ‘rx_gain_ctrl_bb1’, ‘rx_gain_ctrl_bb2’, ‘rx_gain_ctrl_bb3’, ‘rx_gain_ctrl_bfrf’. More information about these keys can be found in method <code class="docutils literal notranslate"><span class="pre">set_rx_rf</span></code> from <code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost</span></code> class.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.do_stop_meas_drone_rfsoc">
+<span class="sig-name descname"><span class="pre">do_stop_meas_drone_rfsoc</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.do_stop_meas_drone_rfsoc" title="Link to this definition">#</a></dt>
+<dd><p>Callback function when this node receives a <code class="docutils literal notranslate"><span class="pre">STOPDRONERFSOC</span></code> command.</p>
+<p>This comand is unidirectional. It is always sent by the ground node to the drone node.</p>
+<p>The purpose is to stop the RFSoC thread.</p>
+<p>It is assumed that prior to this function, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.encode_message">
+<span class="sig-name descname"><span class="pre">encode_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">destination_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.encode_message" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Encodes a TCP message to be sent.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_id</strong> (<em>int</em>) – identifies the sender node with a number (this parameter is provided for -potential- future improvements but does not have any functionality)</p></li>
+<li><p><strong>destination_id</strong> (<em>int</em>) – identifies the receiver node with a numer (this parameter is provided for -potential- future improvements but does not have any functionality)</p></li>
+<li><p><strong>message_type</strong> (<em>int</em>) – 0x01, for a short type of message; 0x02, for a long type of message; 0x03, to answer/acknowledge a received request. More information about this is in “Manual A2GMeasurements”.</p></li>
+<li><p><strong>cmd</strong> (<em>int</em>) – one of the supported requests/commands for each <code class="docutils literal notranslate"><span class="pre">message_type</span></code>. The list of commands is provided in “Manual A2GMeasurements” (Communication Protocl chapter).</p></li>
+<li><p><strong>data</strong> (<em>dictionary</em><em>, </em><em>optional</em>) – additional data required by the request/command. The particular data sent depends on the <code class="docutils literal notranslate"><span class="pre">message_type</span></code> and the <code class="docutils literal notranslate"><span class="pre">cmd</span></code>. More information on “Manual A2GMeasurements” (Communication Protocl chapter).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the bytes object representing the message to be sent.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bytes</p>
 </dd>
 </dl>
 </dd></dl>
@@ -867,6 +1069,50 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.process_answer_get_gps">
+<span class="sig-name descname"><span class="pre">process_answer_get_gps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.process_answer_get_gps" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function when this node receives an <code class="docutils literal notranslate"><span class="pre">ANS</span></code> type of message (the equivalent to an acknowledment) from the other node, after this node sent to the other node a <code class="docutils literal notranslate"><span class="pre">GETGPS</span></code> or a <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code> command.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>data</strong> (<em>dictionary</em>) – dictionary with keys ‘X’, ‘Y’, ‘Z’, ‘FMODE’, ‘FOLLOW_GIMBAL’. The values of ‘X’, ‘Y’, ‘Z’ are the geocentric coordinates from the other node. ‘FMODE’ is either 0x00 (Elevation and Azimuth), 0x01 (Elevation) or 0x02 (Azimuth). ‘FOLLOW_GIMBAL’ is either True (when the sent command by this node was <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code>) or False (when the sent command by this node was <code class="docutils literal notranslate"><span class="pre">GETGPS</span></code>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.socket_receive">
+<span class="sig-name descname"><span class="pre">socket_receive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stop_event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.socket_receive" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>The communication thread callback. Calls the parser to decode the most recent TCP message received.</p>
+<p>The time between calls of this function is OS and hardware dependent.</p>
+<p>As both nodes can send and receive messages, this thread</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>stop_event</strong> (<em>threading.Event</em>) – when this is set, this function has nothing to execute.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.HelperA2GMeasurements.socket_send_cmd">
+<span class="sig-name descname"><span class="pre">socket_send_cmd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type_cmd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.HelperA2GMeasurements.socket_send_cmd" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Creates a message by the name of the request/command. Wrapper to <code class="docutils literal notranslate"><span class="pre">encode_message</span></code>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>type_cmd</strong> (<em>int</em><em>, </em><em>optional</em>) – refers to the <code class="docutils literal notranslate"><span class="pre">cmd</span></code> parameter in <code class="docutils literal notranslate"><span class="pre">encode_message</span></code> , defaults to None</p></li>
+<li><p><strong>data</strong> (<em>int</em><em>, </em><em>optional</em>) – refers to the <code class="docutils literal notranslate"><span class="pre">data</span></code> parameter in <code class="docutils literal notranslate"><span class="pre">encode_message</span></code>, defaults to None</p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
@@ -914,6 +1160,7 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">A2GMeasurements</a><ul>
+<li><a class="reference internal" href="#quick-definitions-for-documentation">Quick definitions for documentation</a></li>
 <li><a class="reference internal" href="#use">Use</a></li>
 <li><a class="reference internal" href="#api">API</a><ul>
 <li><a class="reference internal" href="#a2gmeasurements.GimbalRS2"><code class="docutils literal notranslate"><span class="pre">GimbalRS2</span></code></a><ul>
@@ -960,8 +1207,25 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements</span></code></a><ul>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.HelperA2GStopCom"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.HelperA2GStopCom()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.HelperStartA2GCom"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.HelperStartA2GCom()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.__init__"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.decode_message"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.decode_message()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_closed_gui_action"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_closed_gui_action()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_finish_meas_drone_rfsoc"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_finish_meas_drone_rfsoc()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_follow_mode_gimbal"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_follow_mode_gimbal()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_getgps_action"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_getgps_action()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_set_irf_action"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_set_irf_action()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_set_remote_fm_flag"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_set_remote_fm_flag()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_set_remote_stop_fm"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_set_remote_stop_fm()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_setgimbal_action"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_setgimbal_action()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_start_meas_drone_rfsoc"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_start_meas_drone_rfsoc()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.do_stop_meas_drone_rfsoc"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.do_stop_meas_drone_rfsoc()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.encode_message"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.encode_message()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.gimbal_follows_drone"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.gimbal_follows_drone()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.process_answer_get_gps"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.process_answer_get_gps()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.socket_receive"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.socket_receive()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.socket_send_cmd"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.socket_send_cmd()</span></code></a></li>
 </ul>
 </li>
 </ul>
