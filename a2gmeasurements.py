@@ -2482,17 +2482,37 @@ class NumpyArrayEncoder(JSONEncoder):
 
 class GimbalGremsyH16:
     """
-    In azimuth and elevation, the speed is controlled by a value between [-100, 100].
-    In both cases, the speed range > 0 is not simetrical w.r.t the speed range < 0. 
-    This means, for example, -15 doesn't move the gimbal the same angle (at opposite direction) as 15, considering for both speeds the smae time was used.
+    Python Class that works as the driver for the gimbal Gremsy H16.
     
+     The gimbal should be connected to the host computer through an TTL2USB connection (check "Manual A2GMeasurements"). 
+     
+     It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.
+    
+     Gimbal's rotational speed (both in yaw -azimuth-, and pitch -elevation-) depends on a value between [-100, 100] as this is the natural range of values in most Remote Controllers (i.e. FrSky X8R).
+     
+     Gmbal's rotational speed dependence on the RC controlling interval is neither linear, nor symmetrical:
+     1. Non-linear:  a change from 10 to 20 is not equivalent to a change from 20 to 30
+     2. Non-symmetrical: a change from 10 to 20 is not equivalent to a change from -10 to -20
+     
+     Gimbal's angle depends on: 1) the RC controlling interval and 2) the time the given RC control value is hold. This dependence is measured as described in "Manual A2GMeasurements".
+     
+     This class relies on heavily on the ``SBUSEncoder`` class, as that is the class decoding the sbus protocol from Gremsy. 
+     
+     This class is meant to be equivalent to ``GimbalRS2``. Mainly by implementing the ``setPosControl`` for this gimbal.     
     """
+    
     def __init__(self, speed_time_azimuth_table=None, speed_time_elevation_table=None):
         """
-            speed_time_azimuth_table (ndarray): n x 3. First column is speed, second column is time, third column is azimuth. 
-            speed_time_elevation_table (ndarray): n x 3. First column is speed, second column is time, third column is elevation. 
+         Constructor for the class. 
+         
+         Loads the measured angle (yaw and pitch, each one separately) dependence on RC control value and time. Replace ``load_measured_data_august_2023`` or reimplement it if newer/better measurements of this dependence are available. 
+         
+        :param speed_time_azimuth_table: array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured azimuth (yaw), defaults to None
+        :type speed_time_azimuth_table: numpy.ndarray, optional
+        :param speed_time_elevation_table: array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured elevation (pitch), defaults to None
+        :type speed_time_elevation_table: numpy.ndarray, optional
+        """
         
-        """               
         self.cnt_imu_readings = 0
         
         if speed_time_azimuth_table is not None:
@@ -2508,6 +2528,13 @@ class GimbalGremsyH16:
         self.start_imu_thread()
     
     def define_home_position(self):
+        """
+         Defines the center of the coordinated system (yaw, pitch).
+         
+         As the gimbal controller from the manufacturer can't be accesed, imu readings are not available. An external IMU is required and any cheap raspberry pi pico is capable of providing decent IMU support. Potential magnetic interferences between the IMU readings of the raspberry pi pico and the motors of the gimbal have not been researched.
+         
+         This function requires *to be further tested*, if the Gremsy gimbal is to be used again as part of the channel sounder system.
+        """
         print("[DEBUG]: Defining HOME for Gremsy... This might take a second")
         
         start_time = time.time()
