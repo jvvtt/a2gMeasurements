@@ -1556,9 +1556,10 @@ class HelperA2GMeasurements(object):
             self.myGimbal = GimbalRS2()
             self.myGimbal.start_thread_gimbal()
             time.sleep(0.5)
+            print("[DEBUG]: Created Gimbal class")
         elif IsGimbal == 2:
             self.myGimbal = GimbalGremsyH16()
-            self.myGimbal.start_conn()
+            self.myGimbal.start_thread_gimbal()
             print("[DEBUG]: Created Gimbal class")
         else: # IsGimbal = False
             print("[DEBUG]: No gimbal class is created")
@@ -2482,7 +2483,7 @@ class NumpyArrayEncoder(JSONEncoder):
 
 class GimbalGremsyH16:
     """
-    Python Class that works as the driver for the gimbal Gremsy H16.
+     Python Class that works as the driver for the gimbal Gremsy H16.
     
      The gimbal should be connected to the host computer through an TTL2USB connection (check "Manual A2GMeasurements"). 
      
@@ -2492,9 +2493,11 @@ class GimbalGremsyH16:
      
      Gmbal's rotational speed dependence on the RC controlling interval is neither linear, nor symmetrical:
      1. Non-linear:  a change from 10 to 20 is not equivalent to a change from 20 to 30
-     2. Non-symmetrical: a change from 10 to 20 is not equivalent to a change from -10 to -20
+     2. Non-symmetrical: a change from 10 to 20 is not equivalent to a change from -10 to -20. A change from 10 to 20 (or -10 to -20) in yaw is not equivalent to a change from 10 to 20 (or -10 to -20) in pitch.
      
-     Gimbal's angle depends on: 1) the RC controlling interval and 2) the time the given RC control value is hold. This dependence is measured as described in "Manual A2GMeasurements".
+     Gimbal's angle (either yaw or pitch) depends on: 1) the RC controlling interval and 2) the time the given RC control value is hold. This dependence is measured as described in "Manual A2GMeasurements".
+     
+     Gimbal's angle can only be controlled by using the *RC control value* and the *time* the serial SBUS will hold that control value.
      
      This class relies on heavily on the ``SBUSEncoder`` class, as that is the class decoding the sbus protocol from Gremsy. 
      
@@ -2529,11 +2532,11 @@ class GimbalGremsyH16:
     
     def define_home_position(self):
         """
-         Defines the center of the coordinated system (yaw, pitch).
+        Defines the center of the coordinated system (yaw, pitch). To do so, it checks if the gimbal is moving (in both azimuth and elevation) and if not, read the angles provided by the IMU and set them as the home position. Due to this operation, this function **must** be called in ``__init__`` or before any ``setPosControl`` call.
+
+        As the gimbal controller from the manufacturer can't be accesed, imu readings are not available. An external IMU is required and any cheap raspberry pi pico is capable of providing decent IMU support. Potential magnetic interferences between the IMU readings of the raspberry pi pico and the motors of the gimbal have not been researched.
          
-         As the gimbal controller from the manufacturer can't be accesed, imu readings are not available. An external IMU is required and any cheap raspberry pi pico is capable of providing decent IMU support. Potential magnetic interferences between the IMU readings of the raspberry pi pico and the motors of the gimbal have not been researched.
-         
-         This function requires *to be further tested*, if the Gremsy gimbal is to be used again as part of the channel sounder system.
+         **NOTE**: this function *requires to be further tested*, if the Gremsy gimbal is to be used again as part of the channel sounder system. The reason is that when checking if the gimbal is moving, a good tolerated error (tol_err = abs(angle_now - angle_before)) must be set.
         """
         print("[DEBUG]: Defining HOME for Gremsy... This might take a second")
         
@@ -2542,17 +2545,18 @@ class GimbalGremsyH16:
         pitch_before = 1000 # Set it high for first iteration
         cnt = self.cnt_imu_readings
         DONT_STOP = True
+        tol_err = 2
         while(DONT_STOP):
             if cnt != self.cnt_imu_readings:
                 yaw = self.last_imu_reading['YAW']
                 pitch = self.last_imu_reading['PITCH']
                 
-                if yaw - yaw_before <= 1:
+                if np.abs(yaw - yaw_before) <= tol_err:
                     CONDITION_YAW_SATISFIED = True
                 else:
                     CONDITION_YAW_SATISFIED = False
                     
-                if pitch - pitch_before <= 1:
+                if np.abs(pitch - pitch_before) <= tol_err:
                     CONDITION_PITCH_SATISFIED = True
                 else:
                     CONDITION_PITCH_SATISFIED = False
@@ -2568,6 +2572,12 @@ class GimbalGremsyH16:
         print(f"TIME SPENT DEFINE HOME POSITION: {time.time() - start_time}")
     
     def start_imu_thread(self, COM_PORT='COM21'):
+        """
+         Connects to the IMU and creates a new thread (the imu thread) to read the angle data from the IMU.
+
+        :param COM_PORT: port where the IMU is connected. If this host computer's OS is Windows it would be 'COM#', if it is Linux it would be "/dev/ttyUSB#", defaults to 'COM21'
+        :type COM_PORT: str, optional
+        """
         try:
             self.imu_serial = serial.Serial(COM_PORT, 9600)
             print("[DEBUG]: Connected to IMU")
@@ -2585,6 +2595,12 @@ class GimbalGremsyH16:
         #    print(f"PORT: {this_port}, DESC: {desc}, verbose: {verbose}")
     
     def receive_imu_data(self, stop_event):
+        """
+         Callback function for the imu thread. Read the yaw, pitch, roll angles and stores them in the attribute ``last_imu_reading`` of this class.
+
+        :param stop_event: when this is set, this function won't do anything
+        :type stop_event: threading.Event
+        """
         while not stop_event.is_set():
             data = self.imu_serial.readline().decode('utf-8').strip()
             data = data.split(',')
@@ -2598,12 +2614,28 @@ class GimbalGremsyH16:
         #print(f"YAW: {data[0]}, PITCH: {data[1]}, ROLL: {data[2]}")
         
     def stop_thread_imu(self):
+        """
+         Stops the imu thread and closed the serial port where the IMU is connected.
+        """
         if self.thread_read_imu.is_alive():
             self.event_stop_thread_imu.set()
         
         self.imu_serial.close()
         
-    def fit_model_to_gimbal_angular_data(self, model='linear'):      
+    def fit_model_to_gimbal_angular_data(self, model='linear'):
+        """
+         Fits a model to the measured angle (yaw, pitch) dependence on time and speed (RC control value). There are two models: a linear model and a gaussian regressor.
+         
+         The linear model is suitable specific range of "speeds" and time, since the non-linear dependence can be linearized. However, this *range must be defined*.
+         
+         For the gaussian regressor, *more training samples (RC control value, time, angle) over the full range are required* to avoid overfitting and bad predicting behaviour.
+         
+         There is either a linear or gp model for the RC control positive values and another one for the RC control negative values.
+         
+        :param model: either "linear" or "gp", defaults to 'linear'
+        :type model: str, optional
+        """
+        
         # Define the kernel for Gaussian Process Regressor
         kernel = 1.0 * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2)) + WhiteKernel(noise_level=1e-5, noise_level_bounds=(1e-10, 1e-3))
         
@@ -2648,21 +2680,22 @@ class GimbalGremsyH16:
         
     def setPosControlGPModel(self, yaw=0, pitch=0):
         """
-        ------------THIS REQUIRES MORE TESTING. A BETTER GRID OF MEASURED SPEED, TIME, ANGLE ---------------------------
-        ------------THIS FUNCTION SHOULD GUARANTEE THAT THE RETURNED TIME (FOR BOTH YAW AND PITCH) IS POSITIVE ----------
-        ------------WITH ACTUAL DATA THE EXTRAPOLATION DOES NOT GIVE PHYSICAL CONSISTENT RESULTS (i.e. TIME IT TAKES TO MOVE 60 DEG AT SPEED 20 IS SMALLER THAN THE ONE IT TAKES TO MOVE 60 DEG AT A LOWER SPEED)
-        
-        Computes the speed and time reauired to set the desired angle if using the gp model for the measured angle values
+         Finds the RC control value and time giving the desired yaw (or pitch, or both separately) for the gaussian regressor. 
+         
+         Uses an iterative approach to find the RC control value and time to hold it by smartly searching in the grid composed by the RC control values and the times to hold it. The initial value of for the "speed" (RC control value) influences the convergence of the iterative method.
+                  
+         NOTE FOR DEVELOPERS: *this function requires*:
+         1) a better grid of measured "speed", time, angle. With the actual training samples, the prediction does not give physical consistent results (i.e. the time it takes to move 60 degrees at speed 20 is smaller than the one it takes to move 60 degrees at a lower speed). This is because the grid is coarse and not equally sampled.
+         2) this function should guarantee that the returned time is always positive. Negative times does not make physical sense. Furthermore, it should also guarantee that the time is above a certain threshold (i.e. 2 seconds), during which the gimbal will accelerate until reaching the desired speed. In a realistic gimbal, the acceleration of the gimbal is not infinite. On the contrary, gimbal's speed vs time dependence follows usually a trapezoidal curve, which means that there is some time required (the threshold) for the gimbal to reach the plateau of the trapezoid (desired speed).
+         3) the caller of this function (``setPosControl``) to handle when an exeception is raised.
 
-        Args:
-            yaw (float, optional): SHOULD BE FLOAT. Defaults to None.
-            pitch (float, optional): SHOULD BE FLOAT. Defaults to None.
-
-        Raises:
-            Exception: _description_
-
-        Returns:
-            _type_: _description_
+        :param yaw: desired yaw angle to set, defaults to 0
+        :type yaw: int, optional
+        :param pitch: desired pitch angle to set, defaults to 0
+        :type pitch: int, optional
+        :raises Exception: when the optimization local function ``find_feature_values_for_angle`` does not converge.
+        :return: 4 floats: required RC control value to set yaw, required time to set yaw, required RC control value to set pitch, required time to set pitch.
+        :rtype: float, float, float, float
         """
         start_time = time.time()
         
@@ -2738,8 +2771,7 @@ class GimbalGremsyH16:
         
     def load_measured_drifts(self):
         """
-        First column is time [s] and second column is angle computed from (a_{i}, a_{i+1}, b_{i}) distances
-        
+         Loads measured drift angles from the experiment described on "Manual A2GMeasurements".        
         """ 
         drift_with_low_speed_counter = [[137, self.gremsy_angle(2, 1.97, 0.10)],
                                         [144, self.gremsy_angle(1.97, 1.94, 0.10)],
@@ -2773,9 +2805,11 @@ class GimbalGremsyH16:
     
     def load_measured_data_july_2023(self):
         """
-        This table contains as columns the speed [-100, 100], time [s], and the (near) azimuth angle computed 
-        from the 3 distances (a_{i}, a_{i+1}, b_{i}). The distances were measured by Julian D. Villegas G.
-        
+         Loads a set of measured data extracted from the experiment described on "Manual A2GMeasurements". 
+                  
+         This table contains as columns the speed [-100, 100], time [s], and the azimuth angle computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in "Manual A2GMeasurements".
+         
+         NOTE FOR DEVELOPERS: *the experiment described in* "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
         """        
         speed_time_azimuth_table = [[15, 6, self.gremsy_angle(1.903, 1.949, 0.87)], 
                         [15, 7, self.gremsy_angle(1.955, 1.926, 1)],
@@ -2803,9 +2837,11 @@ class GimbalGremsyH16:
     
     def load_measured_data_august_2023(self):
         """
-        This table contains as columns the speed [-100, 100], time [s], and the (near) azimuth angle computed 
-        from the 3 distances (a_{i}, a_{i+1}, b_{i}). The distances were measured by Kimmo Mäkelä.
-        
+         Loads a second set of measured data extracted from the experiment described on "Manual A2GMeasurements".
+         
+         This table contains as columns the speed [-100, 100], time [s], and the angle (azimuth, elevation) computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in "Manual A2GMeasurements".
+         
+         NOTE FOR DEVELOPERS: *the experiment described in* "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
         """        
         speed_time_azimuth_table = [[15, 6, self.gremsy_angle(1.903, 1.949, 0.87)], 
                         [15, 7, self.gremsy_angle(1.955, 1.926, 1)],
@@ -2966,33 +3002,41 @@ class GimbalGremsyH16:
                                         [-20, 5, self.gremsy_angle(1.769, 1.737, 1.764)]]
         self.speed_time_elevation_table = np.array(speed_time_elevation_table)
     
-    def gremsy_angle(self, distance_1, distance_2, distance_3):
+    def gremsy_angle(self, a_i, a_ip, b_i):
         """
-        Computes the angle between the sides of the triangle given by distance_1 and distance_2. 
-        The opposite side to the angle computed is the one defined by distance_3.
+         Computes the angle between the sides of the triangle given by a_i and  a_i+1. The opposite side to the angle computed is the one defined by b_i. 
+        
+         A definition of this distances can be found in "Manual A2GMeasurements".
 
-        Args:
-            distance_1 (float): _description_
-            distance_2 (float): _description_
-            distance_3 (float): _description_
-
-        Returns:
-            _type_: _description_
+         NOTE FOR DEVELOPERS: *the experiment described in * "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
+        
+        :param distance_1: defined in "Manual A2GMeasurements"
+        :type distance_1: float
+        :param distance_2: defined in "Manual A2GMeasurements"
+        :type distance_2: float
+        :param distance_3: defined in "Manual A2GMeasurements"
+        :type distance_3: float
+        :return: angle
+        :rtype: float (radians)
         """
-        tmp = (distance_1**2 + distance_2**2 - distance_3**2)/(2*distance_1*distance_2)
+        tmp = (a_i**2 + a_ip**2 - b_i**2)/(2*a_i*a_ip)
         return np.arccos(tmp)
     
     def plot_linear_reg_on_near_domain(self, loaded='august'):
         """
-        Generates a figure with 3 subplots, both with measured values (default measured values or new values measured 
-        for more (speed, time) tuples given as a parameter to the class)
-        and with linear regression models applied to the measured values.
-        1. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> azimuth
-        2. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> azimuth
-        3. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> elevation
+         Generates a figure with 3 subplots with measured values (default measured values or new values measured for more (speed, time) tuples given as a parameter to the class) and with linear regression model applied to the measured values.
+         
+         1. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> azimuth
+         
+         2. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> azimuth
+         
+         3. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> elevation
         
-        if 'loaded' is august then the figure has 4 subplots, with the 4th being
-        4. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> elevation
+         if 'loaded' is august then the figure has 4 subplots, with the 4th being
+         4. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> elevation
+
+        :param loaded: which table loaded: the one from ``load_measured_data_july_2023`` or the one from ``load_measured_data_august_2023``, defaults to 'august'.
+        :type loaded: str, optional
         """
         
         is_positive_azimuth = self.speed_time_azimuth_table > 0
@@ -3062,27 +3106,41 @@ class GimbalGremsyH16:
         fig.update_layout(autosize=False, width=1400, height=800, margin=dict(l=50, r=50, t=50, b=50),)
         fig.show()
     
-    def start_conn(self):
+    def start_thread_gimbal(self):
+        """
+         Creates an instance of the ``SBUSEncoder`` class responsible for encoding the actual serial signal used by sbus protocol to set an RC control value.
+         
+         By creating such instance, the gremsy gimbal thread is created and started.
+        """
         self.sbus = SBUSEncoder()
         self.sbus.start_sbus(serial_interface='COM20', period_packet=0.015)
         
         self.define_home_position()
     
-    def stop_conn(self):
-        self.stop_thread_imu()
-        self.stop_thread_gimbal()
-        self.sbus.stop_updating()
-    
     def setPosControl(self, yaw, pitch, roll=0, mode=0x00, model='linear'):
         """
-        Set yaw and pitch
-
-        Args:
-            yaw (float): Angle in degrees. Valid range between [-180, 180]
-            pitch (float): Angle in degrees. Valid range between [, ]
-            mode (hex): 0x00 Relative movement
-                        0x01 Absolute movement
-                        THIS OPTION HAS TO BE IMPLEMENTED
+         Moves Gremsy H16 gimbal by the input angle. This function works as the equivalent to the ``setPosControl`` function of the class ``GimbalRS2``. If movement is desired in both yaw and pitch, the gimbal will move first in either axis (i.e. yaw) and after finishing the that movement, it will move in the other axis (i.e. pitch).
+         
+         If the linear model is used: this function sets an RC control value ("speed") and finds the corresponding time, given the angle desired to be set.
+         
+         If the gp model is used: this function calls ``setPosControlGPModel`` to get the RC control value and time, corresponding to the input angle.
+         
+         For a more accurate gimbal angle movement: 
+         
+         1) Provide a finer and equally sampled grid of RC control value, time with its corresponding measured angle.
+         2) Modify ``fit_model_to_gimbal_angular_data`` to tune parameters of the gp model (if gp model is chosen).
+         3) Modify  ``setPosControlGPModel`` (if gp model is chosen) if a better logic for getting RC control values and times from a given angle is available.
+         
+        :param yaw: yaw angle (in degrees) to be set. Valid range between [-180, 180].
+        :type yaw: float
+        :param pitch: pitch angle (in degrees) to be set. Valid range between [-90, 90].
+        :type pitch: float
+        :param roll: roll angle (in degrees) to be set. Roll angle is not used because desired movement of the gimbal only requires yaw and pitch angles.
+        :type roll: float, optional
+        :param mode: _description_, defaults to 0x00
+        :type mode: int (hex), optional
+        :param model: 'linear' or 'gp' model for the angle dependence on the RC control value and the time to hold it. defaults to 'linear'
+        :type model: str, optional
         """
         
         if model == 'linear':
@@ -3141,16 +3199,17 @@ class GimbalGremsyH16:
             
     def stop_thread_gimbal(self):
         """
-        Wrapper to stop_updating from SBUSEncoder
+         Stops the imu thread and the ``SBUSEncoder`` gremsy gimbal thread.
         """
+        self.stop_thread_imu()
         self.sbus.stop_updating()
     
     def control_power_motors(self, power='on'):
         """
-        Wrapper to turn_off_motors and turn_on_motors
-
-        Returns:
-            power (str): 'on' or 'off
+         Turns gremsy gimbal motors on or off. This function is a wrapper of ``turn_on_motors`` an ``turn_off_motors`` of the ``SBUSEncoder`` class.
+        
+        :param power: _description_, defaults to 'on'
+        :type power: str, optional
         """
         if power == 'on':
             self.sbus.turn_on_motors()
@@ -3158,6 +3217,12 @@ class GimbalGremsyH16:
             self.sbus.turn_off_motors()
             
     def change_gimbal_mode(self, mode='LOCK'):
+        """
+         Changes Gremsy gimbal mode. Available modes are: 'Lock' and 'Follow' (and motors off). Brief description of the modes is on the manual of the gimbal provided by the manufacturer.
+
+        :param mode: either 'LOCK' or 'FOLLOW', defaults to 'LOCK'.
+        :type mode: str, optional
+        """
         self.sbus.change_mode(mode=mode)
         self.sbus.MODE = mode
         

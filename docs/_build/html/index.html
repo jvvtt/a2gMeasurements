@@ -1119,6 +1119,260 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">a2gmeasurements.</span></span><span class="sig-name descname"><span class="pre">GimbalGremsyH16</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">speed_time_azimuth_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">speed_time_elevation_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16" title="Link to this definition">#</a></dt>
+<dd><p>Python Class that works as the driver for the gimbal Gremsy H16.</p>
+<p>The gimbal should be connected to the host computer through an TTL2USB connection (check “Manual A2GMeasurements”).</p>
+<p>It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.</p>
+<p>Gimbal’s rotational speed (both in yaw -azimuth-, and pitch -elevation-) depends on a value between [-100, 100] as this is the natural range of values in most Remote Controllers (i.e. FrSky X8R).</p>
+<p>Gmbal’s rotational speed dependence on the RC controlling interval is neither linear, nor symmetrical:
+1. Non-linear:  a change from 10 to 20 is not equivalent to a change from 20 to 30
+2. Non-symmetrical: a change from 10 to 20 is not equivalent to a change from -10 to -20. A change from 10 to 20 (or -10 to -20) in yaw is not equivalent to a change from 10 to 20 (or -10 to -20) in pitch.</p>
+<p>Gimbal’s angle (either yaw or pitch) depends on: 1) the RC controlling interval and 2) the time the given RC control value is hold. This dependence is measured as described in “Manual A2GMeasurements”.</p>
+<p>Gimbal’s angle can only be controlled by using the <em>RC control value</em> and the <em>time</em> the serial SBUS will hold that control value.</p>
+<p>This class relies on heavily on the <code class="docutils literal notranslate"><span class="pre">SBUSEncoder</span></code> class, as that is the class decoding the sbus protocol from Gremsy.</p>
+<p>This class is meant to be equivalent to <code class="docutils literal notranslate"><span class="pre">GimbalRS2</span></code>. Mainly by implementing the <code class="docutils literal notranslate"><span class="pre">setPosControl</span></code> for this gimbal.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">speed_time_azimuth_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">speed_time_elevation_table</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.__init__" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Constructor for the class.</p>
+<p>Loads the measured angle (yaw and pitch, each one separately) dependence on RC control value and time. Replace <code class="docutils literal notranslate"><span class="pre">load_measured_data_august_2023</span></code> or reimplement it if newer/better measurements of this dependence are available.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>speed_time_azimuth_table</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured azimuth (yaw), defaults to None</p></li>
+<li><p><strong>speed_time_elevation_table</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured elevation (pitch), defaults to None</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.change_gimbal_mode">
+<span class="sig-name descname"><span class="pre">change_gimbal_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'LOCK'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.change_gimbal_mode" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Changes Gremsy gimbal mode. Available modes are: ‘Lock’ and ‘Follow’ (and motors off). Brief description of the modes is on the manual of the gimbal provided by the manufacturer.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>mode</strong> (<em>str</em><em>, </em><em>optional</em>) – either ‘LOCK’ or ‘FOLLOW’, defaults to ‘LOCK’.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.control_power_motors">
+<span class="sig-name descname"><span class="pre">control_power_motors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">power</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'on'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.control_power_motors" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Turns gremsy gimbal motors on or off. This function is a wrapper of <code class="docutils literal notranslate"><span class="pre">turn_on_motors</span></code> an <code class="docutils literal notranslate"><span class="pre">turn_off_motors</span></code> of the <code class="docutils literal notranslate"><span class="pre">SBUSEncoder</span></code> class.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>power</strong> (<em>str</em><em>, </em><em>optional</em>) – _description_, defaults to ‘on’</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.define_home_position">
+<span class="sig-name descname"><span class="pre">define_home_position</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.define_home_position" title="Link to this definition">#</a></dt>
+<dd><p>Defines the center of the coordinated system (yaw, pitch). To do so, it checks if the gimbal is moving (in both azimuth and elevation) and if not, read the angles provided by the IMU and set them as the home position. Due to this operation, this function <strong>must</strong> be called in <code class="docutils literal notranslate"><span class="pre">__init__</span></code> or before any <code class="docutils literal notranslate"><span class="pre">setPosControl</span></code> call.</p>
+<p>As the gimbal controller from the manufacturer can’t be accesed, imu readings are not available. An external IMU is required and any cheap raspberry pi pico is capable of providing decent IMU support. Potential magnetic interferences between the IMU readings of the raspberry pi pico and the motors of the gimbal have not been researched.</p>
+<blockquote>
+<div><p><strong>NOTE</strong>: this function <em>requires to be further tested</em>, if the Gremsy gimbal is to be used again as part of the channel sounder system. The reason is that when checking if the gimbal is moving, a good tolerated error (tol_err = abs(angle_now - angle_before)) must be set.</p>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.fit_model_to_gimbal_angular_data">
+<span class="sig-name descname"><span class="pre">fit_model_to_gimbal_angular_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'linear'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.fit_model_to_gimbal_angular_data" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Fits a model to the measured angle (yaw, pitch) dependence on time and speed (RC control value). There are two models: a linear model and a gaussian regressor.</p>
+<p>The linear model is suitable specific range of “speeds” and time, since the non-linear dependence can be linearized. However, this <em>range must be defined</em>.</p>
+<p>For the gaussian regressor, <em>more training samples (RC control value, time, angle) over the full range are required</em> to avoid overfitting and bad predicting behaviour.</p>
+<p>There is either a linear or gp model for the RC control positive values and another one for the RC control negative values.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>model</strong> (<em>str</em><em>, </em><em>optional</em>) – either “linear” or “gp”, defaults to ‘linear’</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.gremsy_angle">
+<span class="sig-name descname"><span class="pre">gremsy_angle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a_i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.gremsy_angle" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Computes the angle between the sides of the triangle given by a_i and  a_i+1. The opposite side to the angle computed is the one defined by b_i.</p>
+<p>A definition of this distances can be found in “Manual A2GMeasurements”.</p>
+<p>NOTE FOR DEVELOPERS: <em>the experiment described in * “Manual A2GMeasurements” *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class</em>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>distance_1</strong> (<em>float</em>) – defined in “Manual A2GMeasurements”</p></li>
+<li><p><strong>distance_2</strong> (<em>float</em>) – defined in “Manual A2GMeasurements”</p></li>
+<li><p><strong>distance_3</strong> (<em>float</em>) – defined in “Manual A2GMeasurements”</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>angle</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float (radians)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.load_measured_data_august_2023">
+<span class="sig-name descname"><span class="pre">load_measured_data_august_2023</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.load_measured_data_august_2023" title="Link to this definition">#</a></dt>
+<dd><p>Loads a second set of measured data extracted from the experiment described on “Manual A2GMeasurements”.</p>
+<p>This table contains as columns the speed [-100, 100], time [s], and the angle (azimuth, elevation) computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in “Manual A2GMeasurements”.</p>
+<p>NOTE FOR DEVELOPERS: <em>the experiment described in</em> “Manual A2GMeasurements” <em>was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class</em>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.load_measured_data_july_2023">
+<span class="sig-name descname"><span class="pre">load_measured_data_july_2023</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.load_measured_data_july_2023" title="Link to this definition">#</a></dt>
+<dd><p>Loads a set of measured data extracted from the experiment described on “Manual A2GMeasurements”.</p>
+<p>This table contains as columns the speed [-100, 100], time [s], and the azimuth angle computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in “Manual A2GMeasurements”.</p>
+<p>NOTE FOR DEVELOPERS: <em>the experiment described in</em> “Manual A2GMeasurements” <em>was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class</em>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.load_measured_drifts">
+<span class="sig-name descname"><span class="pre">load_measured_drifts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.load_measured_drifts" title="Link to this definition">#</a></dt>
+<dd><p>Loads measured drift angles from the experiment described on “Manual A2GMeasurements”.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.plot_linear_reg_on_near_domain">
+<span class="sig-name descname"><span class="pre">plot_linear_reg_on_near_domain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loaded</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'august'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.plot_linear_reg_on_near_domain" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Generates a figure with 3 subplots with measured values (default measured values or new values measured for more (speed, time) tuples given as a parameter to the class) and with linear regression model applied to the measured values.</p>
+<ol class="arabic simple">
+<li><p>3D Scatter Plot of (speed, time, angle) for speed &gt; 0 and angle -&gt; azimuth</p></li>
+<li><p>3D Scatter Plot of (speed, time, angle) for speed &lt; 0 and angle -&gt; azimuth</p></li>
+<li><p>3D Scatter Plot of (speed, time, angle) for speed &lt; 0 and angle -&gt; elevation</p></li>
+</ol>
+<p>if ‘loaded’ is august then the figure has 4 subplots, with the 4th being
+4. 3D Scatter Plot of (speed, time, angle) for speed &gt; 0 and angle -&gt; elevation</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>loaded</strong> (<em>str</em><em>, </em><em>optional</em>) – which table loaded: the one from <code class="docutils literal notranslate"><span class="pre">load_measured_data_july_2023</span></code> or the one from <code class="docutils literal notranslate"><span class="pre">load_measured_data_august_2023</span></code>, defaults to ‘august’.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.receive_imu_data">
+<span class="sig-name descname"><span class="pre">receive_imu_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stop_event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.receive_imu_data" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback function for the imu thread. Read the yaw, pitch, roll angles and stores them in the attribute <code class="docutils literal notranslate"><span class="pre">last_imu_reading</span></code> of this class.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>stop_event</strong> (<em>threading.Event</em>) – when this is set, this function won’t do anything</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.setPosControl">
+<span class="sig-name descname"><span class="pre">setPosControl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">yaw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pitch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">roll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'linear'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.setPosControl" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Moves Gremsy H16 gimbal by the input angle. This function works as the equivalent to the <code class="docutils literal notranslate"><span class="pre">setPosControl</span></code> function of the class <code class="docutils literal notranslate"><span class="pre">GimbalRS2</span></code>. If movement is desired in both yaw and pitch, the gimbal will move first in either axis (i.e. yaw) and after finishing the that movement, it will move in the other axis (i.e. pitch).</p>
+<p>If the linear model is used: this function sets an RC control value (“speed”) and finds the corresponding time, given the angle desired to be set.</p>
+<p>If the gp model is used: this function calls <code class="docutils literal notranslate"><span class="pre">setPosControlGPModel</span></code> to get the RC control value and time, corresponding to the input angle.</p>
+<p>For a more accurate gimbal angle movement:</p>
+<ol class="arabic simple">
+<li><p>Provide a finer and equally sampled grid of RC control value, time with its corresponding measured angle.</p></li>
+<li><p>Modify <code class="docutils literal notranslate"><span class="pre">fit_model_to_gimbal_angular_data</span></code> to tune parameters of the gp model (if gp model is chosen).</p></li>
+<li><p>Modify  <code class="docutils literal notranslate"><span class="pre">setPosControlGPModel</span></code> (if gp model is chosen) if a better logic for getting RC control values and times from a given angle is available.</p></li>
+</ol>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>yaw</strong> (<em>float</em>) – yaw angle (in degrees) to be set. Valid range between [-180, 180].</p></li>
+<li><p><strong>pitch</strong> (<em>float</em>) – pitch angle (in degrees) to be set. Valid range between [-90, 90].</p></li>
+<li><p><strong>roll</strong> (<em>float</em><em>, </em><em>optional</em>) – roll angle (in degrees) to be set. Roll angle is not used because desired movement of the gimbal only requires yaw and pitch angles.</p></li>
+<li><p><strong>mode</strong> (<em>int</em><em> (</em><em>hex</em><em>)</em><em>, </em><em>optional</em>) – _description_, defaults to 0x00</p></li>
+<li><p><strong>model</strong> (<em>str</em><em>, </em><em>optional</em>) – ‘linear’ or ‘gp’ model for the angle dependence on the RC control value and the time to hold it. defaults to ‘linear’</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.setPosControlGPModel">
+<span class="sig-name descname"><span class="pre">setPosControlGPModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">yaw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pitch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.setPosControlGPModel" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Finds the RC control value and time giving the desired yaw (or pitch, or both separately) for the gaussian regressor.</p>
+<p>Uses an iterative approach to find the RC control value and time to hold it by smartly searching in the grid composed by the RC control values and the times to hold it. The initial value of for the “speed” (RC control value) influences the convergence of the iterative method.</p>
+<p>NOTE FOR DEVELOPERS: <em>this function requires</em>:
+1) a better grid of measured “speed”, time, angle. With the actual training samples, the prediction does not give physical consistent results (i.e. the time it takes to move 60 degrees at speed 20 is smaller than the one it takes to move 60 degrees at a lower speed). This is because the grid is coarse and not equally sampled.
+2) this function should guarantee that the returned time is always positive. Negative times does not make physical sense. Furthermore, it should also guarantee that the time is above a certain threshold (i.e. 2 seconds), during which the gimbal will accelerate until reaching the desired speed. In a realistic gimbal, the acceleration of the gimbal is not infinite. On the contrary, gimbal’s speed vs time dependence follows usually a trapezoidal curve, which means that there is some time required (the threshold) for the gimbal to reach the plateau of the trapezoid (desired speed).
+3) the caller of this function (<code class="docutils literal notranslate"><span class="pre">setPosControl</span></code>) to handle when an exeception is raised.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>yaw</strong> (<em>int</em><em>, </em><em>optional</em>) – desired yaw angle to set, defaults to 0</p></li>
+<li><p><strong>pitch</strong> (<em>int</em><em>, </em><em>optional</em>) – desired pitch angle to set, defaults to 0</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – when the optimization local function <code class="docutils literal notranslate"><span class="pre">find_feature_values_for_angle</span></code> does not converge.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>4 floats: required RC control value to set yaw, required time to set yaw, required RC control value to set pitch, required time to set pitch.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>float, float, float, float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.start_imu_thread">
+<span class="sig-name descname"><span class="pre">start_imu_thread</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">COM_PORT</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'COM21'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.start_imu_thread" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Connects to the IMU and creates a new thread (the imu thread) to read the angle data from the IMU.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>COM_PORT</strong> (<em>str</em><em>, </em><em>optional</em>) – port where the IMU is connected. If this host computer’s OS is Windows it would be ‘COM#’, if it is Linux it would be “/dev/ttyUSB#”, defaults to ‘COM21’</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.start_thread_gimbal">
+<span class="sig-name descname"><span class="pre">start_thread_gimbal</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.start_thread_gimbal" title="Link to this definition">#</a></dt>
+<dd><p>Creates an instance of the <code class="docutils literal notranslate"><span class="pre">SBUSEncoder</span></code> class responsible for encoding the actual serial signal used by sbus protocol to set an RC control value.</p>
+<p>By creating such instance, the gremsy gimbal thread is created and started.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.stop_thread_gimbal">
+<span class="sig-name descname"><span class="pre">stop_thread_gimbal</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.stop_thread_gimbal" title="Link to this definition">#</a></dt>
+<dd><p>Stops the imu thread and the <code class="docutils literal notranslate"><span class="pre">SBUSEncoder</span></code> gremsy gimbal thread.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.GimbalGremsyH16.stop_thread_imu">
+<span class="sig-name descname"><span class="pre">stop_thread_imu</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GimbalGremsyH16.stop_thread_imu" title="Link to this definition">#</a></dt>
+<dd><p>Stops the imu thread and closed the serial port where the IMU is connected.</p>
+</dd></dl>
+
+</dd></dl>
+
 </section>
 </section>
 
@@ -1226,6 +1480,26 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.process_answer_get_gps"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.process_answer_get_gps()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.socket_receive"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.socket_receive()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.HelperA2GMeasurements.socket_send_cmd"><code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements.socket_send_cmd()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16</span></code></a><ul>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.__init__"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.change_gimbal_mode"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.change_gimbal_mode()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.control_power_motors"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.control_power_motors()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.define_home_position"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.define_home_position()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.fit_model_to_gimbal_angular_data"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.fit_model_to_gimbal_angular_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.gremsy_angle"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.gremsy_angle()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.load_measured_data_august_2023"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.load_measured_data_august_2023()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.load_measured_data_july_2023"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.load_measured_data_july_2023()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.load_measured_drifts"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.load_measured_drifts()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.plot_linear_reg_on_near_domain"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.plot_linear_reg_on_near_domain()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.receive_imu_data"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.receive_imu_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.setPosControl"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.setPosControl()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.setPosControlGPModel"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.setPosControlGPModel()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.start_imu_thread"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.start_imu_thread()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.start_thread_gimbal"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.start_thread_gimbal()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.stop_thread_gimbal"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.stop_thread_gimbal()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.stop_thread_imu"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.stop_thread_imu()</span></code></a></li>
 </ul>
 </li>
 </ul>
