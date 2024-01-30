@@ -1661,6 +1661,526 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.SetupWindow">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">GUI_A2G_MEAS.</span></span><span class="sig-name descname"><span class="pre">SetupWindow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.SetupWindow" title="Link to this definition">#</a></dt>
+<dd><p>Creates a new dialog with configuration options for the user, when is pressed the “Setup” &gt; “Setup devices and more” menu.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.SetupWindow.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.SetupWindow.__init__" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Creates the PyQt5 components of the setup dialog and sets its layout with them.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parent</strong> (<em>_type_</em><em>, </em><em>optional</em>) – not used, defaults to None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.SetupWindow.enable_drone_coords_callback">
+<span class="sig-name descname"><span class="pre">enable_drone_coords_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">myinput</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.SetupWindow.enable_drone_coords_callback" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Enables the drone coordinates QLineEdits when the user inputs a “Static” mobility for the drone node in the Setup dialog.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>myinput</strong> (<em>str</em>) – drone’s mobility. Either “Static” or “Moving”.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.SetupWindow.enable_gnd_coords_callback">
+<span class="sig-name descname"><span class="pre">enable_gnd_coords_callback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">myinput</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.SetupWindow.enable_gnd_coords_callback" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Enables the ground coordinates QLineEdits when the user inputs a “Static” mobility for the ground node in the Setup dialog.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>myinput</strong> (<em>str</em>) – ground’s mobility. Either “Static” or “Moving”.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">GUI_A2G_MEAS.</span></span><span class="sig-name descname"><span class="pre">WidgetGallery</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery" title="Link to this definition">#</a></dt>
+<dd><p>Python class responsible for creating the main window of the GUI and all the functionality to handle user interaction.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.__init__" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Calls the functions to create some class attributes and the menu bar with its associated callbacks.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parent</strong> (<em>_type_</em><em>, </em><em>optional</em>) – not used, defaults to None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.activate_gps_display_flag">
+<span class="sig-name descname"><span class="pre">activate_gps_display_flag</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.activate_gps_display_flag" title="Link to this definition">#</a></dt>
+<dd><p>Toggles the <code class="docutils literal notranslate"><span class="pre">gps_display_flag</span></code></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.activate_rs2_fm_flag">
+<span class="sig-name descname"><span class="pre">activate_rs2_fm_flag</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.activate_rs2_fm_flag" title="Link to this definition">#</a></dt>
+<dd><p>Toggles the <code class="docutils literal notranslate"><span class="pre">rs2_fm_flag</span></code></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_drone_fpga_connected">
+<span class="sig-name descname"><span class="pre">check_if_drone_fpga_connected</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">drone_fpga_static_ip_addr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'10.1.1.40'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_drone_fpga_connected" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks if the rfsoc is detected on the drone.</p>
+<p>Caller function SHOULD check first if there is an SSH connection.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>drone_fpga_static_ip_addr</strong> (<em>str</em><em>, </em><em>optional</em>) – drone’s RFSoC IP address for the Ethernet interface, defaults to ‘10.1.1.40’</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>success_drone_fpga: True if the ping to the rfsoc IP address (Ethernet interface) is replied.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_drone_gimbal_connected">
+<span class="sig-name descname"><span class="pre">check_if_drone_gimbal_connected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_drone_gimbal_connected" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks if a gimbal (Ronin RS2 or Gremsy H16) is connected to the host computer of the drone node.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>success_drone_gimbal: True if the gimbal is detected, False if not. None if an error appeared.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_gnd_fpga_connected">
+<span class="sig-name descname"><span class="pre">check_if_gnd_fpga_connected</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gnd_fpga_static_ip_addr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'10.1.1.30'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_gnd_fpga_connected" title="Link to this definition">#</a></dt>
+<dd><p>Check if the rfsoc is detected on the ground node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>gnd_fpga_static_ip_addr</strong> (<em>str</em><em>, </em><em>optional</em>) – ground’s RFSoC IP address for the Ethernet interface, defaults to ‘10.1.1.30’</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>success_ping_gnd_fpga: True if ping is successful, False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_gnd_gimbal_connected">
+<span class="sig-name descname"><span class="pre">check_if_gnd_gimbal_connected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_gnd_gimbal_connected" title="Link to this definition">#</a></dt>
+<dd><p>Checks if a Ronin RS2 gimbal is connected to the host computer of the ground node.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>success_gnd_gimbal: True if a PCAN device is detected, False otherwise.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_gnd_gps_connected">
+<span class="sig-name descname"><span class="pre">check_if_gnd_gps_connected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_gnd_gps_connected" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks if a Septentrio gps is connected to the host computer of the ground node.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>success_gnd_gps: True if a gps is detected, False otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_server_running_drone_fpga">
+<span class="sig-name descname"><span class="pre">check_if_server_running_drone_fpga</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_server_running_drone_fpga" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks if the server.py daemon is running on drone’s RFSoC (the PS of the RFSoC). If it is not running, this function starts it.</p>
+</div></blockquote>
+<p>ASSUMES DRONE RFSOC IP STATIC ADDR FOR ETH INTERFACE IS 10.1.1.40 (THIS IS THE DEFAULT SETUP)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>success_server_drone_fpga: True if the server.py daemon is running. False if not. None if the daemon could not be started.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_server_running_gnd_fpga">
+<span class="sig-name descname"><span class="pre">check_if_server_running_gnd_fpga</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_server_running_gnd_fpga" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks if the server.py daemon is running on ground’s RFSoC (the PS of the RFSoC). If it is not running, this function starts it.</p>
+</div></blockquote>
+<p>ASSUMES GROUND RFSOC IP STATIC ADDR FOR ETH INTERFACE IS 10.1.1.30 (THIS IS THE DEFAULT SETUP)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>success_server_gnd_fpga: True if the server.py daemon is running on ground’s RFSoC. False otherwise.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_if_ssh_2_drone_reached">
+<span class="sig-name descname"><span class="pre">check_if_ssh_2_drone_reached</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">drone_ip</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">username</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">password</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_if_ssh_2_drone_reached" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks if it is possible to ping and establish an SSH connection betwwen the host computer of the ground node and the host computer of the drone node.</p>
+<p>Error checking of the input parameters SHOULD BE DONE by the caller function.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>drone_ip</strong> (<em>str</em>) – drone’s IP address for the WiFi interface.</p></li>
+<li><p><strong>username</strong> (<em>str</em>) – SSH username</p></li>
+<li><p><strong>password</strong> (<em>str</em>) – SSH password</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>success_ping_network: True if drone node is reachable; success_air_node_ssh: True if ssh connection can be established; success_drone_fpga: True if rfsoc on drone is detected.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool, bool, bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.check_status_all_devices">
+<span class="sig-name descname"><span class="pre">check_status_all_devices</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.check_status_all_devices" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when user presses the “Check” button. Gets the connection status of all devices.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.checker_gimbal_input_range">
+<span class="sig-name descname"><span class="pre">checker_gimbal_input_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">angle</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.checker_gimbal_input_range" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Checks if a given angle is within the allowed range.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>angle</strong> (<em>float</em>) – angle</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the angle is within the allowed range, False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.connect_drone_callback">
+<span class="sig-name descname"><span class="pre">connect_drone_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.connect_drone_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Connect” button.</p>
+<p>Calls the <code class="docutils literal notranslate"><span class="pre">create_class_instance</span></code> method to create the Helper class in this (ground) node, depending on the availability of ground and drone devices.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.convert_dB_to_valid_hex_sivers_register_values">
+<span class="sig-name descname"><span class="pre">convert_dB_to_valid_hex_sivers_register_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.convert_dB_to_valid_hex_sivers_register_values" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Converts the dB gain values (all of them) the user has input in the “Sivers settings” panel to the actual values required for the Sivers EVK registers.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>a dictionary with the Tx gain values to be set at the Tx Sivers EVK registers, and another dictionary with the Rx gain values to be set at the RX Sivers EVK registers.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict, dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.createMenu">
+<span class="sig-name descname"><span class="pre">createMenu</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.createMenu" title="Link to this definition">#</a></dt>
+<dd><p>Creates the menu bar and associates the callback functions for when the user clicks on each of the menu items.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_GPS_visualization_panel">
+<span class="sig-name descname"><span class="pre">create_GPS_visualization_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_GPS_visualization_panel" title="Link to this definition">#</a></dt>
+<dd><p>Creates the “GPS visualization” panel with its widgets and layout.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_Gimbal_AIR_panel">
+<span class="sig-name descname"><span class="pre">create_Gimbal_AIR_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_Gimbal_AIR_panel" title="Link to this definition">#</a></dt>
+<dd><p>Creates the drone gimbal panel with its widgets and layout.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_Gimbal_GND_panel">
+<span class="sig-name descname"><span class="pre">create_Gimbal_GND_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_Gimbal_GND_panel" title="Link to this definition">#</a></dt>
+<dd><p>Creates the ground gimbal panel with its widgets and layout.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_Planning_Measurements_panel">
+<span class="sig-name descname"><span class="pre">create_Planning_Measurements_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_Planning_Measurements_panel" title="Link to this definition">#</a></dt>
+<dd><p>Creates the “Control measurements” panel with its widgets and layout.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_check_connections_panel">
+<span class="sig-name descname"><span class="pre">create_check_connections_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_check_connections_panel" title="Link to this definition">#</a></dt>
+<dd><p>Creates the “Check connections” panel with its widgets and layout.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_class_instances">
+<span class="sig-name descname"><span class="pre">create_class_instances</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">IsGPS</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsGimbal</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">IsRFSoC</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">GPS_Stream_Interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sec1'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_class_instances" title="Link to this definition">#</a></dt>
+<dd><p>Creates <code class="docutils literal notranslate"><span class="pre">HelperA2GMeasurements</span></code> class instance for this (ground) node and starts the WiFi communication thread.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>IsGPS</strong> (<em>bool</em><em>, </em><em>optional</em>) – True if there is a Septentrio GPS connected to this (ground) host computer, defaults to False</p></li>
+<li><p><strong>IsGimbal</strong> (<em>bool</em><em>, </em><em>optional</em>) – True if there is a Ronin RS2 gimbal connected to this (ground) host computer, defaults to False</p></li>
+<li><p><strong>IsRFSoC</strong> (<em>bool</em><em>, </em><em>optional</em>) – True if there is an RFSoC connected to this (ground) host computer, defaults to False</p></li>
+<li><p><strong>GPS_Stream_Interval</strong> (<em>str</em><em>, </em><em>optional</em>) – controls the regularity of getting GPS coordinates in this (ground) node. Available options are provided in <code class="docutils literal notranslate"><span class="pre">GpsSignaling.start_gps_data_retrieval</span></code>, defaults to ‘sec1’</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_fpga_and_sivers_panel">
+<span class="sig-name descname"><span class="pre">create_fpga_and_sivers_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_fpga_and_sivers_panel" title="Link to this definition">#</a></dt>
+<dd><p>Creates the “Sivers settings” panel with its widgets and layout.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_pap_plot_panel">
+<span class="sig-name descname"><span class="pre">create_pap_plot_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_pap_plot_panel" title="Link to this definition">#</a></dt>
+<dd><p>Creates the “PAP” panel (responsible for ploting the Power Angular Profile of the measured CIRs).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.disconnect_drone_callback">
+<span class="sig-name descname"><span class="pre">disconnect_drone_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.disconnect_drone_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Disconnect” button.</p>
+<p>If there is an ongoing measurement it will be finished.</p>
+<p>The WiFi thread will be stopped and its associated socket will be closed in this node. Devices connection to this node will be closed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.down_button_gimbal_drone_callback">
+<span class="sig-name descname"><span class="pre">down_button_gimbal_drone_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.down_button_gimbal_drone_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Left” button from the Gimbal drone panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.down_button_gimbal_gnd_callback">
+<span class="sig-name descname"><span class="pre">down_button_gimbal_gnd_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.down_button_gimbal_gnd_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Down” button from the Gimbal GND panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.finish_meas_button_callback">
+<span class="sig-name descname"><span class="pre">finish_meas_button_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.finish_meas_button_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “FINISH” button. Sends a <code class="docutils literal notranslate"><span class="pre">FINISHDRONERFSOC</span></code> command to the drone, to stop its rfsoc thread.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.get_gnd_ip_node_address">
+<span class="sig-name descname"><span class="pre">get_gnd_ip_node_address</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.get_gnd_ip_node_address" title="Link to this definition">#</a></dt>
+<dd><p>Gets the IP address ground’s node WiFi interface.</p>
+<p>Caller function IS RESPONSIBLE for checking if there is a WiFi operating.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.init_constants">
+<span class="sig-name descname"><span class="pre">init_constants</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.init_constants" title="Link to this definition">#</a></dt>
+<dd><p>Creates some class attributes.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">STATIC_DRONE_IP_ADDRESS</span></code> is to set a static IP address for the drone. This IP address must be assigned to the drone from the router configuration interface (this IP address was set for the drone on the Archer AX router)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.left_button_gimbal_drone_callback">
+<span class="sig-name descname"><span class="pre">left_button_gimbal_drone_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.left_button_gimbal_drone_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Left” button from the Gimbal Drone panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.left_button_gimbal_gnd_callback">
+<span class="sig-name descname"><span class="pre">left_button_gimbal_gnd_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.left_button_gimbal_gnd_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Left” button from the Gimbal GND panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.move_button_gimbal_drone_callback">
+<span class="sig-name descname"><span class="pre">move_button_gimbal_drone_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.move_button_gimbal_drone_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Move” button from the Gimbal Drone panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons if the movement is absolute or relative. BOTH yaw and pitch inputs are required.</p>
+<p>Example:</p>
+<p>For a yaw absolute movement to -20 deg and a pitch to 97 deg, the user MUST select the absolute radio button and enter -20 in the yaw text box and enter 97 in the pitch text box.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.move_button_gimbal_gnd_callback">
+<span class="sig-name descname"><span class="pre">move_button_gimbal_gnd_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.move_button_gimbal_gnd_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Move” button from the Gimbal GND panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons if the movement is absolute or relative. BOTH yaw and pitch inputs are required.</p>
+<p>Example:</p>
+<p>For a yaw absolute movement to -20 deg and a pitch to 97 deg, the user MUST select the absolute radio button and enter -20 in the yaw text box and enter 97 in the pitch text box.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.periodical_gps_display_callback">
+<span class="sig-name descname"><span class="pre">periodical_gps_display_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.periodical_gps_display_callback" title="Link to this definition">#</a></dt>
+<dd><p>Displays (periodically) GPS position of the drone node on the GPS panel.</p>
+<p>The period is controlled by the property “update_vis_time_gps” of this class.</p>
+<p>Uses the <code class="docutils literal notranslate"><span class="pre">show_air_moving</span></code> function of the class <code class="docutils literal notranslate"><span class="pre">GpsOnMap</span></code>, meaning that such method has to implement the functionality to display gps coordinates on a given input (PyQt5 panel).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.periodical_pap_display_callback">
+<span class="sig-name descname"><span class="pre">periodical_pap_display_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.periodical_pap_display_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for display the PAP of the measured CIR in the PAP panel of the GUI.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.right_button_gimbal_drone_callback">
+<span class="sig-name descname"><span class="pre">right_button_gimbal_drone_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.right_button_gimbal_drone_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Left” button from the Gimbal drone panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.right_button_gimbal_gnd_callback">
+<span class="sig-name descname"><span class="pre">right_button_gimbal_gnd_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.right_button_gimbal_gnd_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Right” button from the Gimbal GND panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.rx_follow_mode_radio_button_callback">
+<span class="sig-name descname"><span class="pre">rx_follow_mode_radio_button_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.rx_follow_mode_radio_button_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “FOLLOW” radio button in the drone gimbal panel and when it has selected the “Gremsy H16” gimbal in the Setup dialog.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.rx_lock_mode_radio_button_callback">
+<span class="sig-name descname"><span class="pre">rx_lock_mode_radio_button_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.rx_lock_mode_radio_button_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “LOCK” radio button in the drone gimbal panel and when it has selected the “Gremsy H16” gimbal in the Setup dialog.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.showCentralWidget">
+<span class="sig-name descname"><span class="pre">showCentralWidget</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.showCentralWidget" title="Link to this definition">#</a></dt>
+<dd><p>Creates and shows the panels of the main window according to grid layout defined in this function.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.showSetupMenu">
+<span class="sig-name descname"><span class="pre">showSetupMenu</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.showSetupMenu" title="Link to this definition">#</a></dt>
+<dd><p>Creates an instance of the SetupWindow class (a Setup dialog), and create attributes for this class with the values the user input in the Setup dialog.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.start_meas_button_callback">
+<span class="sig-name descname"><span class="pre">start_meas_button_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.start_meas_button_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “START” button. Starts sending pilot signal from the TX Sivers.</p>
+<p>Sends the parameters to the RX sivers (RX RFSoC server) for it to be configured and start to listen incoming signals over the air.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.start_thread_drone_gimbal_fm">
+<span class="sig-name descname"><span class="pre">start_thread_drone_gimbal_fm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.start_thread_drone_gimbal_fm" title="Link to this definition">#</a></dt>
+<dd><p>Sets the <code class="docutils literal notranslate"><span class="pre">drone_fm_flag</span></code> flag in drone’s HelperA2GMeasurements class instance, so that the drone periodically send a <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code> command to the ground node, for it (drone) node’s gimbal to follow the location of the ground node.</p>
+<p>The periodical <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code> command is sent from the drone node main script (<code class="docutils literal notranslate"><span class="pre">drone_main.py</span></code>).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.start_thread_gnd_gimbal_fm">
+<span class="sig-name descname"><span class="pre">start_thread_gnd_gimbal_fm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.start_thread_gnd_gimbal_fm" title="Link to this definition">#</a></dt>
+<dd><p>Creates and starts a timer thread (periodical callback) to send periodically the <code class="docutils literal notranslate"><span class="pre">FOLLOWGIMBAL</span></code> command to the drone node, for (this) ground node gimbal to follow the drone node location.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.start_thread_gps_visualization">
+<span class="sig-name descname"><span class="pre">start_thread_gps_visualization</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.start_thread_gps_visualization" title="Link to this definition">#</a></dt>
+<dd><p>Creates and starts a timer thread (repeating callback) to display in the GPS panel updated gps coordinates of drone’s location.</p>
+<p>NOTE: <em>the callback ``periodical_gps_display_callback`` works as expected with synthetic gps coordinates. However, this function has not been tested with the actual gps and thus, minor bugs might appear</em></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.stop_meas_button_callback">
+<span class="sig-name descname"><span class="pre">stop_meas_button_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.stop_meas_button_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “STOP” button. Sends a <code class="docutils literal notranslate"><span class="pre">STOPDRONERFSOC</span></code> command to the drone, to stop its rfsoc thread.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.stop_thread_drone_gimbal_fm">
+<span class="sig-name descname"><span class="pre">stop_thread_drone_gimbal_fm</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.stop_thread_drone_gimbal_fm" title="Link to this definition">#</a></dt>
+<dd><p>Unsets <code class="docutils literal notranslate"><span class="pre">drone_fm_flag</span></code> in drone’s HelperA2GMeasurements class instance, so that the drone’s gimbal stops following ground node location.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.stop_thread_gps_visualization">
+<span class="sig-name descname"><span class="pre">stop_thread_gps_visualization</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.stop_thread_gps_visualization" title="Link to this definition">#</a></dt>
+<dd><p>Stops the timer thread responsible for display gps coordinates in the GPS panel.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.up_button_gimbal_drone_callback">
+<span class="sig-name descname"><span class="pre">up_button_gimbal_drone_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.up_button_gimbal_drone_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Left” button from the Gimbal drone panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.up_button_gimbal_gnd_callback">
+<span class="sig-name descname"><span class="pre">up_button_gimbal_gnd_callback</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.up_button_gimbal_gnd_callback" title="Link to this definition">#</a></dt>
+<dd><p>Callback for when the user presses the “Up” button from the Gimbal GND panel.</p>
+<p>Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the “Step” textbox. The movement is relative to the angle before the button was pressed.</p>
+<p>If no value is provided in the “Step” textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.</p>
+</dd></dl>
+
+</dd></dl>
+
 </section>
 </section>
 
@@ -1813,6 +2333,66 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.start_thread_receive_meas_data"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.start_thread_receive_meas_data()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.stop_thread_receive_meas_data"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.stop_thread_receive_meas_data()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.transmit_signal"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.transmit_signal()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.SetupWindow"><code class="docutils literal notranslate"><span class="pre">SetupWindow</span></code></a><ul>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.SetupWindow.__init__"><code class="docutils literal notranslate"><span class="pre">SetupWindow.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.SetupWindow.enable_drone_coords_callback"><code class="docutils literal notranslate"><span class="pre">SetupWindow.enable_drone_coords_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.SetupWindow.enable_gnd_coords_callback"><code class="docutils literal notranslate"><span class="pre">SetupWindow.enable_gnd_coords_callback()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery"><code class="docutils literal notranslate"><span class="pre">WidgetGallery</span></code></a><ul>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.__init__"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.activate_gps_display_flag"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.activate_gps_display_flag()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.activate_rs2_fm_flag"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.activate_rs2_fm_flag()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_drone_fpga_connected"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_drone_fpga_connected()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_drone_gimbal_connected"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_drone_gimbal_connected()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_gnd_fpga_connected"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_gnd_fpga_connected()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_gnd_gimbal_connected"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_gnd_gimbal_connected()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_gnd_gps_connected"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_gnd_gps_connected()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_server_running_drone_fpga"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_server_running_drone_fpga()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_server_running_gnd_fpga"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_server_running_gnd_fpga()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_if_ssh_2_drone_reached"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_if_ssh_2_drone_reached()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.check_status_all_devices"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.check_status_all_devices()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.checker_gimbal_input_range"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.checker_gimbal_input_range()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.connect_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.connect_drone_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.convert_dB_to_valid_hex_sivers_register_values"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.convert_dB_to_valid_hex_sivers_register_values()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.createMenu"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.createMenu()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_GPS_visualization_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_GPS_visualization_panel()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_Gimbal_AIR_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_Gimbal_AIR_panel()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_Gimbal_GND_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_Gimbal_GND_panel()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_Planning_Measurements_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_Planning_Measurements_panel()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_check_connections_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_check_connections_panel()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_class_instances"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_class_instances()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_fpga_and_sivers_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_fpga_and_sivers_panel()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_pap_plot_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_pap_plot_panel()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.disconnect_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.disconnect_drone_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.down_button_gimbal_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.down_button_gimbal_drone_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.down_button_gimbal_gnd_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.down_button_gimbal_gnd_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.finish_meas_button_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.finish_meas_button_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.get_gnd_ip_node_address"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.get_gnd_ip_node_address()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.init_constants"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.init_constants()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.left_button_gimbal_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.left_button_gimbal_drone_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.left_button_gimbal_gnd_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.left_button_gimbal_gnd_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.move_button_gimbal_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.move_button_gimbal_drone_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.move_button_gimbal_gnd_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.move_button_gimbal_gnd_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.periodical_gps_display_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.periodical_gps_display_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.periodical_pap_display_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.periodical_pap_display_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.right_button_gimbal_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.right_button_gimbal_drone_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.right_button_gimbal_gnd_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.right_button_gimbal_gnd_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.rx_follow_mode_radio_button_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.rx_follow_mode_radio_button_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.rx_lock_mode_radio_button_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.rx_lock_mode_radio_button_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.showCentralWidget"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.showCentralWidget()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.showSetupMenu"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.showSetupMenu()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.start_meas_button_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.start_meas_button_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.start_thread_drone_gimbal_fm"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.start_thread_drone_gimbal_fm()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.start_thread_gnd_gimbal_fm"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.start_thread_gnd_gimbal_fm()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.start_thread_gps_visualization"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.start_thread_gps_visualization()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.stop_meas_button_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.stop_meas_button_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.stop_thread_drone_gimbal_fm"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.stop_thread_drone_gimbal_fm()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.stop_thread_gps_visualization"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.stop_thread_gps_visualization()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.up_button_gimbal_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.up_button_gimbal_drone_callback()</span></code></a></li>
+<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.up_button_gimbal_gnd_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.up_button_gimbal_gnd_callback()</span></code></a></li>
 </ul>
 </li>
 </ul>
