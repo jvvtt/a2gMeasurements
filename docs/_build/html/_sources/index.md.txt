@@ -34,4 +34,8 @@ $ python GUI_A2G_MEAS.py
     :members: __init__, gimbal_follows_drone, do_follow_mode_gimbal, do_getgps_action, do_setgimbal_action, do_start_meas_drone_rfsoc, do_stop_meas_drone_rfsoc, do_finish_meas_drone_rfsoc, do_set_irf_action, do_closed_gui_action, do_set_remote_fm_flag, do_set_remote_stop_fm, process_answer_get_gps, decode_message, encode_message, socket_receive, socket_send_cmd, HelperStartA2GCom, HelperA2GStopCom
 .. autoclass:: a2gmeasurements.GimbalGremsyH16
     :members: __init__, define_home_position, start_imu_thread, receive_imu_data, stop_thread_imu, fit_model_to_gimbal_angular_data, setPosControlGPModel, load_measured_drifts, load_measured_data_july_2023, load_measured_data_august_2023, gremsy_angle, plot_linear_reg_on_near_domain, start_thread_gimbal, setPosControl, stop_thread_gimbal, control_power_motors, change_gimbal_mode
+.. autoclass:: a2gmeasurements.SBUSEncoder
+    :members: __init__, set_channel, start_sbus, stop_updating, send_sbus_msg, update_rest_state_channel, not_move_command, move_gimbal, change_mode
+.. autoclass:: a2gmeasurements.RFSoCRemoteControlFromHost
+    :members: __init__, send_cmd, transmit_signal, set_rx_rf, receive_signal_async, pipeline_operations_rfsoc_rx_ndarray, save_hest_buffer, start_thread_receive_meas_data, stop_thread_receive_meas_data, finish_measurement
 ```

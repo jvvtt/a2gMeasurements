@@ -3228,16 +3228,32 @@ class GimbalGremsyH16:
         
 class SBUSEncoder:
     """
-    Requires a hardware inverter (i.e. 74HCN04) on the signal to be able to work as FrSky receiver because
-    (idle, stop and parity bits are different than conventional UART).
+    Python class that encodes the sbus protocol serial signal. The sbus protocol is an UART protocol that specifies the way to send a receive multiple channel information by using a conventional UART channel.
     
-    For Gremsy H16:
-    Channel 2 is assumed to be elevation (pitch)
-    Channel 4 is assumed to be pan (yaw)
-    Channel 5 is assumed to be mode (lock, follow, off)
+    Each channel carries information about a control value. It is mainly used by RC receivers to control the angular movement of an object along its different axis.
     
+    Among the control values in an sbus protocol message are the known throttle, aileron, rudder and elevation.
+    
+    Each manufacturer can have a slightly different implementation of the sbus protocol.
+    
+    The sbus implementation for the Gremsy H16 requires that the idle, stop and parity bits are inverted w.r.t to their voltage value in a conventional UART communication. That is why a hardware inverter (i.e. 74HCN04) is used on the signal.
+    
+    The following is the standard convention for the channels in Gremsy H16 (although it can be changed):
+    
+    1. Channel 2 is assumed to be elevation (pitch)
+    
+    2. Channel 4 is assumed to be pan (yaw)
+    
+    3. Channel 5 is assumed to be mode (lock, follow, off)    
     """
     def __init__(self):
+        """
+         Initializes the channels.
+         
+         Establishes a linear mapping between the RC control value interval (-100, 100) and the actual values seen at the osciloscoppe of a given channel (i.e rudder).
+         
+         Define some attributes of the class. The atributes related with drifting are defined in the section Gremsy H16 Gimbal of the "Manual A2GMeasurements".
+        """
         #self.channels = [1024] * 16
         self.channels = np.ones(16, dtype=np.uint16)*1024
 
@@ -3247,8 +3263,8 @@ class SBUSEncoder:
         
         # What intuitively should be is
         # m, b = np.linalg.solve([[-100, 1], [100, 1]], [0, 2047]) 
+        
         # or according to some repositories, for FrSky receivers:
-
         #m, b = np.linalg.solve([[-100, 1], [100, 1]], [127, 1811])
         #m, b = np.linalg.solve([[-100, 1], [100, 1]], [237, 1864])
         #m, b = np.linalg.solve([[-100, 1], [100, 1]], [0, 2047])
@@ -3267,9 +3283,23 @@ class SBUSEncoder:
         self.MODE = 'LOCK'
          
     def set_channel(self, channel, data):
+        """
+         Sets a value on a channel. This a "setter function".
+
+        :param channel: channel to be set
+        :type channel: int
+        :param data: value to be set at the channel
+        :type data: int
+        """
         self.channels[channel] = data & 0x07ff    
     
     def encode_data(self):
+        """
+         Encodes the values on the channels according to the sbus protocol.
+
+        :return: a 24-fields packet/msg that encodes the channel values according to sbus protocol.
+        :rtype: list of int
+        """
         
         #packet = np.zeros(25, dtype=np.uint8)
         packet = [0]*25
@@ -3307,8 +3337,14 @@ class SBUSEncoder:
         
     def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.009): #period_packet=0.009
         """
-        Serial port on Raspberry Pi 4 ground node is /dev/ttyAMA#
-        
+         Creates the serial connection between the host computer and the gimbal.
+         
+         Starts the repeating thread (RepeatTimer class instance) to send data each ``period_packet`` seconds. This mimics the behaviour between the RC transmitter and receiver.
+
+        :param serial_interface: serial port, defaults to '/dev/ttyUSB'
+        :type serial_interface: str, optional
+        :param period_packet: time between calls of ``self.send_sbus_msg``. It was found that the communication is decoded when this value is lower than 20 ms. The actual value observed in the oscilloscope of the interval between sbus signal is 10-13ms (More in "Manual A2GMeasurements", section Gremsy H16 Gimbal), defaults to 0.009
+        :type period_packet: float, optional
         """
         
         #self.encoder = SBUSEncoder()
@@ -3325,10 +3361,18 @@ class SBUSEncoder:
         print('\n[DEBUG]: SBUS threading started')
 
     def stop_updating(self):
+        """
+         Stops the thread to repeatedly call ``self.send_sbus_msg``. Closes the opened serial port for this communication.
+        """
         self.timer_fcn.cancel()
         self.serial_port.close()
     
     def send_sbus_msg(self):
+        """
+         Calls the channels encoder to write the message on the serial port.
+         
+         Since there is a known drifting in the yaw axis, this method sets a different 0 value (no movement) to counter the drifting behaviour. This is explained in "Manual A2GMeasurements" (Gremsy H16 Gimbal section), but a kind of equivalent way to understand this, is that we try to counter drift by changing the effective duty cycle of the yaw channel value.
+        """
         if self.ENABLE_UPDATE_REST:
             self.update_rest_state_channel()
         data = self.encode_data()
@@ -3348,7 +3392,13 @@ class SBUSEncoder:
         #self.set_channel(channel, int(scale * 2047))
     
     def update_rest_state_channel(self):
-        if self.cnt % 2 == 0:
+        """
+         Sets the no movement value (0) of the yaw channel (i.e. channel 4) to the experimentally found value that counters the drift. 
+         
+         Change ``parameter`` to change the "effective duty cycle" of the yaw channel value. More explanation is found in "Manual A2GMeasurements" (Gremsy H16 Gimbal section)
+        """
+        parameter = 2
+        if self.cnt % parameter == 0:
             self.update_channel(channel=4, value=0)
         else:
             self.update_channel(channel=4, value=self.LOW_SPEED_COUNTER_rud)
@@ -3356,10 +3406,9 @@ class SBUSEncoder:
         self.cnt = self.cnt + 1
     
     def not_move_command(self):
-        '''
-        Update the channel so that it does not continue moving
-
-        '''
+        """
+         Updates the channel so that it does not continue moving.
+        """
         
         self.update_channel(channel=1, value=0)
         self.update_channel(channel=2, value=0)
@@ -3375,11 +3424,20 @@ class SBUSEncoder:
         
     def move_gimbal(self, ele, rud, mov_time):
         """
-        Move the gimbal in the pan and elevationa axis
+         Moves the gimbal a certain angle. The angle to be moved is determined by the RC control value for yaw, the RC control value for pitch, and the time those values are hold before realeasing them.
+         
+         The RC control values for yaw (``rud``) and pitch (``ele``) are values in the range (-100, 100) that behave as speed values: speed the gimbal will move in that particular axis (i.e. speed it will move in the yaw axis).
+         
+         Angle = Angular Speed x time
+         
+         Angular Speed = function of the RC control value
 
-        Args:
-            ele (float): should be between -100 , 100
-            mov_time (float): time in seconds 
+        :param ele: RC control value for pitch. Can be thought as the pitch axis velocity. Between -100, 100. 
+        :type ele: int
+        :param rud: RC control value for yaw. Can be thought as the yaw axis velocity. Between -100, 100. 
+        :type rud: int
+        :param mov_time: time (seconds) to hold the velocity in a particular axis. 
+        :type mov_time: int
         """
         self.ENABLE_UPDATE_REST = False
         self.update_channel(channel=1, value=0)
@@ -3398,6 +3456,9 @@ class SBUSEncoder:
         self.time_last_move_cmd = datetime.datetime.now().timestamp()
     
     def turn_off_motors(self):
+        """
+         Turns off all gimbal motors.
+        """
         self.update_channel(channel=1, value=0)
         self.update_channel(channel=2, value=0)
         self.update_channel(channel=3, value=0)
@@ -3405,6 +3466,9 @@ class SBUSEncoder:
         self.update_channel(channel=5, value=100)
     
     def turn_on_motors(self):
+        """
+         Turns on all gimbal motors.
+        """
         # Turn on motors and set the gimbal to lock mode
         self.update_channel(channel=5, value=0)
         
@@ -3412,6 +3476,12 @@ class SBUSEncoder:
         #self.update_channel(channel=5, value=-100)
         
     def change_mode(self, mode='LOCK'):
+        """
+         Changes the mode of all gimbal motors. According to manufacturers H16 manual the choices are: "FOLLOW" and "LOCK".
+
+        :param mode: either "FOLLOW" or "LOCK". A description of each mode is on the manufacturer H16 manual, defaults to 'LOCK'
+        :type mode: str, optional
+        """
         if mode == 'FOLLOW':
             self.update_channel(channel=5, value=-100)
         elif mode == 'LOCK':
@@ -3419,14 +3489,46 @@ class SBUSEncoder:
 
 class RFSoCRemoteControlFromHost():
     """
-    Class that implements methods handling commands to be sent from the host computer (either the ground node or the drone node) to the server program
-    running in the RFSoC connected through ETH to that computer.
+     Python class that implements all functionality for the communication between a host computer (client) and the RFSoC (server) connected through Ethernet to it. 
+     
+     Configures the antenna front end (Sivers EVK) parameters. The antenna front end is responsible for upconverting the frequency, beamforming and providing the physical interface with the air.
     
-    Code used in this class was provided by Panagiotis Skrimponis.
-    It was extended and adpated by Julian D. Villegas G.
+     Implements the client side (host computer) functionality of the TCP connection. 
+    
+     Most of the methods of this class were developed by Panagiotis Skrimponis. They were integrated in a class and extended by Julian D. Villegas G.
     """
     
     def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDAPs', operating_freq=57.51e9):
+        """
+         Creates two sockets: one for control commands and another for transfer data.
+         
+         Establish the connection between the client and the RFSoC.
+         
+         Some important attributes of this class are:
+         
+         1. ``beam_idx_for_vis``: this attribute sets the index of the beams of the measured Channel Impulse Response (CIR) that are sent from the drone node to the ground node to be displayed in the GUI.
+         
+         2. ``TIME_SNAPS_TO_SAVE``: number of CIR snapshots to collect before save them on disk.
+         
+         3. ``TIME_SNAPS_TO_VIS``: number of CIR snapshots to be displayed. This value is set depending on the max bytes that can be send through Ethernet in a single message (i.e. 22 time snaps * 16 beams * 4 bytes-per-PAP-entry = 1408 bytes)
+         
+         4. ``nbeams``: number of beams of the CIR to be retrieved from the server.
+         
+         5. ``nread``: number of delay taps of the CIR to be retrieved from the server.
+         
+         6. ``nbytes``: number of bytes of a full CIR (1 time snapshot, 64 beams, 1024 delay taps)
+         
+        :param radio_control_port: port for "control socket", defaults to 8080
+        :type radio_control_port: int, optional
+        :param radio_data_port: port for "data socket", defaults to 8081
+        :type radio_data_port: int, optional
+        :param rfsoc_static_ip_address: static IP address of the rfsoc ethernet interface, defaults to '10.1.1.40'
+        :type rfsoc_static_ip_address: str, optional
+        :param filename: name to be used when saving the CIRs, defaults to 'PDAPs'.
+        :type filename: str, optional
+        :param operating_freq: operating frequency for the antenna array front end, defaults to 57.51e9.
+        :type operating_freq: int, optional
+        """
         self.operating_freq = operating_freq
         self.radio_control_port = radio_control_port
         self.radio_data_port = radio_data_port
@@ -3443,16 +3545,14 @@ class RFSoCRemoteControlFromHost():
         self.beam_idx_for_vis = [i*4 for i in range(0, 16)]
         self.bytes_per_irf = 64*1024*16 # Exactly 1 MB
         self.irfs_per_second = 7 # THIS MUST BE FOUND IN BETTER A WAY
-        self.MAX_PAP_BUF_SIZE = 220  
-        self.MAX_PAP_BUF_SIZE_BYTES = self.MAX_PAP_BUF_SIZE * self.bytes_per_irf
-        self.TIME_SNAPS_TO_VIS = 10
+        self.TIME_SNAPS_TO_SAVE = 220  
+        self.MAX_PAP_BUF_SIZE_BYTES = self.TIME_SNAPS_TO_SAVE * self.bytes_per_irf
+        self.TIME_SNAPS_TO_VIS = 22
         self.TIME_GET_IRF = 0.14
-        self.TIME_SAVE_H = 15
-        self.TIME_SEND_PAP = 1
         self.nbeams = 64
-        self.nbytes_per_item = 2
+        nbytes_per_item = 2
         self.nread = 1024
-        self.nbytes = self.nbeams * self.nbytes_per_item * self.nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
+        self.nbytes = self.nbeams * nbytes_per_item * self.nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
         
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -3468,15 +3568,14 @@ class RFSoCRemoteControlFromHost():
         
     def send_cmd(self, cmd, cmd_arg=None):
         """
-        Sends a comand to the RFSoC connected through ethernet to the host computer.
+         Sends a command to the RFSoC server. 
+         
+         These commands control the Sivers EVK mode, carrier frequncy, tx gain and rx gain.
 
-        Args:
-            cmd (str): List of available of commands are: 'setModeSivers', 'setCarrierFrequencySivers', 'setGainTxSivers', 'setGainRxSivers
-            cmd_arg (str or float): command parameter. This the list of supported parameters for each command:
-                                    'setModeSivers'                   'RXen_0_TXen1', 'RXen1_TXen0', 'RXen0_TXen0'
-                                    'setCarrierFrequencySivers'        float number, i.e.: 57.51e9
-                                    'setGainTxSivers'    dict with this structure {'tx_bb_gain': 0x00, 'tx_bb_phase': 0x00, 'tx_bb_iq_gain': 0x00, 'tx_bfrf_gain': 0x00}
-                                    'setGainRxSivers'    dict with this structure {'rx_gain_ctrl_bb1':0x00, 'rx_gain_ctrl_bb2':0x00, 'rx_gain_ctrl_bb3':0x00, 'rx_gain_ctrl_bfrf':0x00}
+        :param cmd: available commands are: 'setModeSivers', 'setCarrierFrequencySivers', 'setGainTxSivers', 'setGainRxSivers
+        :type cmd: str
+        :param cmd_arg: supported parameters for 'setModeSivers' are 'RXen_0_TXen1', 'RXen1_TXen0', 'RXen0_TXen0'; supported parameters for 'setCarrierFrequencySivers' are float number, i.e.: 57.51e9; supported parameters for 'setGainTxSivers' are dict with this structure {'tx_bb_gain': 0x00, 'tx_bb_phase': 0x00, 'tx_bb_iq_gain': 0x00, 'tx_bfrf_gain': 0x00}; supported parameters for 'setGainRxSivers' are dict with this structure {'rx_gain_ctrl_bb1':0x00, 'rx_gain_ctrl_bb2':0x00, 'rx_gain_ctrl_bb3':0x00, 'rx_gain_ctrl_bfrf':0x00}.
+        :type cmd_arg: str or float or dict, optional
         """
 
         if cmd == 'setModeSivers':
@@ -3522,22 +3621,20 @@ class RFSoCRemoteControlFromHost():
     
     def transmit_signal(self, tx_bb_gain=0x3, tx_bb_phase=0, tx_bb_iq_gain=0x77, tx_bfrf_gain=0x40, carrier_freq=57.51e9):
         """
-        Wrapper function to set Tx gains and frequency of operation
+         Sets Tx gains and frequency of operation. Wrapper function of ``send_cmd``.
+         
+         More about TX gains is found in the Sivers EVK manual/reference guides.
 
-        Args:
-            tx_bb_gain (hexadecimal, optional): Defaults to 0x3.
-             tx_ctrl bit 3 (BB Ibias set) = 0: 0x00  = 0 dB, 0x01  = 6 dB, 0x02  = 6 dB, 0x03  = 9.5 dB
-             tx_ctrl bit 3 (BB Ibias set) = 1, 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB
-            tx_bb_phase (int, optional): Defaults to 0.
-            tx_bb_iq_gain (hexadecimal, optional): Defaults to 0x77.
-             Gain in BB:
-             [0:3, I gain]: 0-6 dB, 16 steps
-             [4:7, Q gain]: 0-6 dB, 16 steps
-            tx_bfrf_gain (hexadecimal, optional): Defaults to 0x40.
-             Gain after RF mixer:
-             [0:3, RF gain]: 0-15 dB, 16 steps 
-             [4:7, BF gain]: 0-15 dB, 16 steps  
-            carrier_freq (float, optional): _description_. Defaults to 57.51e9.
+        :param tx_bb_gain: sets baseband gain according to: 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB (when sivers register tx_ctrl bit 3 (BB Ibias set) = 1), defaults to 0x3
+        :type tx_bb_gain: int (hexadecimal), optional
+        :param tx_bb_phase: _description_, defaults to 0
+        :type tx_bb_phase: int, optional
+        :param tx_bb_iq_gain: sets baseband I, Q gain according to: [0:3, I gain]: 0-6 dB, 16 steps; [4:7, Q gain]: 0-6 dB, 16 steps, defaults to 0x77
+        :type tx_bb_iq_gain: int (hexadecimal), optional
+        :param tx_bfrf_gain: sets gain after RF mixer according to: [0:3, RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps, defaults to 0x40
+        :type tx_bfrf_gain: int (hexadecimal), optional
+        :param carrier_freq: carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz), defaults to 57.51e9
+        :type carrier_freq: int, optional
         """
 
         dict_tx_gains = {'tx_bb_gain': tx_bb_gain, 'tx_bb_phase': tx_bb_phase, 'tx_bb_iq_gain': tx_bb_iq_gain, 'tx_bfrf_gain': tx_bfrf_gain}
@@ -3549,23 +3646,18 @@ class RFSoCRemoteControlFromHost():
         
     def set_rx_rf(self, rx_gain_ctrl_bb1=0x77, rx_gain_ctrl_bb2=0x00, rx_gain_ctrl_bb3=0x99, rx_gain_ctrl_bfrf=0xFF, carrier_freq=57.51e9):
         """
-        Wrapper function to set Rx gains and Frequency of operation
+         Sets rx gains and frequency of operation. Wrapper function of ``send_cmd``.
 
-        Args:
-            rx_gain_ctrl_bb1 (hexadecimal, optional): Defaults to 0x77.
-             I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-             Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            rx_gain_ctrl_bb2 (hexadecimal, optional): Defaults to 0x00.
-             I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-             Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            rx_gain_ctrl_bb3 (hexadecimal, optional): Defaults to 0x99.
-             I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-             Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps
-            rx_gain_ctrl_bfrf (_type_, optional): Defaults to 0xFF.
-             Gain after RF mixer:
-             [0:3,RF gain]: 0-15 dB, 16 steps
-             [4:7, BF gain]: 0-15 dB, 16 steps 
-            carrier_freq (_type_, optional): _description_. Defaults to 57.51e9.
+        :param rx_gain_ctrl_bb1: sets the first rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x77
+        :type rx_gain_ctrl_bb1: int (hexadecimal), optional
+        :param rx_gain_ctrl_bb2: sets the second rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x00
+        :type rx_gain_ctrl_bb2: int (hexadecimal), optional
+        :param rx_gain_ctrl_bb3: sets the third rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x99
+        :type rx_gain_ctrl_bb3: int (hexadecimal), optional
+        :param rx_gain_ctrl_bfrf: sets gain after the mixer according to; [0:3,RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps, defaults to 0xFF
+        :type rx_gain_ctrl_bfrf: int (hex), optional
+        :param carrier_freq: carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz), defaults to 57.51e9
+        :type carrier_freq: int , optional
         """
 
         dict_rx_gains = {'rx_gain_ctrl_bb1':rx_gain_ctrl_bb1, 'rx_gain_ctrl_bb2':rx_gain_ctrl_bb2, 'rx_gain_ctrl_bb3':rx_gain_ctrl_bb3, 'rx_gain_ctrl_bfrf':rx_gain_ctrl_bfrf}
@@ -3576,11 +3668,14 @@ class RFSoCRemoteControlFromHost():
     
     def receive_signal_async(self, stop_event):
         """
-        Function callback for the thread of reading rx signal from fpga. Asks the server at the rfsoc to do the logic/procedure to get
-        the rx signal at the rfsoc and then sends it back to the host computer.
+         Callback for the thread responsible for retrieving CIRs from RFSoC server (rfsoc thread).
+         
+         When enough (``self.TIME_SNAPS_TO_VIS``) CIR time snapshots are available, computes the Power Angular Profile to be sent to the ground node for displaying it in the GUI.
+         
+         When enough (``self.TIME_SNAPS_TO_SAVE``) CIR time snapshots are available, saves the CIRs on disk.
 
-        Args:
-            stop_event (threading.Event): event that stops this thread
+        :param stop_event: when set, this function does nothing (the thread can be alived but does nothing)
+        :type stop_event: threading.Event
         """
         while not stop_event.is_set():
             self.n_receive_calls = self.n_receive_calls + 1
@@ -3596,30 +3691,32 @@ class RFSoCRemoteControlFromHost():
             
             self.hest.append(rxtd)
             
-            if len(self.hest) == 22:
+            if len(self.hest) == self.TIME_SNAPS_TO_VIS:
                 self.data_to_visualize = self.pipeline_operations_rfsoc_rx_ndarray(np.array(self.hest), 2)
             
-            if len(self.hest) > 22: # maximum packet size to send over the tcp connection
+            if len(self.hest) > self.TIME_SNAPS_TO_VIS: # maximum packet size to send over the tcp connection
                 tmp = self.pipeline_operations_rfsoc_rx_ndarray(rxtd, 1)
                 self.data_to_visualize = np.roll(self.data_to_visualize, -1, axis=0) 
                 self.data_to_visualize[-1, :] = tmp 
             
-            if len(self.hest) >= self.MAX_PAP_BUF_SIZE:
+            if len(self.hest) >= self.TIME_SNAPS_TO_SAVE:
                 print(f"[DEBUG]: Time between save callbacks: {time.time() - self.start_time_pap_callback}")
                 self.save_hest_buffer()      
     
     def pipeline_operations_rfsoc_rx_ndarray(self, array, axis, each_n_beams=4):
         """
-        Compute a pipeline of predefined operations for 'array'.
+         Computes the PAP for a single snapshot CIR (64 beams * 1024 delay taps) or the PAPs of multiple snapshots CIR (snaps * 64 beams * 1024 delay taps).
 
-        Args:
-            array (ndarray): numpy array of 2 or 3 dimensions
-            axis (int): axis over which to compute the sum. It should be less than len(array.shape)
-            each_n_beams (int, optional): _description_. Defaults to 4.
-
-        Returns:
-            _type_: _description_
+        :param array: CIRs. If it has 2 dimensions the CIR correspond to a single snapshot, if it has 3 dimensions, the CIR correspond to multiple snapshots.
+        :type array: numpy.ndarray
+        :param axis: delay tap axis
+        :type axis: either 0, 1 or 2
+        :param each_n_beams: subsample the 64 beams by this value, defaults to 4
+        :type each_n_beams: int, optional
+        :return: computed PAP "subsampled" version.
+        :rtype: numpy.ndarray
         """
+        
         if axis >= len(array.shape):
             print(f"[DEBUG]: Invalid axis over which to add entries. The array has: {len(array.shape)} dimensions")
             return 0
@@ -3641,9 +3738,12 @@ class RFSoCRemoteControlFromHost():
     
     def save_hest_buffer(self, register_time=True):
         """
-        Save the raw (time-snaps, n_beams, n_delay_taps) array
-        
+         Saves the raw (time-snaps, n_beams, n_delay_taps) CIR array
+
+        :param register_time: parameter used for debugging purposes, defaults to True
+        :type register_time: bool, optional
         """
+        
         datestr = datetime.datetime.now()
         datestr = datestr.strftime('%Y-%m-%d-%H-%M-%S-%f')
         
@@ -3662,13 +3762,16 @@ class RFSoCRemoteControlFromHost():
 
     def start_thread_receive_meas_data(self, msg_data):
         """
-        A thread -instead of a subprocess- is good enough since the computational expense
-        of the task is not donde in the host computer but in the RFSoC. The host just reads
-        the data through ETH.
+         Creates and starts the rfsoc thread.
+         
+         A thread -instead of a subprocess- is good enough since the computational expense of the task is not donde in the host computer but in the RFSoC. The host just reads the data through Ethernet.
         
-        A new thread is started each time the this function is called. It is required for the developer to call
-        'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
+         A new thread is started each time this function is called. It is required for the developer to call 'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
+
+        :param msg_data: dictionary containing the parameters required by ``set_rx_rf`` to set a Sivers EVK configuration. 
+        :type msg_data: dict
         """
+        
         self.event_stop_thread_rx_irf = threading.Event()                
         self.thread_rx_irf = threading.Thread(target=self.receive_signal_async, args=(self.event_stop_thread_rx_irf,))
         self.set_rx_rf(carrier_freq=msg_data['carrier_freq'],
@@ -3684,6 +3787,9 @@ class RFSoCRemoteControlFromHost():
         print("[DEBUG]: receive_signal_async thread STARTED")
     
     def stop_thread_receive_meas_data(self):
+        """
+         Stops the rfsoc thread and saves remaining CIRs.
+        """
         self.event_stop_thread_rx_irf.set()
         self.time_finish_receive_thread = time.time()
         print("[DEBUG]: receive_signal_async thread STOPPED")
@@ -3695,6 +3801,9 @@ class RFSoCRemoteControlFromHost():
         self.n_receive_calls = 0
         
     def finish_measurement(self):
+        """
+         Kills the rfsoc if it is still alive and saves the remaining CIRs.
+        """
         # Check if the thread is finished and if not stop it
         if self.thread_rx_irf.is_alive():
             self.stop_thread_receive_meas_data()

@@ -1373,6 +1373,294 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">a2gmeasurements.</span></span><span class="sig-name descname"><span class="pre">SBUSEncoder</span></span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder" title="Link to this definition">#</a></dt>
+<dd><p>Python class that encodes the sbus protocol serial signal. The sbus protocol is an UART protocol that specifies the way to send a receive multiple channel information by using a conventional UART channel.</p>
+<p>Each channel carries information about a control value. It is mainly used by RC receivers to control the angular movement of an object along its different axis.</p>
+<p>Among the control values in an sbus protocol message are the known throttle, aileron, rudder and elevation.</p>
+<p>Each manufacturer can have a slightly different implementation of the sbus protocol.</p>
+<p>The sbus implementation for the Gremsy H16 requires that the idle, stop and parity bits are inverted w.r.t to their voltage value in a conventional UART communication. That is why a hardware inverter (i.e. 74HCN04) is used on the signal.</p>
+<p>The following is the standard convention for the channels in Gremsy H16 (although it can be changed):</p>
+<ol class="arabic simple">
+<li><p>Channel 2 is assumed to be elevation (pitch)</p></li>
+<li><p>Channel 4 is assumed to be pan (yaw)</p></li>
+<li><p>Channel 5 is assumed to be mode (lock, follow, off)</p></li>
+</ol>
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.__init__" title="Link to this definition">#</a></dt>
+<dd><p>Initializes the channels.</p>
+<p>Establishes a linear mapping between the RC control value interval (-100, 100) and the actual values seen at the osciloscoppe of a given channel (i.e rudder).</p>
+<p>Define some attributes of the class. The atributes related with drifting are defined in the section Gremsy H16 Gimbal of the “Manual A2GMeasurements”.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.change_mode">
+<span class="sig-name descname"><span class="pre">change_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'LOCK'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.change_mode" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Changes the mode of all gimbal motors. According to manufacturers H16 manual the choices are: “FOLLOW” and “LOCK”.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>mode</strong> (<em>str</em><em>, </em><em>optional</em>) – either “FOLLOW” or “LOCK”. A description of each mode is on the manufacturer H16 manual, defaults to ‘LOCK’</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.move_gimbal">
+<span class="sig-name descname"><span class="pre">move_gimbal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ele</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rud</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mov_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.move_gimbal" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Moves the gimbal a certain angle. The angle to be moved is determined by the RC control value for yaw, the RC control value for pitch, and the time those values are hold before realeasing them.</p>
+<p>The RC control values for yaw (<code class="docutils literal notranslate"><span class="pre">rud</span></code>) and pitch (<code class="docutils literal notranslate"><span class="pre">ele</span></code>) are values in the range (-100, 100) that behave as speed values: speed the gimbal will move in that particular axis (i.e. speed it will move in the yaw axis).</p>
+<p>Angle = Angular Speed x time</p>
+<p>Angular Speed = function of the RC control value</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ele</strong> (<em>int</em>) – RC control value for pitch. Can be thought as the pitch axis velocity. Between -100, 100.</p></li>
+<li><p><strong>rud</strong> (<em>int</em>) – RC control value for yaw. Can be thought as the yaw axis velocity. Between -100, 100.</p></li>
+<li><p><strong>mov_time</strong> (<em>int</em>) – time (seconds) to hold the velocity in a particular axis.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.not_move_command">
+<span class="sig-name descname"><span class="pre">not_move_command</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.not_move_command" title="Link to this definition">#</a></dt>
+<dd><p>Updates the channel so that it does not continue moving.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.send_sbus_msg">
+<span class="sig-name descname"><span class="pre">send_sbus_msg</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.send_sbus_msg" title="Link to this definition">#</a></dt>
+<dd><p>Calls the channels encoder to write the message on the serial port.</p>
+<p>Since there is a known drifting in the yaw axis, this method sets a different 0 value (no movement) to counter the drifting behaviour. This is explained in “Manual A2GMeasurements” (Gremsy H16 Gimbal section), but a kind of equivalent way to understand this, is that we try to counter drift by changing the effective duty cycle of the yaw channel value.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.set_channel">
+<span class="sig-name descname"><span class="pre">set_channel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.set_channel" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Sets a value on a channel. This a “setter function”.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>channel</strong> (<em>int</em>) – channel to be set</p></li>
+<li><p><strong>data</strong> (<em>int</em>) – value to be set at the channel</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.start_sbus">
+<span class="sig-name descname"><span class="pre">start_sbus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">serial_interface</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'/dev/ttyUSB'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period_packet</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.009</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.start_sbus" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Creates the serial connection between the host computer and the gimbal.</p>
+<p>Starts the repeating thread (RepeatTimer class instance) to send data each <code class="docutils literal notranslate"><span class="pre">period_packet</span></code> seconds. This mimics the behaviour between the RC transmitter and receiver.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>serial_interface</strong> (<em>str</em><em>, </em><em>optional</em>) – serial port, defaults to ‘/dev/ttyUSB’</p></li>
+<li><p><strong>period_packet</strong> (<em>float</em><em>, </em><em>optional</em>) – time between calls of <code class="docutils literal notranslate"><span class="pre">self.send_sbus_msg</span></code>. It was found that the communication is decoded when this value is lower than 20 ms. The actual value observed in the oscilloscope of the interval between sbus signal is 10-13ms (More in “Manual A2GMeasurements”, section Gremsy H16 Gimbal), defaults to 0.009</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.stop_updating">
+<span class="sig-name descname"><span class="pre">stop_updating</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.stop_updating" title="Link to this definition">#</a></dt>
+<dd><p>Stops the thread to repeatedly call <code class="docutils literal notranslate"><span class="pre">self.send_sbus_msg</span></code>. Closes the opened serial port for this communication.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.SBUSEncoder.update_rest_state_channel">
+<span class="sig-name descname"><span class="pre">update_rest_state_channel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.SBUSEncoder.update_rest_state_channel" title="Link to this definition">#</a></dt>
+<dd><p>Sets the no movement value (0) of the yaw channel (i.e. channel 4) to the experimentally found value that counters the drift.</p>
+<p>Change <code class="docutils literal notranslate"><span class="pre">parameter</span></code> to change the “effective duty cycle” of the yaw channel value. More explanation is found in “Manual A2GMeasurements” (Gremsy H16 Gimbal section)</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">a2gmeasurements.</span></span><span class="sig-name descname"><span class="pre">RFSoCRemoteControlFromHost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">radio_control_port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8080</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">radio_data_port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8081</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rfsoc_static_ip_address</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'10.1.1.40'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'PDAPs'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operating_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">57510000000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost" title="Link to this definition">#</a></dt>
+<dd><p>Python class that implements all functionality for the communication between a host computer (client) and the RFSoC (server) connected through Ethernet to it.</p>
+<p>Configures the antenna front end (Sivers EVK) parameters. The antenna front end is responsible for upconverting the frequency, beamforming and providing the physical interface with the air.</p>
+<p>Implements the client side (host computer) functionality of the TCP connection.</p>
+<p>Most of the methods of this class were developed by Panagiotis Skrimponis. They were integrated in a class and extended by Julian D. Villegas G.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">radio_control_port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8080</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">radio_data_port</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8081</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rfsoc_static_ip_address</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'10.1.1.40'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'PDAPs'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operating_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">57510000000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.__init__" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Creates two sockets: one for control commands and another for transfer data.</p>
+<p>Establish the connection between the client and the RFSoC.</p>
+<p>Some important attributes of this class are:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">beam_idx_for_vis</span></code>: this attribute sets the index of the beams of the measured Channel Impulse Response (CIR) that are sent from the drone node to the ground node to be displayed in the GUI.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TIME_SNAPS_TO_SAVE</span></code>: number of CIR snapshots to collect before save them on disk.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TIME_SNAPS_TO_VIS</span></code>: number of CIR snapshots to be displayed. This value is set depending on the max bytes that can be send through Ethernet in a single message (i.e. 22 time snaps * 16 beams * 4 bytes-per-PAP-entry = 1408 bytes)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbeams</span></code>: number of beams of the CIR to be retrieved from the server.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nread</span></code>: number of delay taps of the CIR to be retrieved from the server.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nbytes</span></code>: number of bytes of a full CIR (1 time snapshot, 64 beams, 1024 delay taps)</p></li>
+</ol>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>radio_control_port</strong> (<em>int</em><em>, </em><em>optional</em>) – port for “control socket”, defaults to 8080</p></li>
+<li><p><strong>radio_data_port</strong> (<em>int</em><em>, </em><em>optional</em>) – port for “data socket”, defaults to 8081</p></li>
+<li><p><strong>rfsoc_static_ip_address</strong> (<em>str</em><em>, </em><em>optional</em>) – static IP address of the rfsoc ethernet interface, defaults to ‘10.1.1.40’</p></li>
+<li><p><strong>filename</strong> (<em>str</em><em>, </em><em>optional</em>) – name to be used when saving the CIRs, defaults to ‘PDAPs’.</p></li>
+<li><p><strong>operating_freq</strong> (<em>int</em><em>, </em><em>optional</em>) – operating frequency for the antenna array front end, defaults to 57.51e9.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.finish_measurement">
+<span class="sig-name descname"><span class="pre">finish_measurement</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.finish_measurement" title="Link to this definition">#</a></dt>
+<dd><p>Kills the rfsoc if it is still alive and saves the remaining CIRs.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.pipeline_operations_rfsoc_rx_ndarray">
+<span class="sig-name descname"><span class="pre">pipeline_operations_rfsoc_rx_ndarray</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">each_n_beams</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.pipeline_operations_rfsoc_rx_ndarray" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Computes the PAP for a single snapshot CIR (64 beams * 1024 delay taps) or the PAPs of multiple snapshots CIR (snaps * 64 beams * 1024 delay taps).</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>array</strong> (<em>numpy.ndarray</em>) – CIRs. If it has 2 dimensions the CIR correspond to a single snapshot, if it has 3 dimensions, the CIR correspond to multiple snapshots.</p></li>
+<li><p><strong>axis</strong> (<em>either 0</em><em>, </em><em>1</em><em> or </em><em>2</em>) – delay tap axis</p></li>
+<li><p><strong>each_n_beams</strong> (<em>int</em><em>, </em><em>optional</em>) – subsample the 64 beams by this value, defaults to 4</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>computed PAP “subsampled” version.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.receive_signal_async">
+<span class="sig-name descname"><span class="pre">receive_signal_async</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stop_event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.receive_signal_async" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Callback for the thread responsible for retrieving CIRs from RFSoC server (rfsoc thread).</p>
+<p>When enough (<code class="docutils literal notranslate"><span class="pre">self.TIME_SNAPS_TO_VIS</span></code>) CIR time snapshots are available, computes the Power Angular Profile to be sent to the ground node for displaying it in the GUI.</p>
+<p>When enough (<code class="docutils literal notranslate"><span class="pre">self.TIME_SNAPS_TO_SAVE</span></code>) CIR time snapshots are available, saves the CIRs on disk.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>stop_event</strong> (<em>threading.Event</em>) – when set, this function does nothing (the thread can be alived but does nothing)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.save_hest_buffer">
+<span class="sig-name descname"><span class="pre">save_hest_buffer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">register_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.save_hest_buffer" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Saves the raw (time-snaps, n_beams, n_delay_taps) CIR array</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>register_time</strong> (<em>bool</em><em>, </em><em>optional</em>) – parameter used for debugging purposes, defaults to True</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.send_cmd">
+<span class="sig-name descname"><span class="pre">send_cmd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmd_arg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.send_cmd" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Sends a command to the RFSoC server.</p>
+<p>These commands control the Sivers EVK mode, carrier frequncy, tx gain and rx gain.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cmd</strong> (<em>str</em>) – available commands are: ‘setModeSivers’, ‘setCarrierFrequencySivers’, ‘setGainTxSivers’, ‘setGainRxSivers</p></li>
+<li><p><strong>cmd_arg</strong> (<em>str</em><em> or </em><em>float</em><em> or </em><em>dict</em><em>, </em><em>optional</em>) – supported parameters for ‘setModeSivers’ are ‘RXen_0_TXen1’, ‘RXen1_TXen0’, ‘RXen0_TXen0’; supported parameters for ‘setCarrierFrequencySivers’ are float number, i.e.: 57.51e9; supported parameters for ‘setGainTxSivers’ are dict with this structure {‘tx_bb_gain’: 0x00, ‘tx_bb_phase’: 0x00, ‘tx_bb_iq_gain’: 0x00, ‘tx_bfrf_gain’: 0x00}; supported parameters for ‘setGainRxSivers’ are dict with this structure {‘rx_gain_ctrl_bb1’:0x00, ‘rx_gain_ctrl_bb2’:0x00, ‘rx_gain_ctrl_bb3’:0x00, ‘rx_gain_ctrl_bfrf’:0x00}.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.set_rx_rf">
+<span class="sig-name descname"><span class="pre">set_rx_rf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rx_gain_ctrl_bb1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">119</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rx_gain_ctrl_bb2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rx_gain_ctrl_bb3</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">153</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rx_gain_ctrl_bfrf</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">255</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">carrier_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">57510000000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.set_rx_rf" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Sets rx gains and frequency of operation. Wrapper function of <code class="docutils literal notranslate"><span class="pre">send_cmd</span></code>.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rx_gain_ctrl_bb1</strong> (<em>int</em><em> (</em><em>hexadecimal</em><em>)</em><em>, </em><em>optional</em>) – sets the first rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x77</p></li>
+<li><p><strong>rx_gain_ctrl_bb2</strong> (<em>int</em><em> (</em><em>hexadecimal</em><em>)</em><em>, </em><em>optional</em>) – sets the second rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x00</p></li>
+<li><p><strong>rx_gain_ctrl_bb3</strong> (<em>int</em><em> (</em><em>hexadecimal</em><em>)</em><em>, </em><em>optional</em>) – sets the third rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x99</p></li>
+<li><p><strong>rx_gain_ctrl_bfrf</strong> (<em>int</em><em> (</em><em>hex</em><em>)</em><em>, </em><em>optional</em>) – sets gain after the mixer according to; [0:3,RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps, defaults to 0xFF</p></li>
+<li><p><strong>carrier_freq</strong> (<em>int</em><em> , </em><em>optional</em>) – carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz), defaults to 57.51e9</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.start_thread_receive_meas_data">
+<span class="sig-name descname"><span class="pre">start_thread_receive_meas_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.start_thread_receive_meas_data" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Creates and starts the rfsoc thread.</p>
+<p>A thread -instead of a subprocess- is good enough since the computational expense of the task is not donde in the host computer but in the RFSoC. The host just reads the data through Ethernet.</p>
+<p>A new thread is started each time this function is called. It is required for the developer to call ‘stop_thread_receive_meas_data’ before calling again this function in order to close the actual thread before creating a new one.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>msg_data</strong> (<em>dict</em>) – dictionary containing the parameters required by <code class="docutils literal notranslate"><span class="pre">set_rx_rf</span></code> to set a Sivers EVK configuration.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.stop_thread_receive_meas_data">
+<span class="sig-name descname"><span class="pre">stop_thread_receive_meas_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.stop_thread_receive_meas_data" title="Link to this definition">#</a></dt>
+<dd><p>Stops the rfsoc thread and saves remaining CIRs.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="a2gmeasurements.RFSoCRemoteControlFromHost.transmit_signal">
+<span class="sig-name descname"><span class="pre">transmit_signal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tx_bb_gain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tx_bb_phase</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tx_bb_iq_gain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">119</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tx_bfrf_gain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">carrier_freq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">57510000000.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.RFSoCRemoteControlFromHost.transmit_signal" title="Link to this definition">#</a></dt>
+<dd><blockquote>
+<div><p>Sets Tx gains and frequency of operation. Wrapper function of <code class="docutils literal notranslate"><span class="pre">send_cmd</span></code>.</p>
+<p>More about TX gains is found in the Sivers EVK manual/reference guides.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tx_bb_gain</strong> (<em>int</em><em> (</em><em>hexadecimal</em><em>)</em><em>, </em><em>optional</em>) – sets baseband gain according to: 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB (when sivers register tx_ctrl bit 3 (BB Ibias set) = 1), defaults to 0x3</p></li>
+<li><p><strong>tx_bb_phase</strong> (<em>int</em><em>, </em><em>optional</em>) – _description_, defaults to 0</p></li>
+<li><p><strong>tx_bb_iq_gain</strong> (<em>int</em><em> (</em><em>hexadecimal</em><em>)</em><em>, </em><em>optional</em>) – sets baseband I, Q gain according to: [0:3, I gain]: 0-6 dB, 16 steps; [4:7, Q gain]: 0-6 dB, 16 steps, defaults to 0x77</p></li>
+<li><p><strong>tx_bfrf_gain</strong> (<em>int</em><em> (</em><em>hexadecimal</em><em>)</em><em>, </em><em>optional</em>) – sets gain after RF mixer according to: [0:3, RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps, defaults to 0x40</p></li>
+<li><p><strong>carrier_freq</strong> (<em>int</em><em>, </em><em>optional</em>) – carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz), defaults to 57.51e9</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </section>
 </section>
 
@@ -1500,6 +1788,31 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.start_thread_gimbal"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.start_thread_gimbal()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.stop_thread_gimbal"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.stop_thread_gimbal()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GimbalGremsyH16.stop_thread_imu"><code class="docutils literal notranslate"><span class="pre">GimbalGremsyH16.stop_thread_imu()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder</span></code></a><ul>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.__init__"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.change_mode"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.change_mode()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.move_gimbal"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.move_gimbal()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.not_move_command"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.not_move_command()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.send_sbus_msg"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.send_sbus_msg()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.set_channel"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.set_channel()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.start_sbus"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.start_sbus()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.stop_updating"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.stop_updating()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.SBUSEncoder.update_rest_state_channel"><code class="docutils literal notranslate"><span class="pre">SBUSEncoder.update_rest_state_channel()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost</span></code></a><ul>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.__init__"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.finish_measurement"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.finish_measurement()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.pipeline_operations_rfsoc_rx_ndarray"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.pipeline_operations_rfsoc_rx_ndarray()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.receive_signal_async"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.receive_signal_async()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.save_hest_buffer"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.save_hest_buffer()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.send_cmd"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.send_cmd()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.set_rx_rf"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.set_rx_rf()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.start_thread_receive_meas_data"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.start_thread_receive_meas_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.stop_thread_receive_meas_data"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.stop_thread_receive_meas_data()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.RFSoCRemoteControlFromHost.transmit_signal"><code class="docutils literal notranslate"><span class="pre">RFSoCRemoteControlFromHost.transmit_signal()</span></code></a></li>
 </ul>
 </li>
 </ul>
