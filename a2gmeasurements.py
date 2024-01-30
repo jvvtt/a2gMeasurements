@@ -55,7 +55,7 @@ class GimbalRS2(object):
      
      It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.
     
-     More info on "Manual A2GMeasurements" (Chapter).
+     More info on "Manual A2GMeasurements".
     
      Gimbal control modified and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software
 
