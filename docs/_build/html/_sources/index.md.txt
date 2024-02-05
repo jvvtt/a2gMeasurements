@@ -1,7 +1,15 @@
 # A2GMeasurements
+To download the repository of this project, run the following command in a terminal:
+```{code-block}
+---
+emphasize-lines: 1
+---
+$ git clone https://github.com/jvvtt/a2gMeasurements
+```
 
-a2gMeasurements.py comprises multiple (drivers for gimbal and gps, among others)
-GUI_A2G_MEAS.py has all the functionality related with the GUI
+or manually download the zip file from the same github page.
+
+The password for the github account is provided in the "Manual A2GMeasurements" file.
 
 ## Quick definitions for documentation
 There are only two types of nodes in the system: the ground node or the drone node. A node is just an abstraction of a system (either the drone or the ground) having as one of its components a host computer. 
@@ -12,8 +20,13 @@ When we refer to "this node" in the documentation, it means the node where the a
 
 Equivalently, the "other node" in the documentation, refers to the node where the attribute/method/class is NOT being executed.
 
+# Package requirements
+To run this software, a list of python packages are required. All the packages required are listed in the ``requirements.txt`` file.
+
 ## Use
-To use this software, execute in a terminal of the host computer of the ground node:
+Open a terminal and set ``a2gMeasurements`` as your working directory. 
+
+In the host computer of the **ground** node execute in a terminal:
 
 ```{code-block}
 ---
@@ -22,12 +35,36 @@ emphasize-lines: 1
 $ python GUI_A2G_MEAS.py
 ```
 
+Equivalently, in the host computer of the **drone** node execute in a terminal:
+```{code-block}
+---
+emphasize-lines: 1
+---
+$ python drone_main.py
+```
+
+## Extend docs
+This documentation is made using Sphinx and the MyST extension.
+
+To modify the documentation for classes and their methods, modify the docstring of the corresponding class and/or method in its corresponding file. 
+
+After doing so, open a terminal and set the ``docs`` directory as your working directory. After that, execute:
+```{code-block}
+---
+emphasize-lines: 1
+---
+$ make html
+```
+
+Sphinx will automatically update the documentation.
+
+
 ## API
 ```{eval-rst}
 .. autoclass:: a2gmeasurements.GimbalRS2
     :members: __init__, seq_num, can_buffer_to_full_frame, validate_api_call, parse_position_response, can_callback, setPosControl, setSpeedControl, request_current_position, assemble_can_msg, send_cmd, send_data, receive, start_thread_gimbal, stop_thread_gimbal
 .. autoclass:: a2gmeasurements.GpsSignaling
-    :members: __init__, serial_connect, process_gps_nmea_data, process_pvtcart_sbf_data, process_pvtgeodetic_sbf_data, process_atteuler_sbf_data, parse_septentrio_msg, get_last_sbf_buffer_info, check_coord_closeness, serial_receive, start_thread_gps, stop_thread_gps, sendCommandGps, start_gps_data_retrieval, stop_gps_data_retrieval
+    :members: __init__, serial_connect, process_gps_nmea_data, process_pvtcart_sbf_data, process_pvtgeodetic_sbf_data, process_atteuler_sbf_data, parse_septentrio_msg, get_last_sbf_buffer_info, check_coord_closeness, serial_receive, start_thread_gps, stop_thread_gps, sendCommandGps, start_gps_data_retrieval, stop_gps_data_retrieval, setHeadingOffest
 .. autoclass:: a2gmeasurements.myAnritsuSpectrumAnalyzer
     :members: __init__, spectrum_analyzer_connect, retrieve_max_pow, spectrum_analyzer_close
 .. autoclass:: a2gmeasurements.HelperA2GMeasurements

@@ -40,8 +40,10 @@ def check_devices():
     is_gps_used = input('GPS at DRONE is going to be used? (y/n): ')
     if is_gps_used == 'y' or is_gps_used == 'Y':
         gps_used = True
+        head_offset = input('Enter heading offset if any or 0 if there is no offset: ')
     elif is_gps_used == 'n' or is_gps_used == 'N':
         gps_used = False
+        head_offset = None
 
     is_gimbal_used = input('Gimbal at DRONE is going to be used? (y/n): ')
     if is_gimbal_used == 'y' or is_gimbal_used == 'Y':
@@ -55,7 +57,7 @@ def check_devices():
     elif is_rfsoc_used == 'n' or is_rfsoc_used == 'N':
         rfsoc_used = False
         
-    return GND_ADDRESS, gps_used, gimbal_used, rfsoc_used
+    return GND_ADDRESS, gps_used, gimbal_used, rfsoc_used, head_offset
 
 not_created_class_instance = True
 not_finish_tcp_connection_attempt = True
@@ -63,8 +65,8 @@ unsuccessful_drone2gnd_connection_attempt_cnt = 0
 
 while(not_created_class_instance):
     try:   
-        GND_ADDRESS, gps_used, gimbal_used, rfsoc_used = check_devices()
-        drone_a2g_helper = HelperA2GMeasurements('DRONE', GND_ADDRESS, DBG_LVL_1=False, IsGPS=gps_used, IsRFSoC=rfsoc_used, rfsoc_static_ip_address='10.1.1.40', IsGimbal=gimbal_used)
+        GND_ADDRESS, gps_used, gimbal_used, rfsoc_used, head_offset = check_devices()
+        drone_a2g_helper = HelperA2GMeasurements('DRONE', GND_ADDRESS, DBG_LVL_1=False, IsGPS=gps_used, IsRFSoC=rfsoc_used, rfsoc_static_ip_address='10.1.1.40', IsGimbal=gimbal_used, heading_offset=head_offset)
     except Exception as e:
         print("[DEBUG]: There is some error creating the a2gmeasurements class instance")
         print("[DEBUG]: ERROR: ", e)
@@ -79,6 +81,7 @@ while(not_finish_tcp_connection_attempt):
         print("[DEBUG]: There is an error establishing the TCP connection to the server")
         print("[DEBUG]: ERROR: ", e)
         input("Press ENTER to try to establish the connection again")
+        #time.sleep(0.5)
         unsuccessful_drone2gnd_connection_attempt_cnt = unsuccessful_drone2gnd_connection_attempt_cnt + 1
     else:
         print("[DEBUG]: Connection established with GND")
@@ -95,9 +98,9 @@ if not_finish_tcp_connection_attempt == False:
         time.sleep(1)
         if drone_a2g_helper.drone_fm_flag:
         #if FLAG_DRONE_ASKS_FOLLOWGIMBAL:
-            if drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x00:#Gnd node static
+            if drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x01:#Gnd node static
                 drone_a2g_helper.process_answer_get_gps(data=drone_a2g_helper.remote_config_for_drone_fm)
-            elif drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x01:#Gnd node Moving
+            elif drone_a2g_helper.remote_config_for_drone_fm['MOBILITY'] == 0x00:#Gnd node Moving
                 drone_a2g_helper.socket_send_cmd(type_cmd='FOLLOWGIMBAL')
     timer_send_pap_for_vis.cancel()
     drone_a2g_helper.HelperA2GStopCom(DISC_WHAT='ALL')

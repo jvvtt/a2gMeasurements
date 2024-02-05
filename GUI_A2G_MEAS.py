@@ -114,6 +114,9 @@ class SetupWindow(QDialog):
         self.drone_lon_textEdit.setEnabled(False)
         self.drone_alt_textEdit.setEnabled(False)
 
+        self.gnd_gps_att_offset_textEdit = QLineEdit('')
+        gnd_gps_att_offset_label = QLabel("Enter the heading offset for the ground gps:")
+        
         self.ok_button = QPushButton("OK")
         self.ok_button.clicked.connect(self.accept)
 
@@ -142,8 +145,10 @@ class SetupWindow(QDialog):
         layout.addWidget(self.drone_lon_textEdit, 9, 3, 1, 3)
         layout.addWidget(drone_alt_label, 10, 0, 1, 3)
         layout.addWidget(self.drone_alt_textEdit, 10, 3, 1, 3)
-
-        layout.addWidget(self.ok_button, 11, 0, 1, 6)
+        layout.addWidget(gnd_gps_att_offset_label, 11, 0, 1, 3)
+        layout.addWidget(self.gnd_gps_att_offset_textEdit, 11, 3, 1, 3)
+                         
+        layout.addWidget(self.ok_button, 12, 0, 1, 6)
         self.setLayout(layout)  
 
     def enable_gnd_coords_callback(self, myinput):
@@ -261,6 +266,9 @@ class WidgetGallery(QMainWindow):
         setupWin = SetupWindow()
         result = setupWin.exec_()
         
+        # Save the gps attitude offset for both nodes
+        self.gnd_gps_att_offset = setupWin.gnd_gps_att_offset_textEdit
+        
         self.droneGimbalChoice = setupWin.droneGimbalChoiceTDMenu.currentText()
         
         if setupWin.fm_droneGimbal_TDMenu.currentText() == "Only elevation":
@@ -310,7 +318,7 @@ class WidgetGallery(QMainWindow):
             self.setCentralWidget(self.dummyWidget)
             self.init_constants()
         self.showCentralWidget()
-
+        
         self.setupDevicesAndMoreAction.setDisabled(True)
     
     def createMenu(self):
@@ -914,7 +922,7 @@ class WidgetGallery(QMainWindow):
         """
 
         # As this app is executed at the ground device...
-        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, IsRFSoC=IsRFSoC, IsGimbal=IsGimbal, IsGPS=IsGPS, rfsoc_static_ip_address='10.1.1.30', GPS_Stream_Interval=GPS_Stream_Interval, DBG_LVL_0=False, DBG_LVL_1=False)
+        self.myhelpera2g = HelperA2GMeasurements('GROUND', self.GND_ADDRESS, IsRFSoC=IsRFSoC, IsGimbal=IsGimbal, IsGPS=IsGPS, rfsoc_static_ip_address='10.1.1.30', GPS_Stream_Interval=GPS_Stream_Interval, DBG_LVL_0=False, DBG_LVL_1=False, heading_offset=self.gnd_gps_att_offset)
         self.myhelpera2g.HelperStartA2GCom()
 
         print("[DEBUG]: Starting GUI threads")

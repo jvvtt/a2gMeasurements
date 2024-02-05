@@ -579,7 +579,13 @@ class GpsSignaling(object):
      There are commands (sent to the GPS receiver) that control (mainly) what type of information (in the form of what is called in Septentrio's documentation, NMEA or SBF sentences) is retrieved from the receiver. 
      
      It creates a thread (called here a gps thread) to handle the communication between the receiver and this host computer.
-    
+     
+     The reference coordinate system used by the Septentrio gps is defined as followed:
+     
+     1. The (positive) x-axis is the **longitudinal** axis. This is the axis pointing in the direction of movement of the node.
+     
+     2. The (positive) y-axis is 90 degrees to the right (clockwise) of the (positive) x-axis.
+     
     """
     
     def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False, save_filename='GPS'):
@@ -1363,6 +1369,21 @@ class GpsSignaling(object):
                 self.sendCommandGps(cmd2)       
                 self.sendCommandGps(cmd3)
                 self.sendCommandGps(cmd4)       
+    
+    def setHeadingOffest(self, offset_wrt_xaxis):
+        """
+         Sets the offset mismatch between between the imaginary line formed by the first and second antennas AND the longitudinal axis of the node
+         
+         Wrapper of ``sendCommandGps``.
+         
+        :param offset_wrt_xaxis: angle (degrees) *from* the longitudinal axis of the node *to* the imaginary line formed by the first and second antennas AND .
+        :type offset_wrt_xaxis: float
+        """
+        
+        self.sendCommandGps(cmd='setAttitudeOffset, ' + str(offset_wrt_xaxis))
+        
+        # Can use also
+        #self.sendCommandGps(cmd='sto, ' + str(offset_wrt_xaxis))
            
 class myAnritsuSpectrumAnalyzer(object):
     """
@@ -1491,7 +1512,8 @@ class HelperA2GMeasurements(object):
                  F0=None, L0=None,
                  SPEED=0,
                  GPS_Stream_Interval='msec500', AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN=0.001,
-                 operating_freq=57.51e9):
+                 operating_freq=57.51e9,
+                 heading_offset=0):
         """
          Creates instances of classes ``GimbalRS2`` (or ``GimbalGremsyH16``), ``GpsSignaling``, ``RFSoCRemoteControlFromHost`` to control these devices.
 
@@ -1523,6 +1545,8 @@ class HelperA2GMeasurements(object):
         :type AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN: float, optional
         :param operating_freq: operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the "User Manual EVK06002" of the Sivers EVK (57-71 GHz) , defaults to 57.51e9
         :type operating_freq: int, optional
+        :param heading_offset: heading offset (check its definition in the ``GpsSignaling.setHeadingOffest`` method), defaults to 0.
+        :type heading_offset: float, optional
         """
         
         self.AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN = AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN
@@ -1570,6 +1594,9 @@ class HelperA2GMeasurements(object):
             
             if self.mySeptentrioGPS.GPS_CONN_SUCCESS:
                 self.mySeptentrioGPS.serial_instance.reset_input_buffer()
+                
+                # Set the heading offset if any
+                self.mySeptentrioGPS.setHeadingOffest(heading_offset)
                 
                 if self.ID == 'DRONE':
                     self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
@@ -1905,7 +1932,7 @@ class HelperA2GMeasurements(object):
         
     def do_set_remote_fm_flag(self, data=None):
         """
-         Callback function when this node receives a ``SETFMFLAG`` command.
+         Callback function when this node receives a ``SETREMOTEFMFLAG`` command.
         
          This comand is unidirectional. It is always sent by the ground node to the drone node.
 
@@ -1920,7 +1947,7 @@ class HelperA2GMeasurements(object):
     
     def do_set_remote_stop_fm(self):
         """
-         Callback function when this node receives a ``SETFMFLAG`` command.
+         Callback function when this node receives a ``SETREMOTESTOPFM`` command.
         
          This comand is unidirectional. It is always sent by the ground node to the drone node.
         
@@ -2062,8 +2089,8 @@ class HelperA2GMeasurements(object):
                 print(f"[DEBUG]: THIS {self.ID} receives CLOSEDGUI cmd")
                 self.do_closed_gui_action()
             elif cmd == 0x08 and length == 5: # SETREMOTEFMFLAG
-                print(f"[DEBUG]: THIS {self.ID} receives SETFMFLAG cmd")
-                data_bytes = data_bytes[:14] # 3 float32 and 2 hex
+                print(f"[DEBUG]: THIS {self.ID} receives SETREMOTEFMFLAG cmd")
+                data_bytes = data_bytes[:14] # 3 float32, 2 hex
                 x,y,z,fmode,mobility = struct.unpack('fffBB', data_bytes)
                 mydata ={'X':x, 'Y':y, 'Z':z, 'FMODE': fmode, 'MOBILITY': mobility}
                 self.do_set_remote_fm_flag(data=mydata)
@@ -2096,7 +2123,7 @@ class HelperA2GMeasurements(object):
 
     def encode_message(self, source_id, destination_id, message_type, cmd, data=None):
         """
-         Encodes a TCP message to be sent.         
+         Encodes a TCP message to be sent. More information about the specific commands is in the section "Communication Protocol" of the "Manual A2GMeasurements".
 
         :param source_id: identifies the sender node with a number (this parameter is provided for -potential- future improvements but does not have any functionality)
         :type source_id: int
