@@ -36,6 +36,7 @@ import pickle
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 from sklearn.metrics import mean_squared_error
+import errno
 
 """
 Author: Julian D. Villegas G.
@@ -1370,7 +1371,7 @@ class GpsSignaling(object):
                 self.sendCommandGps(cmd3)
                 self.sendCommandGps(cmd4)       
     
-    def setHeadingOffest(self, offset_wrt_xaxis):
+    def setHeadingOffset(self, offset_wrt_xaxis):
         """
          Sets the offset mismatch between between the imaginary line formed by the first and second antennas AND the longitudinal axis of the node
          
@@ -1545,7 +1546,7 @@ class HelperA2GMeasurements(object):
         :type AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN: float, optional
         :param operating_freq: operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the "User Manual EVK06002" of the Sivers EVK (57-71 GHz) , defaults to 57.51e9
         :type operating_freq: int, optional
-        :param heading_offset: heading offset (check its definition in the ``GpsSignaling.setHeadingOffest`` method), defaults to 0.
+        :param heading_offset: heading offset (check its definition in the ``GpsSignaling.setHeadingOffset`` method), defaults to 0.
         :type heading_offset: float, optional
         """
         
@@ -1596,7 +1597,7 @@ class HelperA2GMeasurements(object):
                 self.mySeptentrioGPS.serial_instance.reset_input_buffer()
                 
                 # Set the heading offset if any
-                self.mySeptentrioGPS.setHeadingOffest(heading_offset)
+                self.mySeptentrioGPS.setHeadingOffset(heading_offset)
                 
                 if self.ID == 'DRONE':
                     self.mySeptentrioGPS.start_gps_data_retrieval(stream_number=1,  msg_type='SBF', interval=GPS_Stream_Interval, sbf_type='+PVTCartesian+AttEuler')
@@ -3607,33 +3608,58 @@ class RFSoCRemoteControlFromHost():
 
         if cmd == 'setModeSivers':
             if cmd_arg == 'RXen0_TXen1' or cmd_arg == 'RXen1_TXen0' or cmd_arg == 'RXen0_TXen0':
-                self.radio_control.sendall(b"setModeSiver "+str.encode(str(cmd_arg)))
+                try:
+                    self.radio_control.sendall(b"setModeSiver "+str.encode(str(cmd_arg)))
+                except IOError as e:
+                    if e.errno == errno.EPIPE:
+                        print("We pass over this error: ", e)
+                        pass
             else:
                 print("[DEBUG]: Unknown Sivers mode")
         elif cmd == 'setCarrierFrequencySivers':
-            self.radio_control.sendall(b"setCarrierFrequency "+str.encode(str(cmd_arg)))
+            try:
+                self.radio_control.sendall(b"setCarrierFrequency "+str.encode(str(cmd_arg)))
+            except IOError as e:
+                if e.errno == errno.EPIPE:
+                    print("We pass over this error: ", e)
+                    pass
         elif cmd == 'setGainTxSivers':
             tx_bb_gain = cmd_arg['tx_bb_gain']
             tx_bb_phase = cmd_arg['tx_bb_phase']
             tx_bb_iq_gain = cmd_arg['tx_bb_iq_gain']
             tx_bfrf_gain = cmd_arg['tx_bfrf_gain']
 
-            self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
+            try:
+                self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
                                                         + str.encode(str(int(tx_bb_phase)) + " ") \
                                                         + str.encode(str(int(tx_bb_iq_gain)) + " ") \
                                                         + str.encode(str(int(tx_bfrf_gain))))
+            except IOError as e:
+                if e.errno == errno.EPIPE:
+                    print("We pass over this error: ", e)
+                    pass
         elif cmd == 'setGainRxSivers':
             rx_gain_ctrl_bb1 = cmd_arg['rx_gain_ctrl_bb1']
             rx_gain_ctrl_bb2 = cmd_arg['rx_gain_ctrl_bb2']
             rx_gain_ctrl_bb3 = cmd_arg['rx_gain_ctrl_bb3']
             rx_gain_ctrl_bfrf = cmd_arg['rx_gain_ctrl_bfrf']
             
-            self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
+            try:
+                self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
                                                         + str.encode(str(int(rx_gain_ctrl_bfrf))))
+            except IOError as e:
+                if e.errno == errno.EPIPE:
+                    print("We pass over this error: ", e)
+                    pass
         elif cmd == 'transmitSamples':
-            self.radio_control.sendall(b"transmitSamples")
+            try:
+                self.radio_control.sendall(b"transmitSamples")
+            except IOError as e:
+                if e.errno == errno.EPIPE:
+                    print("We pass over this error: ", e)
+                    pass
         else: 
             print("[DEBUG]: Unknown command to send to RFSoC")
             return

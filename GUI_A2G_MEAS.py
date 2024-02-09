@@ -114,7 +114,7 @@ class SetupWindow(QDialog):
         self.drone_lon_textEdit.setEnabled(False)
         self.drone_alt_textEdit.setEnabled(False)
 
-        self.gnd_gps_att_offset_textEdit = QLineEdit('')
+        self.gnd_gps_att_offset_textEdit = QLineEdit('0')
         gnd_gps_att_offset_label = QLabel("Enter the heading offset for the ground gps:")
         
         self.ok_button = QPushButton("OK")
@@ -663,19 +663,37 @@ class WidgetGallery(QMainWindow):
                     time.sleep(0.1)
                 out_now = shell.recv(65535).decode('utf-8')
 
-                shell.send("xilinx\r\n")
-                while(shell.recv_ready() == False):
-                    time.sleep(0.1)
-                out_now = shell.recv(65535).decode('utf-8')
-                
-                shell.send("ps aux | grep mmwsdr\r\n")
-                while(shell.recv_ready() == False):
-                    time.sleep(0.1)
-                out_now = shell.recv(65535).decode('utf-8')
+                aux = "Permission denied, please try again"
+                cnt=1
+                while(("Permission denied, please try again" in aux) and cnt<10):
+                    shell.send("xilinx\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+                    aux = out_now
+                    cnt = cnt +1
+                if cnt == 10:
+                    print("[DEBUG]: Unsuccesfull check of drone fpga server. Please CHECK IT MANUALLY on the drone")
+                    success_server_drone_fpga = False
+                    return success_server_drone_fpga
 
-                shell.close()
+                aux = "xilinx: command not found"
+                cnt=1
+                while(("xilinx: command not found" in aux) and cnt<10):
+                    shell.send("ps aux | grep mmwsdr\r\n")
+                    while(shell.recv_ready() == False):
+                        time.sleep(0.1)
+                    out_now = shell.recv(65535).decode('utf-8')
+                    aux=out_now
+                    cnt=cnt+1
+                if cnt == 10:
+                    print("[DEBUG]: Unsuccesfull check of drone fpga server. Please CHECK IT MANUALLY on the drone")
+                    success_server_drone_fpga = False
+                    return success_server_drone_fpga
+                
+                #shell.close()
             except Exception as e:
-                print(f"This error occurred when trying to check if server is running on drone fpga: {e}")
+                print(f"[DEBUG]:Error when trying to check if server is running on drone fpga: {e}")
                 success_server_drone_fpga = None
                 return success_server_drone_fpga
             
@@ -685,21 +703,7 @@ class WidgetGallery(QMainWindow):
                 print("[DEBUG]: Server script is not running on DRONE fpga")
                 print("[DEBUG]: Starting server daemon on DRONE fpga")
                 try:
-                    shell = self.remote_drone_conn.invoke_shell()
-                    while(shell.recv_ready() == False):
-                        time.sleep(0.1)
-                    out_now = shell.recv(65535).decode('utf-8')
-                    
-                    shell.send("ssh xilinx@10.1.1.40\r\n")
-                    while(shell.recv_ready() == False):
-                        time.sleep(0.1)
-                    out_now = shell.recv(65535).decode('utf-8')
-
-                    shell.send("xilinx\r\n")
-                    while(shell.recv_ready() == False):
-                        time.sleep(0.1)
-                    out_now = shell.recv(65535).decode('utf-8')
-                    
+                    # The shell is not closed                    
                     shell.send("cd jupyter_notebook/mmwsdr\r\n")
                     while(shell.recv_ready() == False):
                         time.sleep(0.1)
@@ -885,8 +889,10 @@ class WidgetGallery(QMainWindow):
         SUCCESS_GND_FPGA = self.check_if_gnd_fpga_connected()
         SUCCESS_GND_GIMBAL = self.check_if_gnd_gimbal_connected()        
         SUCCESS_GND_GPS = self.check_if_gnd_gps_connected()
-        SUCCESS_DRONE_SERVER_FPGA = self.check_if_server_running_drone_fpga()
-        SUCCESS_GND_SERVER_FPGA = self.check_if_server_running_gnd_fpga()
+        #SUCCESS_DRONE_SERVER_FPGA = self.check_if_server_running_drone_fpga()
+        #SUCCESS_GND_SERVER_FPGA = self.check_if_server_running_gnd_fpga()
+        SUCCESS_DRONE_SERVER_FPGA = None
+        SUCCESS_GND_SERVER_FPGA = None
         
         self.get_gnd_ip_node_address()
         self.gnd_gimbal_conn_label_modifiable.setText(str(SUCCESS_GND_GIMBAL))

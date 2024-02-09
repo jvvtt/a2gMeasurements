@@ -5,9 +5,9 @@
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" />
 
-    <!-- Generated with Sphinx 7.2.6 and Furo 2023.09.10 -->
+    <!-- Generated with Sphinx 7.2.6 and Furo 2024.01.29 -->
         <title>Aerial 1.0 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=a746c00c" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=362ab14a" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=135e06be" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
     
@@ -693,8 +693,8 @@ communication is made through the USB connection with the host computer.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.setHeadingOffest">
-<span class="sig-name descname"><span class="pre">setHeadingOffest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">offset_wrt_xaxis</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.setHeadingOffest" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="a2gmeasurements.GpsSignaling.setHeadingOffset">
+<span class="sig-name descname"><span class="pre">setHeadingOffset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">offset_wrt_xaxis</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#a2gmeasurements.GpsSignaling.setHeadingOffset" title="Link to this definition">#</a></dt>
 <dd><blockquote>
 <div><p>Sets the offset mismatch between between the imaginary line formed by the first and second antennas AND the longitudinal axis of the node</p>
 <p>Wrapper of <code class="docutils literal notranslate"><span class="pre">sendCommandGps</span></code>.</p>
@@ -914,7 +914,7 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <li><p><strong>GPS_Stream_Interval</strong> (<em>str</em><em>, </em><em>optional</em>) – time interval used for the retrieving of the configured SBF sentences in Septentrio’s receiver connected to this host computer. A list of available options is shown in <code class="docutils literal notranslate"><span class="pre">start_gps_data_retrieval</span></code> of class <code class="docutils literal notranslate"><span class="pre">GpsSignaling</span></code>, defaults to ‘msec500’.</p></li>
 <li><p><strong>AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN</strong> (<em>float</em><em>, </em><em>optional</em>) – approximated time between calls of the communication thread. This parameter is used in conjunction with <code class="docutils literal notranslate"><span class="pre">MAX_TIME_EMPTY_SOCKETS</span></code> to raise an exception when neither side of the communication link is sending any message. Unfortunately, this is a very simple estimate, since the actual time between calls depends on many factors and is does not remain constant between calls. Defaults to 0.001</p></li>
 <li><p><strong>operating_freq</strong> (<em>int</em><em>, </em><em>optional</em>) – operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the “User Manual EVK06002” of the Sivers EVK (57-71 GHz) , defaults to 57.51e9</p></li>
-<li><p><strong>heading_offset</strong> (<em>float</em><em>, </em><em>optional</em>) – heading offset (check its definition in the <code class="docutils literal notranslate"><span class="pre">GpsSignaling.setHeadingOffest</span></code> method), defaults to 0.</p></li>
+<li><p><strong>heading_offset</strong> (<em>float</em><em>, </em><em>optional</em>) – heading offset (check its definition in the <code class="docutils literal notranslate"><span class="pre">GpsSignaling.setHeadingOffset</span></code> method), defaults to 0.</p></li>
 </ul>
 </dd>
 </dl>
@@ -2302,7 +2302,7 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.sendCommandGps"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.sendCommandGps()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.serial_connect"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.serial_connect()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.serial_receive"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.serial_receive()</span></code></a></li>
-<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.setHeadingOffest"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.setHeadingOffest()</span></code></a></li>
+<li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.setHeadingOffset"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.setHeadingOffset()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.start_gps_data_retrieval"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.start_gps_data_retrieval()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.start_thread_gps"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.start_thread_gps()</span></code></a></li>
 <li><a class="reference internal" href="#a2gmeasurements.GpsSignaling.stop_gps_data_retrieval"><code class="docutils literal notranslate"><span class="pre">GpsSignaling.stop_gps_data_retrieval()</span></code></a></li>
