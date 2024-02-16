@@ -1,8 +1,7 @@
-from enum import Enum
+import requests
 import threading
 import numpy as np
 import csv
-import json
 import datetime
 import platform
 import re
@@ -16,13 +15,16 @@ from PyQt5.QtCore import Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QGridLayout, QGroupBox, QLabel, QLineEdit,
         QPushButton, QRadioButton, QTextEdit, QVBoxLayout, QWidget, QPlainTextEdit, QToolTip, QMenu, QMenuBar, QMainWindow, QAction)
 from PyQt5.QtGui import QCursor
-
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import sys
 from a2gmeasurements import HelperA2GMeasurements, RepeatTimer
 from a2gUtils import GpsOnMap, geocentric2geodetic, geodetic2geocentric
+import folium
+from folium.plugins import realtime
+from folium.utilities import JsCode
 
 import pyqtgraph as pg
 
@@ -230,6 +232,10 @@ class WidgetGallery(QMainWindow):
         self.SUCCESS_GND_FPGA = False
         self.SUCCESS_GND_GIMBAL = False
         self.SUCCESS_GND_GPS = False
+        
+        self.url_get_map = "http://127.0.0.1:8000/gps/get"
+        self.url_post_map = "http://127.0.0.1:8000/gps/post/septentrio"
+        self.url_put_map = "http://127.0.0.1:8000/gps/update/septentrio"
 
     def showCentralWidget(self):
         """
@@ -434,10 +440,14 @@ class WidgetGallery(QMainWindow):
         """
         if hasattr(self, 'myhelpera2g'):   
             self.update_vis_time_gps = 1
-            self.stop_event_gps_display = threading.Event()
-            self.periodical_gps_display_thread = TimerThread(self.stop_event_gps_display, self.update_vis_time_gps)
-            self.periodical_gps_display_thread.update.connect(self.periodical_gps_display_callback)
-            self.periodical_gps_display_thread.start()
+            #self.stop_event_gps_display = threading.Event()
+            #self.periodical_gps_display_thread = TimerThread(self.stop_event_gps_display, self.update_vis_time_gps)
+            #self.periodical_gps_display_thread.update.connect(self.periodical_gps_display_callback)
+            #self.periodical_gps_display_thread.start()
+            
+            self.periodical_gps_display_thread = QTimer(self)
+            self.periodical_gps_display_thread.timeout.connect(self.periodical_gps_display_callback)
+            self.periodical_gps_display_thread.start(1000*self.update_vis_time_gps)  
         
         self.start_gps_visualization_action.setEnabled(False)
         self.stop_gps_visualization_action.setEnabled(True)
@@ -447,8 +457,9 @@ class WidgetGallery(QMainWindow):
          Stops the timer thread responsible for display gps coordinates in the GPS panel.
         """
         if hasattr(self, 'periodical_gps_display_thread'):
-            if self.periodical_gps_display_thread.isRunning():
-                self.stop_event_gps_display.set()
+            if self.periodical_gps_display_thread.isActive():
+                #self.stop_event_gps_display.set()
+                self.periodical_gps_display_thread.stop()
         
         self.start_gps_visualization_action.setEnabled(True)
         self.stop_gps_visualization_action.setEnabled(False)
@@ -943,7 +954,6 @@ class WidgetGallery(QMainWindow):
         
         """
         
-        
         print("[DEBUG]: Starting GUI threads...")
         # Although thus function should be called when a HelperA2GMeasurements class instance has been created, better to do a double check
         if hasattr(self, 'myhelpera2g'):
@@ -992,15 +1002,20 @@ class WidgetGallery(QMainWindow):
         coords, head_info = self.myhelpera2g.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
             
         if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
-            pass
+            print("[DEBUG]: Error in received GPS coordinates from DRONE")
+            print("[DEBUG]: Due to this error, DRONE location will not be seen")
         else:
             lat_gnd_node, lon_gnd_node, height_node = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
-            self.mygpsonmap.show_air_moving(lat=lat_gnd_node, lon=lon_gnd_node) 
-        
-        # Display drone node coords
-        # The coordinates shown will be the coordinates of up to self.update_time_fps before
-        if hasattr(self.myhelpera2g, 'last_drone_coords_requested'):
-            self.mygpsonmap.show_air_moving(lat=self.myhelpera2g.last_drone_coords_requested['LAT'], lon=self.myhelpera2g.last_drone_coords_requested['LON'])
+            
+            #self.mygpsonmap.show_air_moving(lat=lat_gnd_node, lon=lon_gnd_node)
+            
+            # Display drone node coords
+            # The coordinates shown will be the coordinates of up to self.update_time_fps before
+            if hasattr(self.myhelpera2g, 'last_drone_coords_requested'):
+                gps_drone_coords_json = {"lat": self.last_drone_coords_requested['LAT'], "lon": self.last_drone_coords_requested['LON']}
+                response = requests.put(self.url_put_map, json=gps_drone_coords_json)
+                
+                #self.mygpsonmap.show_air_moving(lat=self.myhelpera2g.last_drone_coords_requested['LAT'], lon=self.myhelpera2g.last_drone_coords_requested['LON'])
             
     def write_to_log_terminal(self, newLine):
         '''
@@ -1997,10 +2012,12 @@ class WidgetGallery(QMainWindow):
         self.stop_meas_togglePushButton.setEnabled(False)
         self.finish_meas_togglePushButton.setEnabled(False)
 
-        if self.periodical_gimbal_follow_thread.isRunning():
-            self.stop_event_gimbal_follow_thread.set()
-        if self.periodical_gps_display_thread.isRunning():
-                self.stop_event_gps_display.set()
+        if hasattr(self, 'periodical_gimbal_follow_thread'):
+            if self.periodical_gimbal_follow_thread.isRunning():
+                self.stop_event_gimbal_follow_thread.set()
+        if hasattr(self, 'periodical_gps_display_thread'):
+            if self.periodical_gps_display_thread.isRunning():
+                    self.stop_event_gps_display.set()
 
     def create_Planning_Measurements_panel(self):
         """
@@ -2034,20 +2051,51 @@ class WidgetGallery(QMainWindow):
         self.planningMeasurementsPanel.setLayout(layout)
     
     def create_GPS_visualization_panel(self):
-        """
-         Creates the "GPS visualization" panel with its widgets and layout.
-        """
-        
         self.gps_vis_panel = QGroupBox('GPS visualization')
-        # Create a Figure object
-        fig_gps = Figure()
+        
+        # This starting point can be anything, as it will be updated throught the PUT requests
+        gps_start_point_in_finland_json = {"lat": 60.15301542729288, "lon": 24.316255998379482}
+        
+        response = requests.post(self.url_post_map, json=gps_start_point_in_finland_json)
+        
+        time.sleep(0.05)
+        
+        js_handler_of_non_geoson = JsCode("""
+        function(responseHandler, errorHandler) {
+            var url ="""+self.url_get_map+""";
 
-        # Create a FigureCanvas widget
-        canvas = FigureCanvas(fig_gps)
+            fetch(url)
+            .then((response) => {
+                return response.json().then((data) => {
+                    var { id, longitude, latitude } = data;
 
-        # Create a QVBoxLayout to hold the canvas
-        #layout = QVBoxLayout()
-
+                    return {
+                        'type': 'FeatureCollection',
+                        'features': [{
+                            'type': 'Feature',
+                            'geometry': {
+                                'type': 'Point',
+                                'coordinates': [longitude, latitude]
+                            },
+                            'properties': {
+                                'id': id
+                            }
+                        }]
+                    };
+                })
+            })
+            .then(responseHandler)
+            .catch(errorHandler);
+        }
+        """)
+        
+        self.gps_map = folium.Map()
+        self.map_rt_foilum_plugin = realtime.Realtime(js_handler_of_non_geoson, interval=5000)
+        self.map_rt_foilum_plugin.add_to(self.gps_map)
+        
+        self.webview = QWebEngineView()
+        self.webview.setHtml(self.gps_map._repr_html_())
+        
         tx_info_label = QLabel('TX')
         rx_info_label = QLabel('RX')
         
@@ -2069,7 +2117,7 @@ class WidgetGallery(QMainWindow):
         rx_z_value_label = QLabel('')
         
         layout = QGridLayout()
-        layout.addWidget(canvas, 0, 0, 8, 10)
+        layout.addWidget(self.webview, 0, 0, 8, 10)
         layout.addWidget(tx_info_label, 8, 0, 1, 5)
         layout.addWidget(rx_info_label, 8, 5, 1, 5)
         layout.addWidget(tx_x_label, 9, 0, 1, 1)
@@ -2087,17 +2135,6 @@ class WidgetGallery(QMainWindow):
 
         # Set the layout of the group box
         self.gps_vis_panel.setLayout(layout)
-
-        # Create a subplot on the Figure
-        ax_gps = fig_gps.add_subplot(111)
-
-        hi_q = {'LAT': 60.18592, 'LON': 24.81174 }
-        
-        torbacka_point = {'LAT': 60.07850739357558, 'LON': 24.171551864664867}
-        #mygpsonmap = GpsOnMap('data/planet_24.81,60.182_24.829,60.189.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=hi_q)
-        mygpsonmap = GpsOnMap('data/torbacka_planet_24.162,60.076_24.18,60.082.osm.pbf', canvas=canvas, fig=fig_gps, ax=ax_gps, air_coord=torbacka_point)
-        
-        self.mygpsonmap = mygpsonmap
     
     def create_pap_plot_panel(self):
         """
