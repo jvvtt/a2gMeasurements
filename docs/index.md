@@ -23,6 +23,47 @@ Equivalently, the "other node" in the documentation, refers to the node where th
 # Package requirements
 To run this software, a list of python packages are required. All the packages required are listed in the ``requirements.txt`` file.
 
+For the GPS visualization, the last available version of Folium in pip or conda might lack of the Realtime plugin. 
+To cope for that, go to the Github of Folium to the following files:
+
+1-The ``utilities.py`` (https://github.com/python-visualization/folium/blob/main/folium/utilities.py)
+
+2-The ``realtime.py`` (https://github.com/python-visualization/folium/blob/main/folium/plugins/realtime.py)
+
+1-Copy the ``JsCode`` class of the downloaded ``utilities.py`` file into the ``utilities.py`` file you have under your conda environment. To look for where is your conda environment, type in Windows:
+
+```{code-block}
+---
+emphasize-lines: 1
+---
+$ where python
+```
+
+or equivalently in Linux:
+
+```{code-block}
+---
+emphasize-lines: 1
+---
+$ which python
+```
+
+The ``utilities.py`` file you have under your conda environment must be in 
+```{code-block}
+---
+emphasize-lines: 1
+---
+PATH_TO_YOUR_CONDA_ENV\Lib\site-packages\folium
+```
+
+2-Download the mentioned ``realtime.py`` file from the Folium Github and place it under the following directory:
+```{code-block}
+---
+emphasize-lines: 1
+---
+PATH_TO_YOUR_CONDA_ENV\Lib\site-packages\folium\plugins\
+```
+
 ## Use
 Open a terminal and set ``a2gMeasurements`` as your working directory. 
 
