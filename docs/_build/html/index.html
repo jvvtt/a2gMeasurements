@@ -190,8 +190,8 @@
           <section id="a2gmeasurements">
 <h1>A2GMeasurements<a class="headerlink" href="#a2gmeasurements" title="Link to this heading">#</a></h1>
 <p>To download the repository of this project, run the following command in a terminal:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="hll">$ git clone https://github.com/jvvtt/a2gMeasurements
-</span></pre></div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/jvvtt/a2gMeasurements
+</pre></div>
 </div>
 <p>or manually download the zip file from the same github page.</p>
 <p>The password for the github account is provided in the “Manual A2GMeasurements” file.</p>
@@ -206,25 +206,87 @@
 <section id="package-requirements">
 <h1>Package requirements<a class="headerlink" href="#package-requirements" title="Link to this heading">#</a></h1>
 <p>To run this software, a list of python packages are required. All the packages required are listed in the <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file.</p>
+<p>For the GPS visualization, the last available version of Folium in pip or conda might lack of the Realtime plugin.
+To cope for that, go to the Github of Folium, and download the following files:</p>
+<p>1-The <code class="docutils literal notranslate"><span class="pre">utilities.py</span></code> (https://github.com/python-visualization/folium/blob/main/folium/utilities.py)</p>
+<p>2-The <code class="docutils literal notranslate"><span class="pre">realtime.py</span></code> (https://github.com/python-visualization/folium/blob/main/folium/plugins/realtime.py)</p>
+<p>1-Copy the <code class="docutils literal notranslate"><span class="pre">JsCode</span></code> class of the downloaded <code class="docutils literal notranslate"><span class="pre">utilities.py</span></code> file and paste it at the end of the Folium <code class="docutils literal notranslate"><span class="pre">utilities.py</span></code> file you have under your conda environment. To look for where is your conda environment, type in Windows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ where python
+</pre></div>
+</div>
+<p>or equivalently in Linux:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ which python
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">utilities.py</span></code> file you have under your conda environment must be in</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">PATH_TO_YOUR_CONDA_ENV</span>\<span class="n">Lib</span>\<span class="n">site</span><span class="o">-</span><span class="n">packages</span>\<span class="n">folium</span>
+</pre></div>
+</div>
+<p>or in</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">PATH_TO_YOUR_CONDA_ENV</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">python</span><span class="p">[</span><span class="n">version</span><span class="p">]</span><span class="o">/</span><span class="n">site</span><span class="o">-</span><span class="n">packages</span><span class="o">/</span><span class="n">folium</span>
+</pre></div>
+</div>
+<p>2-Place the downloaded <code class="docutils literal notranslate"><span class="pre">realtime.py</span></code> file from the Folium Github under the following directory:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">PATH_TO_YOUR_CONDA_ENV</span>\<span class="n">Lib</span>\<span class="n">site</span><span class="o">-</span><span class="n">packages</span>\<span class="n">folium</span>\<span class="n">plugins</span>\
+</pre></div>
+</div>
+<p>or in</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">PATH_TO_YOUR_CONDA_ENV</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">python</span><span class="p">[</span><span class="n">version</span><span class="p">]</span><span class="o">/</span><span class="n">site</span><span class="o">-</span><span class="n">packages</span><span class="o">/</span><span class="n">folium</span><span class="o">/</span><span class="n">plugins</span><span class="o">/</span>
+</pre></div>
+</div>
+<section id="installing-pyqt5-on-rasberrypi">
+<h2>Installing PyQt5 on RasberryPi<a class="headerlink" href="#installing-pyqt5-on-rasberrypi" title="Link to this heading">#</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">GUI_A2G_MEAS.py</span></code> software requires PyQt5 and PyQtWebEngine to be working.The installation of both packages under RaspbianOS might have difficulties.</p>
+<p>Try first to install them by using the pip manager under your activated conda environment:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(name_of_your_environment) $ pip install PyQt5
+(name_of_your_environment) $ pip install PyQtWebEngine
+</pre></div>
+</div>
+<p>Check if the installation went well by executing python (in your conda environment) and then importing the packages:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(name_of_your_environment) $ python
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;&gt;</span><span class="kn">import</span> <span class="nn">PyQt5</span>
+<span class="o">&gt;&gt;</span><span class="kn">from</span> <span class="nn">PyQt5.QtWebEngineWidgets</span> <span class="kn">import</span> <span class="n">QWebEngineView</span>
+</pre></div>
+</div>
+<p>If there were no errors in both imports, the packages where succesfully installed under you conda environment.</p>
+<p>If there were errors, try to install them as follows.</p>
+<p>First execute:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">python3</span><span class="o">-</span><span class="n">pyqt5</span>
+</pre></div>
+</div>
+<p>This installation should not have any problem. Then go to <code class="docutils literal notranslate"><span class="pre">/usr/lib/python3/dist-packages</span></code> and copy the folders containing the name ‘PyQt5’ (there might be at least 2: ‘PyQt5’ and ‘PyQt5-version.dist-info) to <code class="docutils literal notranslate"><span class="pre">site-packages</span></code> of your conda environment (i.e. <code class="docutils literal notranslate"><span class="pre">/home/jvvtt64/mambaforge/envs/groundnode/lib/python3.10/site-packages</span></code>)</p>
+<p>Next, execute:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">python3</span><span class="o">-</span><span class="n">pyqt5</span><span class="o">.</span><span class="n">qtwebengine</span>
+</pre></div>
+</div>
+<p>Look again for the folders named ‘PyQtWebEngine’ in <code class="docutils literal notranslate"><span class="pre">/usr/lib/python3/dist-packages/</span></code> and copy them to the <code class="docutils literal notranslate"><span class="pre">site-packages</span></code> folder of your conda environment (i.e. <code class="docutils literal notranslate"><span class="pre">/home/jvvtt64/mambaforge/envs/groundnode/lib/python3.10/site-packages</span></code>).</p>
+<p>Look also under the <code class="docutils literal notranslate"><span class="pre">/usr/lib/python3/dist-packages/PyQt5</span></code> folder any file having the name ‘WebEngine’ in it and copy all these files to the ‘PyQt5’ folder of your conda environment (i.e. <code class="docutils literal notranslate"><span class="pre">/home/jvvtt64/mambaforge/envs/groundnode/lib/python3.10/site-packages/PyQt5/</span></code>). Respect the folder and file hierarchy of the folder ‘PyQt5’: if there is a file under a given folder, copy the file to the corresponding destination folder with the same name.</p>
+</section>
 <section id="use">
 <h2>Use<a class="headerlink" href="#use" title="Link to this heading">#</a></h2>
 <p>Open a terminal and set <code class="docutils literal notranslate"><span class="pre">a2gMeasurements</span></code> as your working directory.</p>
 <p>In the host computer of the <strong>ground</strong> node execute in a terminal:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="hll">$ python GUI_A2G_MEAS.py
-</span></pre></div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python GUI_A2G_MEAS.py
+</pre></div>
 </div>
 <p>Equivalently, in the host computer of the <strong>drone</strong> node execute in a terminal:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="hll">$ python drone_main.py
-</span></pre></div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ python drone_main.py
+</pre></div>
 </div>
 </section>
+</section>
+<section id="notes">
+<h1>Notes<a class="headerlink" href="#notes" title="Link to this heading">#</a></h1>
+<p>The gps visualization is updated slower than the speed of the thread used to update the gps coordinates (<code class="docutils literal notranslate"><span class="pre">GUI_A2G_MEAS.WidgetGallery.periodical_gps_display_thread</span></code>). The thread is called regularly at the time it is expected (i.e. 1 sec). The <code class="docutils literal notranslate"><span class="pre">put</span></code> and <code class="docutils literal notranslate"><span class="pre">get</span></code> requests to the uvicorn server seem to performed also within the same time margin. This means that either the Folium Leaflet or PyQt5WebEngine packages for the Rasperry run slow.</p>
 <section id="extend-docs">
 <h2>Extend docs<a class="headerlink" href="#extend-docs" title="Link to this heading">#</a></h2>
 <p>This documentation is made using Sphinx and the MyST extension.</p>
 <p>To modify the documentation for classes and their methods, modify the docstring of the corresponding class and/or method in its corresponding file.</p>
 <p>After doing so, open a terminal and set the <code class="docutils literal notranslate"><span class="pre">docs</span></code> directory as your working directory. After that, execute:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="hll">$ make html
-</span></pre></div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ make html
+</pre></div>
 </div>
 <p>Sphinx will automatically update the documentation.</p>
 </section>
@@ -1974,12 +2036,6 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_GPS_visualization_panel">
-<span class="sig-name descname"><span class="pre">create_GPS_visualization_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_GPS_visualization_panel" title="Link to this definition">#</a></dt>
-<dd><p>Creates the “GPS visualization” panel with its widgets and layout.</p>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="GUI_A2G_MEAS.WidgetGallery.create_Gimbal_AIR_panel">
 <span class="sig-name descname"><span class="pre">create_Gimbal_AIR_panel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#GUI_A2G_MEAS.WidgetGallery.create_Gimbal_AIR_panel" title="Link to this definition">#</a></dt>
 <dd><p>Creates the drone gimbal panel with its widgets and layout.</p>
@@ -2269,7 +2325,11 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#package-requirements">Package requirements</a><ul>
+<li><a class="reference internal" href="#installing-pyqt5-on-rasberrypi">Installing PyQt5 on RasberryPi</a></li>
 <li><a class="reference internal" href="#use">Use</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#notes">Notes</a><ul>
 <li><a class="reference internal" href="#extend-docs">Extend docs</a></li>
 <li><a class="reference internal" href="#api">API</a><ul>
 <li><a class="reference internal" href="#a2gmeasurements.GimbalRS2"><code class="docutils literal notranslate"><span class="pre">GimbalRS2</span></code></a><ul>
@@ -2406,7 +2466,6 @@ msg_type (str, optional): _description_. Defaults to ‘NMEA’.</p>
 <li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.connect_drone_callback"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.connect_drone_callback()</span></code></a></li>
 <li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.convert_dB_to_valid_hex_sivers_register_values"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.convert_dB_to_valid_hex_sivers_register_values()</span></code></a></li>
 <li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.createMenu"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.createMenu()</span></code></a></li>
-<li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_GPS_visualization_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_GPS_visualization_panel()</span></code></a></li>
 <li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_Gimbal_AIR_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_Gimbal_AIR_panel()</span></code></a></li>
 <li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_Gimbal_GND_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_Gimbal_GND_panel()</span></code></a></li>
 <li><a class="reference internal" href="#GUI_A2G_MEAS.WidgetGallery.create_Planning_Measurements_panel"><code class="docutils literal notranslate"><span class="pre">WidgetGallery.create_Planning_Measurements_panel()</span></code></a></li>

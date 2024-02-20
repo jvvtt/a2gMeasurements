@@ -219,6 +219,7 @@ class WidgetGallery(QMainWindow):
          
         """
         # Parameters of the GUI
+        self.debug_cnt_1 = 1
         self.STATIC_DRONE_IP_ADDRESS = '192.168.0.157'
         self.number_lines_log_terminal = 100
         self.log_terminal_txt = ""
@@ -233,7 +234,7 @@ class WidgetGallery(QMainWindow):
         self.SUCCESS_GND_GIMBAL = False
         self.SUCCESS_GND_GPS = False
         
-        self.url_get_map = "http://127.0.0.1:8000/gps/get"
+        self.url_get_map = """'http://127.0.0.1:8000/gps/get'"""
         self.url_post_map = "http://127.0.0.1:8000/gps/post/septentrio"
         self.url_put_map = "http://127.0.0.1:8000/gps/update/septentrio"
 
@@ -365,7 +366,7 @@ class WidgetGallery(QMainWindow):
         self.start_gps_visualization_action = QAction("Start GPS visualization", self)
         threadsMenu.addAction(self.start_gps_visualization_action)
         self.start_gps_visualization_action.triggered.connect(self.start_thread_gps_visualization)
-        self.start_gps_visualization_action.setDisabled(True)
+        self.start_gps_visualization_action.setDisabled(False)
         
         self.stop_gps_visualization_action = QAction("Stop GPS visualization", self)
         threadsMenu.addAction(self.stop_gps_visualization_action)
@@ -438,16 +439,12 @@ class WidgetGallery(QMainWindow):
          
          NOTE: *the callback ``periodical_gps_display_callback`` works as expected with synthetic gps coordinates. However, this function has not been tested with the actual gps and thus, minor bugs might appear*
         """
-        if hasattr(self, 'myhelpera2g'):   
-            self.update_vis_time_gps = 1
-            #self.stop_event_gps_display = threading.Event()
-            #self.periodical_gps_display_thread = TimerThread(self.stop_event_gps_display, self.update_vis_time_gps)
-            #self.periodical_gps_display_thread.update.connect(self.periodical_gps_display_callback)
-            #self.periodical_gps_display_thread.start()
+        #if hasattr(self, 'myhelpera2g'):   
+        self.update_vis_time_gps = 1
             
-            self.periodical_gps_display_thread = QTimer(self)
-            self.periodical_gps_display_thread.timeout.connect(self.periodical_gps_display_callback)
-            self.periodical_gps_display_thread.start(1000*self.update_vis_time_gps)  
+        self.periodical_gps_display_thread = QTimer(self)
+        self.periodical_gps_display_thread.timeout.connect(self.periodical_gps_display_callback)
+        self.periodical_gps_display_thread.start(1000*self.update_vis_time_gps)  
         
         self.start_gps_visualization_action.setEnabled(False)
         self.stop_gps_visualization_action.setEnabled(True)
@@ -456,10 +453,8 @@ class WidgetGallery(QMainWindow):
         """
          Stops the timer thread responsible for display gps coordinates in the GPS panel.
         """
-        if hasattr(self, 'periodical_gps_display_thread'):
-            if self.periodical_gps_display_thread.isActive():
-                #self.stop_event_gps_display.set()
-                self.periodical_gps_display_thread.stop()
+        if self.periodical_gps_display_thread.isActive():
+            self.periodical_gps_display_thread.stop()
         
         self.start_gps_visualization_action.setEnabled(True)
         self.stop_gps_visualization_action.setEnabled(False)
@@ -998,24 +993,30 @@ class WidgetGallery(QMainWindow):
          Uses the ``show_air_moving`` function of the class ``GpsOnMap``, meaning that such method has to implement the functionality to display gps coordinates on a given input (PyQt5 panel).
         """
         
-        # Display GND node coords
-        coords, head_info = self.myhelpera2g.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
-            
-        if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
-            print("[DEBUG]: Error in received GPS coordinates from DRONE")
-            print("[DEBUG]: Due to this error, DRONE location will not be seen")
-        else:
-            lat_gnd_node, lon_gnd_node, height_node = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
-            
-            #self.mygpsonmap.show_air_moving(lat=lat_gnd_node, lon=lon_gnd_node)
-            
-            # Display drone node coords
-            # The coordinates shown will be the coordinates of up to self.update_time_fps before
+        # Display coords
+        if hasattr(self, 'myhelpera2g'):
+            '''
+            coords, head_info = self.myhelpera2g.mySeptentrioGPS.get_last_sbf_buffer_info(what='Both')
+                
+            if coords['X'] == self.ERR_GPS_CODE_BUFF_NULL or self.ERR_GPS_CODE_SMALL_BUFF_SZ:
+                print("[DEBUG]: Error in received GPS coordinates from DRONE")
+                print("[DEBUG]: Due to this error, DRONE location will not be seen")
+            else:
+                lat_gnd_node, lon_gnd_node, height_node = geocentric2geodetic(coords['X'], coords['Y'], coords['Z'])
+            '''
             if hasattr(self.myhelpera2g, 'last_drone_coords_requested'):
                 gps_drone_coords_json = {"lat": self.last_drone_coords_requested['LAT'], "lon": self.last_drone_coords_requested['LON']}
                 response = requests.put(self.url_put_map, json=gps_drone_coords_json)
-                
-                #self.mygpsonmap.show_air_moving(lat=self.myhelpera2g.last_drone_coords_requested['LAT'], lon=self.myhelpera2g.last_drone_coords_requested['LON'])
+        else:# DEBUG: test showing something updating each self.update_vis_time
+            self.debug_cnt_1 = self.debug_cnt_1 + 1
+            alfa = np.random.rand()
+            point1 = [60.187372669712566, 24.96109446381862]
+            point2 = [60.18490587854025, 24.948227873431904]
+            point = np.array(point1)*alfa + (1-alfa)*np.array(point2)
+            point = point.tolist()
+            gps_drone_coords_json = {"lat": point[0], "lon": point[1]}
+            response = requests.put(self.url_put_map, json=gps_drone_coords_json)    
+            print("Periodical GPS", self.debug_cnt_1)
             
     def write_to_log_terminal(self, newLine):
         '''
@@ -1239,8 +1240,8 @@ class WidgetGallery(QMainWindow):
                 self.stop_event_gimbal_follow_thread.set()
         
         if hasattr(self, 'periodical_gps_display_thread'):
-            if self.periodical_gps_display_thread.isRunning():
-                self.stop_event_gps_display.set()
+            if self.periodical_gps_display_thread.isActive():
+                self.periodical_gps_display_thread.stop()
 
         if self.stop_meas_togglePushButton.isChecked():
             print("[DEBUG]: Before disconnecting, the ongoing measurement will be stopped")
@@ -2016,8 +2017,8 @@ class WidgetGallery(QMainWindow):
             if self.periodical_gimbal_follow_thread.isRunning():
                 self.stop_event_gimbal_follow_thread.set()
         if hasattr(self, 'periodical_gps_display_thread'):
-            if self.periodical_gps_display_thread.isRunning():
-                    self.stop_event_gps_display.set()
+            if self.periodical_gps_display_thread.isActive():
+                    self.periodical_gps_display_thread.stop()
 
     def create_Planning_Measurements_panel(self):
         """
@@ -2062,23 +2063,23 @@ class WidgetGallery(QMainWindow):
         
         js_handler_of_non_geoson = JsCode("""
         function(responseHandler, errorHandler) {
-            var url ="""+self.url_get_map+""";
+            let url ="""+self.url_get_map+""";
 
             fetch(url)
             .then((response) => {
                 return response.json().then((data) => {
-                    var { id, longitude, latitude } = data;
-
+                    var {lat, lon } = data;
+                    var id=45;
                     return {
-                        'type': 'FeatureCollection',
-                        'features': [{
-                            'type': 'Feature',
-                            'geometry': {
-                                'type': 'Point',
-                                'coordinates': [longitude, latitude]
+                        "type": "FeatureCollection",
+                        "features": [{
+                            "type": "Feature",
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [lon, lat]
                             },
-                            'properties': {
-                                'id': id
+                            "properties": {
+                                "id": id
                             }
                         }]
                     };
@@ -2170,8 +2171,8 @@ class WidgetGallery(QMainWindow):
             #self.periodical_pap_display_thread.cancel()
             #self.periodical_pap_display_thread.stop()
         if hasattr(self, 'periodical_gps_display_thread'):
-            if self.periodical_gps_display_thread.isRunning():
-                self.stop_event_gps_display.set()
+            if self.periodical_gps_display_thread.isActive():
+                self.periodical_gps_display_thread.stop()
         if hasattr(self, 'periodical_gimbal_follow_thread'):
             if self.periodical_gimbal_follow_thread.isRunning():
                 self.stop_event_gimbal_follow_thread.set()
