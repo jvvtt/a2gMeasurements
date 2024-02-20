@@ -2091,8 +2091,8 @@ class HelperA2GMeasurements(object):
                 self.do_closed_gui_action()
             elif cmd == 0x08 and length == 5: # SETREMOTEFMFLAG
                 print(f"[DEBUG]: THIS {self.ID} receives SETREMOTEFMFLAG cmd")
-                data_bytes = data_bytes[:14] # 3 float32, 2 hex
-                x,y,z,fmode,mobility = struct.unpack('fffBB', data_bytes)
+                data_bytes = data_bytes[:26] # 3 float64, 2 hex
+                x,y,z,fmode,mobility = struct.unpack('dddBB', data_bytes)
                 mydata ={'X':x, 'Y':y, 'Z':z, 'FMODE': fmode, 'MOBILITY': mobility}
                 self.do_set_remote_fm_flag(data=mydata)
             elif cmd == 0x09 and length == 0: # SETREMOTESTOPFM
@@ -2166,7 +2166,7 @@ class HelperA2GMeasurements(object):
                 length = 0
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length)
             elif cmd == 0x08: # SETREMOTEFMFLAG
-                data = struct.pack('fffBB', data['X'], data['Y'], data['Z'], data['FMODE'], data['MOBILITY'])
+                data = struct.pack('dddBB', data['X'], data['Y'], data['Z'], data['FMODE'], data['MOBILITY'])
                 length = 5
                 message = struct.pack('BBBBB', source_id, destination_id, message_type, cmd, length) + data
             elif cmd == 0x09: # SETREMOTESTOPFM
@@ -2252,7 +2252,7 @@ class HelperA2GMeasurements(object):
         if type_cmd == 'SETGIMBAL':
             frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x03, data=data)
         elif type_cmd == 'FOLLOWGIMBAL':
-            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x01)
+            frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x01, data=data)
         elif type_cmd == 'GETGPS':
             frame = self.encode_message(source_id=0x01, destination_id=0x02, message_type=0x01, cmd=0x02)
         elif type_cmd == 'CLOSEDGUI':
@@ -3606,71 +3606,50 @@ class RFSoCRemoteControlFromHost():
         :type cmd_arg: str or float or dict, optional
         """
 
-        if cmd == 'setModeSivers':
-            if cmd_arg == 'RXen0_TXen1' or cmd_arg == 'RXen1_TXen0' or cmd_arg == 'RXen0_TXen0':
-                try:
+        try:
+            if cmd == 'setModeSivers':
+                if cmd_arg == 'RXen0_TXen1' or cmd_arg == 'RXen1_TXen0' or cmd_arg == 'RXen0_TXen0':
                     self.radio_control.sendall(b"setModeSiver "+str.encode(str(cmd_arg)))
-                except IOError as e:
-                    if e.errno == errno.EPIPE:
-                        print("We pass over this error: ", e)
-                        pass
-            else:
-                print("[DEBUG]: Unknown Sivers mode")
-        elif cmd == 'setCarrierFrequencySivers':
-            try:
+                else:
+                    print("[DEBUG]: Unknown Sivers mode")
+            elif cmd == 'setCarrierFrequencySivers':
                 self.radio_control.sendall(b"setCarrierFrequency "+str.encode(str(cmd_arg)))
-            except IOError as e:
-                if e.errno == errno.EPIPE:
-                    print("We pass over this error: ", e)
-                    pass
-        elif cmd == 'setGainTxSivers':
-            tx_bb_gain = cmd_arg['tx_bb_gain']
-            tx_bb_phase = cmd_arg['tx_bb_phase']
-            tx_bb_iq_gain = cmd_arg['tx_bb_iq_gain']
-            tx_bfrf_gain = cmd_arg['tx_bfrf_gain']
+            elif cmd == 'setGainTxSivers':
+                tx_bb_gain = cmd_arg['tx_bb_gain']
+                tx_bb_phase = cmd_arg['tx_bb_phase']
+                tx_bb_iq_gain = cmd_arg['tx_bb_iq_gain']
+                tx_bfrf_gain = cmd_arg['tx_bfrf_gain']
 
-            try:
                 self.radio_control.sendall(b"setGainTX " + str.encode(str(int(tx_bb_gain)) + " ") \
-                                                        + str.encode(str(int(tx_bb_phase)) + " ") \
-                                                        + str.encode(str(int(tx_bb_iq_gain)) + " ") \
-                                                        + str.encode(str(int(tx_bfrf_gain))))
-            except IOError as e:
-                if e.errno == errno.EPIPE:
-                    print("We pass over this error: ", e)
-                    pass
-        elif cmd == 'setGainRxSivers':
-            rx_gain_ctrl_bb1 = cmd_arg['rx_gain_ctrl_bb1']
-            rx_gain_ctrl_bb2 = cmd_arg['rx_gain_ctrl_bb2']
-            rx_gain_ctrl_bb3 = cmd_arg['rx_gain_ctrl_bb3']
-            rx_gain_ctrl_bfrf = cmd_arg['rx_gain_ctrl_bfrf']
-            
-            try:
+                                                            + str.encode(str(int(tx_bb_phase)) + " ") \
+                                                            + str.encode(str(int(tx_bb_iq_gain)) + " ") \
+                                                            + str.encode(str(int(tx_bfrf_gain))))
+            elif cmd == 'setGainRxSivers':
+                rx_gain_ctrl_bb1 = cmd_arg['rx_gain_ctrl_bb1']
+                rx_gain_ctrl_bb2 = cmd_arg['rx_gain_ctrl_bb2']
+                rx_gain_ctrl_bb3 = cmd_arg['rx_gain_ctrl_bb3']
+                rx_gain_ctrl_bfrf = cmd_arg['rx_gain_ctrl_bfrf']
+                
                 self.radio_control.sendall(b"setGainRX " + str.encode(str(int(rx_gain_ctrl_bb1)) + " ") \
-                                                        + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
-                                                        + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
-                                                        + str.encode(str(int(rx_gain_ctrl_bfrf))))
-            except IOError as e:
-                if e.errno == errno.EPIPE:
-                    print("We pass over this error: ", e)
-                    pass
-        elif cmd == 'transmitSamples':
-            try:
+                                                            + str.encode(str(int(rx_gain_ctrl_bb2)) + " ") \
+                                                            + str.encode(str(int(rx_gain_ctrl_bb3)) + " ") \
+                                                            + str.encode(str(int(rx_gain_ctrl_bfrf))))
+            elif cmd == 'transmitSamples':
                 self.radio_control.sendall(b"transmitSamples")
-            except IOError as e:
-                if e.errno == errno.EPIPE:
-                    print("We pass over this error: ", e)
-                    pass
-        else: 
-            print("[DEBUG]: Unknown command to send to RFSoC")
-            return
-        
-        data = self.radio_control.recv(1024)
-        data = data.decode('utf-8')
-            
-        if self.RFSoCSuccessExecutionAns in data or self.RFSoCSuccessAns in data:
-            print("[DEBUG]: Command ", cmd, " executed succesfully on Sivers or RFSoC")
+            else: 
+                print("[DEBUG]: Unknown command to send to RFSoC")
+                return
+        except IOError as e:
+            if e.errno == errno.EPIPE:
+                print("[ERROR]: RFSoC to Host connection has problems: ", e)
         else:
-            print("[DEBUG]: Command ", cmd, " was not successfully executed on Sivers or RFSoC. The following error appears: ", data)
+            data = self.radio_control.recv(1024)
+            data = data.decode('utf-8')
+                
+            if self.RFSoCSuccessExecutionAns in data or self.RFSoCSuccessAns in data:
+                print("[DEBUG]: Command ", cmd, " executed succesfully on Sivers or RFSoC")
+            else:
+                print("[DEBUG]: Command ", cmd, " was not successfully executed on Sivers or RFSoC. The following error appears: ", data)
     
     def transmit_signal(self, tx_bb_gain=0x3, tx_bb_phase=0, tx_bb_iq_gain=0x77, tx_bfrf_gain=0x40, carrier_freq=57.51e9):
         """
