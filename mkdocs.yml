@@ -1,0 +1,82 @@
+site_name: A2G Measurements Software
+theme: 
+  icon:
+    admonition:
+      example: simple/react
+      note: simple/python
+      abstract: simple/html5
+      info: simple/css3
+      tip: simple/javascript
+      quote: simple/git
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - content.footnote.tooltips
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
+  language: en
+  palette:
+  # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: lime
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+
+markdown_extensions:
+  - def_list
+  - footnotes
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tasklist:
+      custom_checkbox: true
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  annotate:
+    json: [.s2]
+
+plugins:
+  - search
+  - mkdocstrings
+
+nav:
+    - Home: index.md
+    - Installation: GettingStarted.md
+    - API reference:
+        - DJI Ronin RS2 gimbal: GimbalRS2.md
+        - Septentrio GPS: GpsSignaling.md
+        - Anritsu Spectrum Analyzer: AnritsuSA.md
+        - Nodes communication: NodesCommunication.md
+        - Gremsy H16 gimbal: GimbalGremsyH16.md
+        - SBUS encoder: SBUSEncoder.md
+        - RFSoC communication: RFSoCHandler.md

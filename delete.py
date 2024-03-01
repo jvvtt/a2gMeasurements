@@ -10,6 +10,12 @@ from folium.utilities import JsCode
 import requests
 
 class MapWidget(QWidget):
+    """
+    Map test for material for mkdocstrings
+
+    Args:
+        QWidget (QWidget): Class
+    """
     def __init__(self, parent=None):
         super(MapWidget, self).__init__(parent)
                        

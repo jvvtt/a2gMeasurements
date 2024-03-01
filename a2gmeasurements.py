@@ -50,32 +50,30 @@ e-mail: julian.villegas@vtt.fi
 
 class GimbalRS2(object):
     """
-     Python Class that works as the driver for the gimbal DJI RS2.
+    Python Class that works as the driver for the gimbal DJI RS2.
     
-     The gimbal should be connected to the host computer through an USB-to-PCAN bridge (PCAN System). 
+    The gimbal should be connected to the host computer through an USB-to-PCAN bridge (PCAN System). 
      
-     It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.
+    It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.
     
-     More info on "Manual A2GMeasurements".
+    More info on "Manual A2GMeasurements".
     
-     Gimbal control modified and extended from https://github.com/ceinem/dji_rs2_ros_controller, based as well on DJI R SDK demo software
-
+    Gimbal control modified and extended from (based as well on DJI R SDK demo software):
+     
+    [DJI ROS CONTROLLER](https://github.com/ceinem/dji_rs2_ros_controller)
     """   
     
     def __init__(self, speed_yaw=40, speed_pitch=40, speed_roll=40, DBG_LVL_1=False, DBG_LVL_0=False):
         """
+        Initialize properties of the class, like the DJI SDK frame header, sequence number and others.
 
-        :param speed_yaw: speed of yaw axis in deg/s, defaults to 40
-        :type speed_yaw: int, optional
-        :param speed_pitch: speed of pitch axis in deg/s, defaults to 40
-        :type speed_pitch: int, optional
-        :param speed_roll: speed of roll axis in deg/s, defaults to 40
-        :type speed_roll: int, optional
-        :param DBG_LVL_1: level of verbose to show at the command line (beta). This shows less verbose than the 0 level.
-        :type DBG_LVL_1: bool, optional
-        :param DBG_LVL_0: level of verbose to show at the command line (beta), defaults to False
-        :type DBG_LVL_0: bool, optional
-        """
+        Args:
+            speed_yaw (int, optional): speed of yaw axis in deg/s. Defaults to 40.
+            speed_pitch (int, optional): speed of pitch axis in deg/s. Defaults to 40.
+            speed_roll (int, optional): speed of roll axis in deg/s. Defaults to 40.
+            DBG_LVL_1 (bool, optional): level of verbose to show at the command line (beta). This shows less verbose than the 0 level. Defaults to False.
+            DBG_LVL_0 (bool, optional): level of verbose to show at the command line (beta). Defaults to False.
+        """      
 
         self.header = 0xAA
         self.enc = 0x00
@@ -116,10 +114,10 @@ class GimbalRS2(object):
   
     def seq_num(self):
         """
-         Updates the sequence number of the gimbal data.
+        Updates the sequence number of the gimbal data.
 
-        :return: number in hexadecimal
-        :rtype: int
+        Returns:
+            seq_str (str): number in hexadecimal split by a ``:``.
         """
 
         if self.seq >= 0xFFFD:
@@ -131,12 +129,12 @@ class GimbalRS2(object):
 
     def can_buffer_to_full_frame(self):
         """
-         Parse the full DJI R frame message from the can buffer.
+        Parse the full DJI R frame message from the can buffer.
         
-         Its fields are explained in the DJI R SDK Protocol and User Interface.
+        Its fields are explained in the DJI R SDK Protocol and User Interface.
 
-        :return: full_msg_frames 
-        :rtype: list
+        Returns:
+            full_msg_frames (list): a full message frame
         """
         
         full_msg_frames = []
@@ -159,12 +157,13 @@ class GimbalRS2(object):
 
     def validate_api_call(self, data_frame):
         """
-         CRC error check.
+        CRC error check.
 
-        :param data_frame: DJI RS2 frame message
-        :type data_frame: list
-        :return: passed or not the crc check
-        :rtype: boolean
+        Args:
+            data_frame (list): DJI RS2 frame message
+
+        Returns:
+            validated (bool): passed or not the crc check
         """
         
         validated = False
@@ -184,10 +183,10 @@ class GimbalRS2(object):
 
     def parse_position_response(self, data_frame):
         """
-         Retrieve the position from the full DJI frame message.
+        Retrieve the position from the full DJI frame message.
 
-        :param data_frame: DJI RS2 frame message
-        :type data_frame: list
+        Args:
+            data_frame (list): DJI RS2 frame message
         """
         
         pos_data = data_frame[16:-4]
@@ -222,10 +221,10 @@ class GimbalRS2(object):
         
     def can_callback(self, data):
         """
-         Callback for the thread in charge of checking the USB-to-CAN input (receive).
+        Callback for the thread in charge of checking the USB-to-CAN input (receive).
 
-        :param data: DJI RS2 frame message
-        :type data: list
+        Args:
+            data (list): DJI RS2 frame message
         """
     
         str_data = ['{:02X}'.format(i) for i in data.data]
@@ -300,20 +299,17 @@ class GimbalRS2(object):
 
     def setPosControl(self, yaw, roll, pitch, ctrl_byte=0x01, time_for_action=0x14):
         """
-         Set the gimbal position by providing the yaw, roll and pitch.
+        Set the gimbal position by providing the yaw, roll and pitch.
 
-        :param yaw: yaw angle. value should be between -1800 and 1800
-        :type yaw: int
-        :param roll: roll angle. value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this) axis value.
-        :type roll: int
-        :param pitch: value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this)axis value.
-        :type pitch: int
-        :param ctrl_byte: Absolute or relative movement. For absolute use 0x01, while for relative use 0x00.
-        :type ctrl_byte: int
-        :param time_for_action: Time it takes for the gimbal to move to desired position. Implicitly, this command controls the speed of gimbal. It is given in units of 0.1 s. For example: a value of 0x14 is 20, which means that the gimbal will take 2s (20*0.1) to reach its destination. Defaults to 0x14.
-        :type time_for_action: int, optional
-        :return: always returns true
-        :rtype: boolean
+        Args:
+            yaw (int): yaw angle. Value should be between -1800 and 1800.
+            roll (int): roll angle. value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this) axis value.
+            pitch (int): pitch angle. value should be betweeen -1800 and 1800. However, gimbal might stop if it reachs its maximum/minimum (this) axis value.
+            ctrl_byte (hexadecimal, optional): Absolute or relative movement. For absolute use 0x01, while for relative use 0x00. Defaults to 0x01.
+            time_for_action (hexadecimal, optional): Time it takes for the gimbal to move to desired position. Implicitly, this command controls the speed of gimbal. It is given in units of 0.1 s. For example: a value of 0x14 is 20, which means that the gimbal will take 2s (20*0.1) to reach its destination. Defaults to 0x14.
+
+        Returns:
+            True (bool): always returns the same, unless there is a raising error.
         """
         
         # yaw, roll, pitch in 0.1 steps (-1800,1800)
@@ -352,21 +348,20 @@ class GimbalRS2(object):
 
     def setSpeedControl(self, yaw, roll, pitch, ctrl_byte=0x80):
         """
-         Sets speed for each axis of the gimbal.
+        Sets speed for each axis of the gimbal.
 
-         Always after seting the speed the gimbal roll is moved (strange behaviour). 
-         Developer has to send a setPosControl to set again the position of the gimbal where it was previously.
+        Always after seting the speed the gimbal roll is moved (strange behaviour). 
+        
+        Developer has to send a setPosControl to set again the position of the gimbal where it was previously.
 
-        :param yaw: yaw speed in units of 0.1 deg/s
-        :type yaw: int
-        :param roll: roll speed in units of 0.1 deg/s
-        :type roll: int
-        :param pitch: pitch speed in units of 0.1 deg/s
-        :type pitch: int
-        :param ctrl_byte: defaults to 0x80
-        :type ctrl_byte: int, optional
-        :return: True if provided arguments are within acceptable range. False otherwise.
-        :rtype: boolean
+        Args:
+            yaw (int): yaw speed in units of 0.1 deg/s.
+            roll (int): roll speed in units of 0.1 deg/s.
+            pitch (int): pitch speed in units of 0.1 deg/s.
+            ctrl_byte (hexadecimal, optional): check DJI SDK manual. Defaults to 0x80.
+
+        Returns:
+            True (bool): True if provided arguments are within acceptable range. False otherwise.
         """
         
         if -3600 <= yaw <= 3600 and -3600 <= roll <= 3600 and -3600 <= pitch <= 3600:
@@ -386,9 +381,9 @@ class GimbalRS2(object):
 
     def request_current_position(self):
         """
-         Sends command to request the current position of the gimbal.
+        Sends command to request the current position of the gimbal.
 
-         Blocks thread execution for the time given by attribute ``TIME_POS_REQ`` to allow the response to be received
+        Blocks thread execution for the time given by attribute ``TIME_POS_REQ`` to allow the response to be received.
         """
         
         hex_data = [0x01]
@@ -404,18 +399,16 @@ class GimbalRS2(object):
 
     def assemble_can_msg(self, cmd_type, cmd_set, cmd_id, data):
         """
-         Builds a DJI RS2 message frame based on the command to be sent.
+        Builds a DJI RS2 message frame based on the command to be sent.
 
-        :param cmd_type: see DJI R SDK Protocol and User Interface document for a description
-        :type cmd_type: int
-        :param cmd_set: see DJI R SDK Protocol and User Interface document for a description
-        :type cmd_set: int
-        :param cmd_id: see DJI R SDK Protocol and User Interface document for a description
-        :type cmd_id: int
-        :param data: see DJI R SDK Protocol and User Interface document for a description
-        :type data: int
-        :return: parsed can frame whose fields are separated by ":".
-        :rtype: string
+        Args:
+            cmd_type (int): see DJI R SDK Protocol and User Interface document for a description.
+            cmd_set (int): see DJI R SDK Protocol and User Interface document for a description.
+            cmd_id (int): see DJI R SDK Protocol and User Interface document for a description.
+            data (int): see DJI R SDK Protocol and User Interface document for a description.
+
+        Returns:
+            whole_can_frame (str): parsed can frame whose fields are separated by ":".
         """
         
         if data == "":
@@ -462,10 +455,10 @@ class GimbalRS2(object):
 
     def send_cmd(self, cmd):
         """
-         Wrapper to ``send_data`` method.
+        Wrapper to ``send_data`` method.
 
-        :param cmd: command fields separated by ':'
-        :type cmd: str
+        Args:
+            cmd (str): command fields separated by ':'.
         """
         
         data = [int(i, 16) for i in cmd.split(":")]
@@ -473,12 +466,11 @@ class GimbalRS2(object):
 
     def send_data(self, can_id, data):
         """
-         Sends a command through the can bus
+        Sends a command through the can bus.
 
-        :param can_id: static can id.
-        :type can_id: int
-        :param data: fields of the frame
-        :type data: list
+        Args:
+            can_id (int): static can id.
+            data (list): fields of the frame.
         """
         
         data_len = len(data)
@@ -514,13 +506,11 @@ class GimbalRS2(object):
 
     def receive(self, bus, stop_event):
         """
-         Threading callback function. Defined when the thread is created. This thread listens 
-         for coming (received) can messages on a USB port. Reads 1 entry of the rx bus buffer at a time.
+        Threading callback function. Defined when the thread is created. This thread listens for coming (received) can messages on a USB port. Reads 1 entry of the rx bus buffer at a time.
 
-        :param bus: object pointing to the type of bus (from 'can' python package)
-        :type bus: can.Bus object
-        :param stop_event: works as a flag to stop receiving messages
-        :type stop_event: threading.Event 
+        Args:
+            bus (can.Bus object): object pointing to the type of bus (from 'can' python package).
+            stop_event (threading.Event): works as a flag to stop receiving messages.
         """
         
         if self.DBG_LVL_0:
@@ -540,10 +530,10 @@ class GimbalRS2(object):
     
     def start_thread_gimbal(self, bitrate=1000000):
         """
-         Starts the thread for listening the incoming data (if any) from the gimbal.
+        Starts the thread for listening the incoming data (if any) from the gimbal.
 
-        :param bitrate: Bitrate for the usb-to-can interface. This is a parameter inherited from can.Bus. Defaults to 1000000
-        :type bitrate: int, optional
+        Args:
+            bitrate (int, optional): Bitrate for the usb-to-can interface. This is a parameter inherited from can.Bus. Defaults to 1000000.
         """
         
         try:
@@ -566,22 +556,21 @@ class GimbalRS2(object):
 
     def stop_thread_gimbal(self):
         """
-         Stops the gimbal thread by setting the threading.Event attribute created in "start_thread_gimbal".
-        """
-        
+        Stops the gimbal thread by setting the threading. Event attribute created in ``start_thread_gimbal``.
+        """        
         self.event_stop_thread_gimbal.set()        
             
 class GpsSignaling(object):
     """
-     Python class that works as "software" driver for the Septentrio's GPS receiver (Mosaic-go). 
+    Python class that works as "software" driver for the Septentrios GPS receiver (Mosaic-go). 
      
-     It implements the commands described in Septentrio's "mosaic-go Reference Guide".
+    It implements the commands described in Septentrios "mosaic-go Reference Guide".
      
-     There are commands (sent to the GPS receiver) that control (mainly) what type of information (in the form of what is called in Septentrio's documentation, NMEA or SBF sentences) is retrieved from the receiver. 
+    There are commands (sent to the GPS receiver) that control (mainly) what type of information (in the form of what is called in Septentrio's documentation, NMEA or SBF sentences) is retrieved from the receiver. 
      
-     It creates a thread (called here a gps thread) to handle the communication between the receiver and this host computer.
+    It creates a thread (called here a gps thread) to handle the communication between the receiver and this host computer.
      
-     The reference coordinate system used by the Septentrio gps is defined as followed:
+    The reference coordinate system used by the Septentrio gps is defined as followed:
      
      1. The (positive) x-axis is the **longitudinal** axis. This is the axis pointing in the direction of movement of the node.
      
@@ -591,22 +580,19 @@ class GpsSignaling(object):
     
     def __init__(self, DBG_LVL_1=False, DBG_LVL_2=False, DBG_LVL_0=False, save_filename='GPS'):
         """
-         Contructor for the GpsSignaling class. Important attributes are:
+        Contructor for the GpsSignaling class. Important attributes are:
         
-         ``register_sbf_sentences_by_id``: list of integers containing the expected SBF sentences that are going to be requested at the receiver. The integer is the ID of the sentence described in Septentrio's manual.
+        * ``register_sbf_sentences_by_id``: list of integers containing the expected SBF sentences that are going to be requested at the receiver. The integer is the ID of the sentence described in Septentrio's manual.
                                           
-         ``SBF_frame_buffer``: list of dictionaries containing the SBF frames during the execution of the thread responsible for receiving SBF frames.
+        * ``SBF_frame_buffer``: list of dictionaries containing the SBF frames during the execution of the thread responsible for receiving SBF frames.
         
-         ``MAX_SBF_BUFF_LEN``: Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
+        * ``MAX_SBF_BUFF_LEN``: Maximum number of entries in the SBF frame buffer before saving, cleaning and starting again
         
-        :param DBG_LVL_1: used to print less verbose than level 0, defaults to False
-        :type DBG_LVL_1: bool, optional
-        :param DBG_LVL_2: used to print less verbose than level 2, defaults to False
-        :type DBG_LVL_2: bool, optional
-        :param DBG_LVL_0: prints all the verbose available, defaults to False
-        :type DBG_LVL_0: bool, optional
-        :param save_filename: name of the file where to save the record of GPS coordinates along an experiment, defaults to 'GPS'
-        :type save_filename: str, optional
+        Args:
+            DBG_LVL_1 (bool, optional): used to print less verbose than level 0. Defaults to False.
+            DBG_LVL_2 (bool, optional): used to print less verbose than level 2. Defaults to False.
+            DBG_LVL_0 (bool, optional): prints all the verbose available. Defaults to False.
+            save_filename (str, optional): name of the file where to save the record of GPS coordinates along an experiment. Defaults to 'GPS'.
         """
         
         # Initializations
@@ -635,25 +621,25 @@ class GpsSignaling(object):
         
     def serial_connect(self, serial_port=None):
         """
-         Open a serial connection. The Septentrio mosaic-go provides 2 virtual serial ports.
+        Open a serial connection. The Septentrio mosaic-go provides 2 virtual serial ports.
         
-         In Windows the name of the virtual serial ports are typically: COM# (Virtual serial port 1), COM# (Virtual serial port 2).
+        In Windows the name of the virtual serial ports are typically: COM# (Virtual serial port 1), COM# (Virtual serial port 2).
 
-         In Linux the name of the virtual serial ports (controlled by the standard Linux CDC-ACM driver) are: /dev/ttyACM0 (Virtual serial port 1), /dev/ttyACM1 (Virtual serial port 2).
+        In Linux the name of the virtual serial ports (controlled by the standard Linux CDC-ACM driver) are: ``/dev/ttyACM0`` (Virtual serial port 1), ``/dev/ttyACM1`` (Virtual serial port 2).
 
-         Septentrio has different interfaces to use with its receiver. Among other interfaces are: IP (using Ethernet-over-USB), USB.
+        Septentrio has different interfaces to use with its receiver. Among other interfaces are: IP (using Ethernet-over-USB), USB.
         
-         For the virtual serial ports the interface name in Septentrio receiver is 'USB' as their
-         communication is made through the USB connection with the host computer. 
+        For the virtual serial ports the interface name in Septentrio receiver is 'USB' as their
+        communication is made through the USB connection with the host computer. 
         
-         Additionally there is an actual (not virtual) serial port in the mosaic-go device. Under Linux, the name of this port is '/dev/serial0' which is the symbolic link to either 'dev/ttyS#' or '/dev/ttyAMA#'.
+        Additionally there is an actual (not virtual) serial port in the mosaic-go device. Under Linux, the name of this port is ``/dev/serial0`` which is the symbolic link to either ``dev/ttyS#`` or ``/dev/ttyAMA#``.
         
-         For information about all available interfaces check the Septentrio "mosaic-go Reference Guide".
+        For information about all available interfaces check the Septentrio "mosaic-go Reference Guide".
         
-         *It is important to note that only the USB interface has been implemented in this class*.
-        
-        :param serial_port: serial port or virtual serial port name, defaults to None
-        :type serial_port: str, optional
+        *It is important to note that only the USB interface has been implemented in this class*.
+
+        Args:
+            serial_port (str, optional): serial port or virtual serial port name. Defaults to None.
         """
         
         self.serial_port = None
@@ -708,16 +694,16 @@ class GpsSignaling(object):
 
     def process_gps_nmea_data(self, data):
         """
-         Parses a line of NMEA data retrieved from the gps and coming from the virtual serial port.
+        Parses a line of NMEA data retrieved from the gps and coming from the virtual serial port.
          
-         Used NMEA sentences are GGA and HDT.
+        Used NMEA sentences are GGA and HDT.
         
-         The labels of the items of the returned dictionary are the following ones for the GGA sentence: 'Timestamp', 'Latitude', 'Longitude', 'Latitude Direction', 'Longitude', 'Longitude Direction', 'GPS Quality Indicator', 'Number of Satellites in use', 'Horizontal Dilution of Precision', 'Antenna Alt above sea level (mean)', 'Units of altitude (meters)', 'Geoidal Separation', 'Units of Geoidal Separation (meters)', 'Age of Differential GPS Data (secs)', 'Differential Reference Station ID'.
+        The labels of the items of the returned dictionary are the following ones for the GGA sentence: ``Timestamp``, ``Latitude``, ``Longitude``, ``Latitude Direction``, ``Longitude``, ``Longitude Direction``, ``GPS Quality Indicator``, ``Number of Satellites in use``, ``Horizontal Dilution of Precision``, ``Antenna Alt above sea level (mean)``, ``Units of altitude (meters)``, ``Geoidal Separation``, ``Units of Geoidal Separation (meters)``, ``Age of Differential GPS Data (secs)``, ``Differential Reference Station ID``.
          
-         *The instances of this class created in the GUI and other classes, use SBF sentences as the default type of sentence*.
+        *The instances of this class created in the GUI and other classes, use SBF sentences as the default type of sentence*.
 
-        :param data: line of read data following the structure of a NMEA frame.
-        :type data: str
+        Args:
+            data (str): line of read data following the structure of a NMEA frame.
         """
         
         try:
@@ -804,16 +790,16 @@ class GpsSignaling(object):
 
     def process_pvtcart_sbf_data(self, raw_data):
         """
-         Parses an PVTCart SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
+        Parses an PVTCart SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
          
-         The PVTCart SBF sentence provides geocentric coordinates X, Y, Z for the position of the receiver.
+        The PVTCart SBF sentence provides geocentric coordinates X, Y, Z for the position of the receiver.
          
-         The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
+        The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
          
-         *More about the information carried by this block in "mosaic-go Reference Guide"*.  
+        *More about the information carried by this block in "mosaic-go Reference Guide"*.
 
-        :param raw_data: received data corresponding to the PVTCart SBF block
-        :type raw_data: bytes
+        Args:
+            raw_data (bytes): received data corresponding to the PVTCart SBF block.
         """
         
         format_before_padd = '<1c3H1I1H2B3d5f1d1f4B2H1I2B4H1B' 
@@ -872,16 +858,16 @@ class GpsSignaling(object):
     
     def process_pvtgeodetic_sbf_data(self, raw_data):
         """
-         Parses an PVTGeodetic SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
+        Parses an PVTGeodetic SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
          
-         The PVTGeodetic SBF sentence provides geodetic coordinates lat, lon, h for the position of the receiver.
+        The PVTGeodetic SBF sentence provides geodetic coordinates lat, lon, h for the position of the receiver.
          
-         The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
+        The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
          
-         *More about the information carried by this block in "mosaic-go Reference Guide"*.
+        *More about the information carried by this block in "mosaic-go Reference Guide"*.
 
-        :param raw_data: received data corresponding to the PVTGeodetic SBF block
-        :type raw_data: bytes
+        Args:
+            raw_data (bytes): received data corresponding to the PVTGeodetic SBF block.
         """
         
         TOW = struct.unpack('<1I', raw_data[7:11])[0]
@@ -914,16 +900,16 @@ class GpsSignaling(object):
             
     def process_atteuler_sbf_data(self, raw_data):
         """
-         Parses an AttEuler SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
+        Parses an AttEuler SBF sentence. To be able to receive this block, the receiver should be configured to output SBF sentences.
 
-         The AttEuler SBF sentence provides heading information of the imaginary line formed by the first and second antennas, w.r.t the North. To do so, the heading, pitch, and roll axis are defined.
+        The AttEuler SBF sentence provides heading information of the imaginary line formed by the first and second antennas, w.r.t the North. To do so, the heading, pitch, and roll axis are defined.
          
-         The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
+        The coordinates are stored in ``SBF_frame_buffer``. Each ``MAX_SBF_BUFF_LEN`` entries of ``SBF_frame_buffer``, the buffer is flushed and its contents are saved on disk.
          
-         *More about all axis definition, and heading information in "mosaic-go Reference Guide"*.
+        *More about all axis definition, and heading information in "mosaic-go Reference Guide"*.
 
-        :param raw_data: received data corresponding to the AttEurler SBF sentence.
-        :type raw_data: bytes
+        Args:
+            raw_data (bytes): received data corresponding to the AttEurler SBF sentence.
         """
         
         TOW = struct.unpack('<1I', raw_data[7:11])[0]
@@ -959,12 +945,12 @@ class GpsSignaling(object):
         
     def parse_septentrio_msg(self, rx_msg):
         """
-         Parses the received message and process it depending if it is an SBF or NMEA message
+        Parses the received message and process it depending if it is an SBF or NMEA message
         
-         Raises an exception if *any* problem is encountered when parsing the message.
+        Raises an exception if *any* problem is encountered when parsing the message.
         
-        :param rx_msg: 
-        :type rx_msg: bytes or str
+        Args:
+            rx_msg (bytes or str): received msg from Ronin RS2 gimbal.
         """
         
         try:
@@ -1073,12 +1059,14 @@ class GpsSignaling(object):
     
     def get_last_sbf_buffer_info(self, what='Coordinates'):
         """
-         Retrieves the last gps coordinates, the last heading information of the receiver, or both things.
+        Retrieves the last gps coordinates, the last heading information of the receiver, or both things.
+        
+        Args:
+            what (str, optional): defines which information wants to be retrieved from ``SBF_frame_buffer``. Options are: 'Coordinates', 'Heading' or 'Both'. Defaults to 'Coordinates'.
 
-        :param what: defines which information wants to be retrieved from ``SBF_frame_buffer``. Options are: 'Coordinates', 'Heading' or 'Both'.
-        :type what: str, optional
-        :return: either one or two dictionaries. The first dictionary (always) returned contains either the coordinates or the heading information. If 'Both' was specified the first dictionary contains the coordinates and the second dictionary contains the heading information.
-        :rtype: dictionary/ies
+        Returns:
+            data_to_return (dict): ``X``, ``Y`` and ``Z`` coordinates in absence of any error. Otherwise, the error code.
+            data_to_return_2 (dict, optional): ``Heading`` angle in [0, 360] degrees.
         """
         
         # Coordinates
@@ -1169,16 +1157,16 @@ class GpsSignaling(object):
     
     def check_coord_closeness(self, coordinates2compare, tol=5):
         """
-         Checks how close is a coordinate with respect to the actual node position.
+        Checks how close is a coordinate with respect to the actual node position.
         
-         It is assumed that both pair of coordinates to be compared lay at the same height.
+        It is assumed that both pair of coordinates to be compared lay at the same height.
 
-        :param coordinates2compare: keys of the dictionary are 'LAT' and 'LON', and each of them has ONLY ONE value.
-        :type coordinates2compare: dictionary
-        :param tol: margin in meters by which the coordinates in comparison are close or not, defaults to 5
-        :type tol: float, optional
-        :return: True if close , False otherwise.
-        :rtype: boolean
+        Args:
+            coordinates2compare (dict): keys of the dictionary are 'LAT' and 'LON', and each of them has ONLY ONE value.
+            tol (int, optional): margin in meters by which the coordinates in comparison are close or not. Defaults to 5.
+
+        Returns:
+            True (bool): True if close , False otherwise.
         """
         
         coords, head_info = self.get_last_sbf_buffer_info(what='Both')
@@ -1198,20 +1186,19 @@ class GpsSignaling(object):
        
     def serial_receive(self, serial_instance_actual, stop_event):
         """
-         Callback function invoked by the thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.
+        Callback function invoked by the thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.
 
-         Most of all messages sent by Septentrio mosaic-go receiver start with an "$" character.
+        Most of all messages sent by Septentrio mosaic-go receiver start with an "$" character.
         
-         The next character depends if the message is an echo of a command sent by the host computer, or if the message is an answer to a command sent by the host computer.
+        The next character depends if the message is an echo of a command sent by the host computer, or if the message is an answer to a command sent by the host computer.
         
-         Echoes of commands sent by the host computer, don't follow the "$" character with any predefined character. This messages are discarded by the method ``parse_septentrio_msg``.
+        Echoes of commands sent by the host computer, don't follow the ``$`` character with any predefined character. This messages are discarded by the method ``parse_septentrio_msg``.
         
-         Messages that answer a command sent by the host computer, DO start with a predefined character. The predefined character depends wheter the answer arises from a NMEA sentence or an SBF sentence. This messages are parsed by the method ``parse_septentrio_msg``.
+        Messages that answer a command sent by the host computer, DO start with a predefined character. The predefined character depends wheter the answer arises from a NMEA sentence or an SBF sentence. This messages are parsed by the method ``parse_septentrio_msg``.
         
-        :param serial_instance_actual: serial connection instance.
-        :type serial_instance_actual: Serial
-        :param stop_event: Event to be used to stop the reading of the serial port.
-        :type stop_event: threading.Event
+        Args:
+            serial_instance_actual (Serial): serial connection instance.
+            stop_event (threading.Event): Event to be used to stop the reading of the serial port.
         """
         
         while not stop_event.is_set():
@@ -1228,12 +1215,12 @@ class GpsSignaling(object):
     
     def start_thread_gps(self, interface='USB'):
         """
-         Starts the GPS thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.
+        Starts the GPS thread responsible for handling I/O communication between the host computer and the Septentrio mosaic-go receiver.
         
-         Creates the threading Event that is set when the I/O communication must be closed.
+        Creates the threading Event that is set when the I/O communication must be closed.
 
-        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
-        :type interface: str, optional
+        Args:
+            interface (str, optional): is one of the allowed Septentrio interfaces. Current implementation of this class only uses 'USB' interface. Defaults to 'USB'.
         """
         
         self.event_stop_thread_gps = threading.Event()
@@ -1250,10 +1237,10 @@ class GpsSignaling(object):
         
     def stop_thread_gps(self, interface='USB'):
         """
-         Stops the GPS thread.
+        Stops the GPS thread.
 
-        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
-        :type interface: str, optional
+        Args:
+            interface (str, optional): is one of the allowed Septentrio interfaces. Current implementation of this class only uses 'USB' interface. Defaults to 'USB'.
         """
         
         self.event_stop_thread_gps.set()
@@ -1269,14 +1256,13 @@ class GpsSignaling(object):
         
     def sendCommandGps(self, cmd, interface='USB'):
         """
-         Sends a command to the Septentrio mosaic-go receiver.
+        Sends a command to the Septentrio mosaic-go receiver.
 
-         Blocks this thread execution for 500 ms.
-        
-        :param cmd: command to be sent to the Septentrio mosaic-go receiver. The available list of commands is defined in "mosaic-go Reference Guide".
-        :type cmd: str
-        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
-        :type interface: str, optional
+        Blocks this thread execution for 500 ms.
+
+        Args:
+            cmd (str): command to be sent to the Septentrio mosaic-go receiver. The available list of commands is defined in "mosaic-go Reference Guide".
+            interface (str, optional): is one of the allowed Septentrio interfaces. Current implementation of this class only uses 'USB' interface. Defaults to 'USB'.
         """
         
         cmd_eof = cmd + '\n'
@@ -1291,22 +1277,17 @@ class GpsSignaling(object):
     def start_gps_data_retrieval(self, stream_number=1, interface='USB', interval='sec1', msg_type='SBF', 
                                  nmea_type='+GGA+HDT', sbf_type='+PVTCartesian+AttEuler'):
         """
-         Starts the streaming of the NMEA/SBF sentences.
+        Starts the streaming of the NMEA or SBF sentences.
          
-         Wrapper of ``sendCommandGps``.
+        Wrapper of ``sendCommandGps``.
 
-        :param stream_number: each interface can have multiple data streams. This parameter defined which is the number of the stream for the given ``interface``, defaults to 1
-        :type stream_number: int, optional
-        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
-        :type interface: str, optional
-        :param interval: time regularity used by the Septentrio receiver to sense the given SBF/NMEA sentence. Can be any of the following self-explanatory names: 'msec10', 'msec20', 'msec40', 'msec50', 'msec100', 'msec200', 'msec500', 'sec1', 'sec2', 'sec5', 'sec10', 'sec15', 'sec30', 'sec60', 'min2', 'min5', 'min10', 'min15', 'min30', 'min60'.
-        :type interval: str, optional
-        :param msg_type: 'NMEA' or 'SBF', defaults to 'SBF'
-        :type msg_type: str, optional
-        :param nmea_type: name/s of the NMEA sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by '+', and all the string should be concatenated in one single string (i.e. '+HDT+GGA') , defaults to '+GGA+HDT'
-        :type nmea_type: str, optional
-        :param sbf_type: name/s of the SBF sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by '+', and all the string should be concatenated in one single string (i.e. '+PVTCartesian+AttEuler'). Each sentence needs to have a parsing function that is called in ``parse_septentrio_msg`` in the part corresponding to the id of the sentence. defaults to '+PVTCartesian+AttEuler'.
-        :type sbf_type: str, optional
+        Args:
+            stream_number (int, optional): each interface can have multiple data streams. This parameter defined which is the number of the stream for the given ``interface``. Defaults to 1.
+            interface (str, optional): is one of the allowed Septentrio interfaces. Current implementation of this class only uses 'USB' interface. Defaults to 'USB'.
+            interval (str, optional): time regularity used by the Septentrio receiver to sense the given SBF/NMEA sentence. Can be any of the following self-explanatory names: 'msec10', 'msec20', 'msec40', 'msec50', 'msec100', 'msec200', 'msec500', 'sec1', 'sec2', 'sec5', 'sec10', 'sec15', 'sec30', 'sec60', 'min2', 'min5', 'min10', 'min15', 'min30', 'min60'. Defaults to 'sec1'.
+            msg_type (str, optional): ``NMEA`` or ``SBF``. Defaults to ``SBF``.
+            nmea_type (str, optional): name/s of the NMEA sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by '+', and all the string should be concatenated in one single string (i.e. ``+HDT+GGA``). Defaults to ``+GGA+HDT``.
+            sbf_type (str, optional): name/s of the SBF sentence/s to be retrieved. If multiple sentences, each sentence string identifier should be preceded by '+', and all the string should be concatenated in one single string (i.e. '+PVTCartesian+AttEuler'). Each sentence needs to have a parsing function that is called in ``parse_septentrio_msg`` in the part corresponding to the id of the sentence. Defaults to ``+PVTCartesian+AttEuler``.
         """
         
         if interface == 'USB' or interface == 'COM':
@@ -1328,23 +1309,16 @@ class GpsSignaling(object):
      
     def stop_gps_data_retrieval(self, stream_number=1, interface='USB', msg_type='+NMEA+SBF'):   
         """
-         Stops the streaming of the NMEA/SBF sentences initiated by calling ``start_gps_data_retrieval``. 
+        Stops the streaming of the NMEA/SBF sentences initiated by calling ``start_gps_data_retrieval``. 
          
-         Wrapper of ``sendCommandGps``.
+        Wrapper of ``sendCommandGps``.
         
-         *Unexpected behaviour to be noted by* **developers**: *it seems that if the stream is not stopped by the time the serial connection is closed, then, when the user opens a new serial connection, Septentrio will start sending all the SBF or NMEA messages that were produced between the last time the serial connection was closed and the time it is opened again*.
+        *Unexpected behaviour to be noted by* **developers**: *it seems that if the stream is not stopped by the time the serial connection is closed, then, when the user opens a new serial connection, Septentrio will start sending all the SBF or NMEA messages that were produced between the last time the serial connection was closed and the time it is opened again*.
 
         Args:
-            stream_number (int, optional): _description_. Defaults to 1.
-            interface (str, optional): _description_. Defaults to 'USB'.
-            msg_type (str, optional): _description_. Defaults to 'NMEA'.
-
-        :param stream_number: number of the stream to be stopped, defaults to 1
-        :type stream_number: int, optional
-        :param interface: is one of the allowed Septentrio interfaces. Current implementation only uses 'USB' interface.
-        :type interface: str, optional
-        :param msg_type: the message type corresponding to the stream ``stream_number``. Options: 'SBF', 'NMEA' or '+NMEA+SBF' or '+SBF+NMEA' (the last two are the same), defaults to '+NMEA+SBF'
-        :type msg_type: str, optional
+            stream_number (int, optional): number of the stream to be stopped. Defaults to 1.
+            interface (str, optional): is one of the allowed Septentrio interfaces. Current implementation of this class only uses 'USB' interface. Defaults to 'USB'.
+            msg_type (str, optional): the message type corresponding to the stream ``stream_number``. Options: 'SBF', 'NMEA' or '+NMEA+SBF' or '+SBF+NMEA' (the last two are the same). Defaults to ``NMEA+SBF``.
         """
         
         if interface == 'USB' or interface == 'COM':
@@ -1373,12 +1347,12 @@ class GpsSignaling(object):
     
     def setHeadingOffset(self, offset_wrt_xaxis):
         """
-         Sets the offset mismatch between between the imaginary line formed by the first and second antennas AND the longitudinal axis of the node
+        Sets the offset mismatch between between the imaginary line formed by the first and second antennas AND the longitudinal axis of the node.
          
-         Wrapper of ``sendCommandGps``.
-         
-        :param offset_wrt_xaxis: angle (degrees) *from* the longitudinal axis of the node *to* the imaginary line formed by the first and second antennas AND .
-        :type offset_wrt_xaxis: float
+        Wrapper of ``sendCommandGps``.
+
+        Args:
+            offset_wrt_xaxis (float): angle (degrees) *from* the longitudinal axis of the node *to* the imaginary line formed by the first and second antennas.
         """
         
         self.sendCommandGps(cmd='setAttitudeOffset, ' + str(offset_wrt_xaxis))
@@ -1388,34 +1362,32 @@ class GpsSignaling(object):
            
 class myAnritsuSpectrumAnalyzer(object):
     """
-     Python class to interact with the MS2760A Anritsu spectrum analyzer.
+    Python class to interact with the MS2760A Anritsu spectrum analyzer.
      
-     Functionality implemented retrieves the peak (power and frequency) of the spectrum of the system under test.
+    Functionality implemented retrieves the peak (power and frequency) of the spectrum of the system under test.
     
-     The spectrum analyzer also outputs xml files. Developer has to implement a method/s to parse the output of such files if they are used. In the commit history of the github of this project a parser was partially implemented (if the developer wants to check that).
-     
+    The spectrum analyzer also outputs xml files. Developer has to implement a method/s to parse the output of such files if they are used. In the commit history of the github of this project a parser was partially implemented (if the developer wants to check that).     
     """
     def __init__(self, is_debug=True, is_config=True):
         """
-         Defines attributes of the class.
+        Initializes attributes of this class.
 
-        :param is_debug: print debug messages, defaults to True
-        :type is_debug: bool, optional
-        :param is_config: true if you want to configure the Spectrum Analyzer, defaults to True
-        :type is_config: bool, optional
+        Args:
+            is_debug (bool, optional): print debug messages. Defaults to True.
+            is_config (bool, optional): true if you want to configure the Spectrum Analyzer. Defaults to True.
         """
+
         self.model = 'MS2760A'
         self.is_debug = is_debug 
         self.is_config = is_config
         
     def spectrum_analyzer_connect(self, HOST='127.0.0.1', PORT=9001):
         """
-         Creates a socket to connect to the spectrum analyzer.
+        Creates a socket to connect to the spectrum analyzer.
 
-        :param HOST: ip address of the spectrum analyzer, defaults to '127.0.0.1'
-        :type HOST: str, optional
-        :param PORT: TCP/IP port, defaults to 9001
-        :type PORT: int, optional
+        Args:
+            HOST (str, optional): ip address of the spectrum analyzer. Defaults to ``127.0.0.1``.
+            PORT (int, optional): TCP/IP port. Defaults to 9001.
         """
                 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -1424,13 +1396,16 @@ class myAnritsuSpectrumAnalyzer(object):
         
     def retrieve_max_pow(self, method=2):
         """
-         Retrieves the maximum power and its correspondent frequency of the spectrum of the system under test.
+        Retrieves the maximum power and its correspondent frequency of the spectrum of the system under test.
 
-        :param method: how to get the maximum peak and corresponding frequency. This is for developer. It is indisctintive for user. Defaults to 2.
-        :type method: int, optional
-        :raises Exception: when method is outside of available methods to compute the peak and corresponding frequency.
-        :return: dictionary with self-explanatory keys 'MAG', 'MAG_UNITS', 'FREQ', 'FREQ_UNITS'
-        :rtype: dictionary
+        Args:
+            method (int, optional): how to get the maximum peak and corresponding frequency. This is for developer. It is indisctintive for user. Defaults to 2.
+
+        Raises:
+            Exception: when method is outside of available methods to compute the peak and corresponding frequency.
+
+        Returns:
+            Dictionary (dict): dictionary with self-explanatory keys 'MAG', 'MAG_UNITS', 'FREQ', 'FREQ_UNITS'.
         """
 
         # Read the ID of the Spectrum Analyzer.
@@ -1481,7 +1456,7 @@ class myAnritsuSpectrumAnalyzer(object):
 
     def spectrum_analyzer_close(self):
         """
-         Closes the socket.
+        Closes the socket.
         """
         
         self.anritsu_con_socket.close()
@@ -1496,16 +1471,14 @@ class HelperA2GMeasurements(object):
     
     It creates a thread (called here communication thread) to handle the communication between the host computers of both nodes.
     
-    ``MAX_TIME_EMPTY_SOCKETS```: the maximum allowed time to wait if no information was sent over a socket.
+    * ``MAX_TIME_EMPTY_SOCKETS``: the maximum allowed time to wait if no information was sent over a socket.
     
-    ``CONN_MUST_OVER_FLAG``: a (boolean) flag indicating whether to close or not the connection between the host computers.
+    * ``CONN_MUST_OVER_FLAG``: a (boolean) flag indicating whether to close or not the connection between the host computers.
     
-    ``drone_fm_flag``: a (boolean) flag set at the GUI indicating whether the air node's gimbal should follow the ground node. In all our documentation, a gimbal is said to be in "follow mode" (don't confuse with DJI's RS2 camera-based follow mode) if it follows the other node. 
+    * ``drone_fm_flag``: a (boolean) flag set at the GUI indicating whether the air node's gimbal should follow the ground node. In all our documentation, a gimbal is said to be in "follow mode" (don't confuse with DJI's RS2 camera-based follow mode) if it follows the other node. 
 
-    ``PAP_TO_PLOT``: a numpy array (of size defined in the method ``pipeline_operations_rfsoc_rx_ndarray``of the class ``RFSoCRemoteControlFromHost``) used to plot the Power Angular Profile (PAP) of the wireless channel in GUI's PAP Panel.
-
+    * ``PAP_TO_PLOT``: a numpy array (of size defined in the method ``pipeline_operations_rfsoc_rx_ndarray``of the class ``RFSoCRemoteControlFromHost``) used to plot the Power Angular Profile (PAP) of the wireless channel in GUI's PAP Panel.
     """
-    
     def __init__(self, ID, SERVER_ADDRESS, 
                  DBG_LVL_0=False, DBG_LVL_1=False, 
                  IsGimbal=False, IsGPS=False, IsSignalGenerator=False, IsRFSoC=False,
@@ -1516,38 +1489,24 @@ class HelperA2GMeasurements(object):
                  operating_freq=57.51e9,
                  heading_offset=0):
         """
-         Creates instances of classes ``GimbalRS2`` (or ``GimbalGremsyH16``), ``GpsSignaling``, ``RFSoCRemoteControlFromHost`` to control these devices.
+        Creates instances of classes ``GimbalRS2`` (or ``GimbalGremsyH16``), ``GpsSignaling``, ``RFSoCRemoteControlFromHost`` to control these devices.
 
-        :param ID: either 'DRONE' or 'GND'.
-        :type ID: str
-        :param SERVER_ADDRESS: the IP address of the ground station.
-        :type SERVER_ADDRESS: str
-        :param DBG_LVL_0: if set, prints some low-level messages usefull for debugging, defaults to False.
-        :type DBG_LVL_0: bool, optional
-        :param DBG_LVL_1: if set, prints some higher-level messages usefull for debugging, defaults to False.
-        :type DBG_LVL_1: bool, optional
-        :param IsGimbal: 0 or FALSE, when no gimbal is physically connected to this host computer; 1, when a Ronin RS2 is physically connected; 2, when a Gremsy H16 is physically connected. Defaults to False.
-        :type IsGimbal: int or bool, optional
-        :param IsGPS: True if a gps is physically connected to this host computer. False otherwise, defaults to False.
-        :type IsGPS: bool, optional
-        :param IsSignalGenerator: True if a signal generator controlled by pyvisa commands is physically connected to this host computer. False otherwise, defaults to False.
-        :type IsSignalGenerator: bool, optional
-        :param IsRFSoC: True if an RFSoC is physically connected to this host computer. False otherwise, defaults to False.
-        :type IsRFSoC: bool, optional
-        :param rfsoc_static_ip_address: IP address of the RFSoC connected to this host computer, defaults to None
-        :type rfsoc_static_ip_address: str, optional
-        :param L0: parameter of the signal generator, defaults to None
-        :type L0: float, optional
-        :param SPEED: the speed of the node in m/s. If this node is GROUND it should be 0 (gnd node does not move) as it is by default. This parameter ONLY incides in raising a warning debug print when the speed of the node is higher than the time difference between consecutive SBF sentences. NOT a crutial parameter at all.
-        :type SPEED: int, optional
-        :param GPS_Stream_Interval: time interval used for the retrieving of the configured SBF sentences in Septentrio's receiver connected to this host computer. A list of available options is shown in ``start_gps_data_retrieval`` of class ``GpsSignaling``, defaults to 'msec500'.
-        :type GPS_Stream_Interval: str, optional
-        :param AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN: approximated time between calls of the communication thread. This parameter is used in conjunction with ``MAX_TIME_EMPTY_SOCKETS`` to raise an exception when neither side of the communication link is sending any message. Unfortunately, this is a very simple estimate, since the actual time between calls depends on many factors and is does not remain constant between calls. Defaults to 0.001
-        :type AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN: float, optional
-        :param operating_freq: operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the "User Manual EVK06002" of the Sivers EVK (57-71 GHz) , defaults to 57.51e9
-        :type operating_freq: int, optional
-        :param heading_offset: heading offset (check its definition in the ``GpsSignaling.setHeadingOffset`` method), defaults to 0.
-        :type heading_offset: float, optional
+        Args:
+            ID (str): either 'DRONE' or 'GND'.
+            SERVER_ADDRESS (str): the IP address of the ground station.
+            DBG_LVL_0 (bool, optional): if set, prints some low-level messages usefull for debugging. Defaults to False.
+            DBG_LVL_1 (bool, optional): if set, prints some higher-level messages usefull for debugging. Defaults to False.
+            IsGimbal (bool, optional): 0 or FALSE, when no gimbal is physically connected to this host computer; 1, when a Ronin RS2 is physically connected; 2, when a Gremsy H16 is physically connected. Defaults to False.
+            IsGPS (bool, optional): True if a gps is physically connected to this host computer. False otherwise. Defaults to False.
+            IsSignalGenerator (bool, optional): True if a signal generator controlled by pyvisa commands is physically connected to this host computer. False otherwise. Defaults to False.
+            IsRFSoC (bool, optional): True if an RFSoC is physically connected to this host computer. False otherwise. Defaults to False.
+            rfsoc_static_ip_address (str, optional): IP address of the RFSoC connected to this host computer. Defaults to None.
+            L0 (float, optional): parameter of the signal generator. Defaults to None.
+            SPEED (int, optional): the speed of the node in m/s. If this node is GROUND it should be 0 (gnd node does not move) as it is by default. This parameter ONLY incides in raising a warning debug print when the speed of the node is higher than the time difference between consecutive SBF sentences. NOT a crutial parameter at all. Stays here for back compatibility. Defaults to 0.
+            GPS_Stream_Interval (str, optional): time interval used for the retrieving of the configured SBF sentences in Septentrio's receiver connected to this host computer. A list of available options is shown in ``start_gps_data_retrieval`` of class ``GpsSignaling``. Defaults to 'msec500'.
+            AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN (float, optional): approximated time between calls of the communication thread. This parameter is used in conjunction with ``MAX_TIME_EMPTY_SOCKETS`` to raise an exception when neither side of the communication link is sending any message. Unfortunately, this is a very simple estimate, since the actual time between calls depends on many factors and is does not remain constant between calls. Defaults to 0.001.
+            operating_freq (_type_, optional): operating frequency of the Sivers RF-frontend. The range of defined frequencies is defined in the "User Manual EVK06002" of the Sivers EVK (57-71 GHz). Defaults to 57.51e9.
+            heading_offset (int, optional): heading offset (check its definition in the ``GpsSignaling.setHeadingOffset`` method). Defaults to 0.
         """
         
         self.AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN = AVG_CALLBACK_TIME_SOCKET_RECEIVE_FCN
@@ -1618,34 +1577,29 @@ class HelperA2GMeasurements(object):
     def gimbal_follows_drone(self, heading=None, lat_ground=None, lon_ground=None, height_ground=None, 
                                     lat_drone=None, lon_drone=None, height_drone=None, fmode=0x00):
         """
-         Computes the yaw, pitch and roll angles required to move the gimbal in this node towards the other node.
+        Computes the yaw, pitch and roll angles required to move the gimbal in this node towards the other node.
          
-         The caller of this function must guarantee that if ``self.ID == 'GROUND'``, the arguments passed to this function are drone coords. The ground coords SHOULD NOT be passed as they will be obtained from this node Septentrio's receiver.
+        The caller of this function must guarantee that if ``self.ID == 'GROUND'``, the arguments passed to this function are drone coords. The ground coords SHOULD NOT be passed as they will be obtained from this node Septentrio's receiver.
          
-         The caller of this function must guarantee that if ``self.ID == 'DRONE'``, the arguments passed to this function are ground coords. The drone coords SHOULD NOT be passed as they will be obtained from this node Septentrio's receiver.
+        The caller of this function must guarantee that if ``self.ID == 'DRONE'``, the arguments passed to this function are ground coords. The drone coords SHOULD NOT be passed as they will be obtained from this node Septentrio's receiver.
          
-         If ``IsGPS`` is False (no GPS connected), then ``heading``, ``lat_ground``, ``lon_ground``, ``height_ground``, ``lat_drone``, ``lon_drone``, ``height_drone`` must be provided. 
+        If ``IsGPS`` is False (no GPS connected), then ``heading``, ``lat_ground``, ``lon_ground``, ``height_ground``, ``lat_drone``, ``lon_drone``, ``height_drone`` must be provided. 
          
-         In that case, all coordinates provided must be geodetic (lat, lon, alt).
+        In that case, all coordinates provided must be geodetic (lat, lon, alt).
 
-        :param heading: angle between [0, 2*pi] (rads) corresponding to the heading of the line between the two antennas connected to Septentrio's receiver in this node, defaults to None
-        :type heading: float, optional
-        :param lat_ground: latitude of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node, defaults to None
-        :type lat_ground: float, optional
-        :param lon_ground: longitude of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node, defaults to None
-        :type lon_ground: float, optional
-        :param height_ground: height of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas, defaults to None
-        :type height_ground: float, optional
-        :param lat_drone: latitude of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node, defaults to None
-        :type lat_drone: float, optional
-        :param lon_drone: longitude of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node, defaults to None
-        :type lon_drone: float, optional
-        :param height_drone: height of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas, defaults to None
-        :type height_drone: float, optional
-        :param fmode: defines if the gimbal will follow the other node in Azimuth, elevation or both of them. Options are: 0x00, for Azimuth and elevation; 0x01, for Elevation, 0x02, for Azimuth. Defaults to 0x00.
-        :type fmode: int, optional
-        :return: returns either the yaw, pitch or both to be set at the gimbal of this node, to follow the other node. The actual value is the angle value in degrees multiplied by 10 and rounded to the closest integer (i.e. a yaw to set of 45.78 degrees is returned as the yaw value 458).
-        :rtype: int
+        Args:
+            heading (float, optional): angle between [0, 2*pi] (rads) corresponding to the heading of the line between the two antennas connected to Septentrio's receiver in this node. Defaults to None.
+            lat_ground (float, optional): latitude of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node. Defaults to None.
+            lon_ground (float, optional): longitude of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node. Defaults to None.
+            height_ground (float, optional): height of the GPS antenna 1 connected to Septentrio's receiver at the GROUND node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas. Defaults to None.
+            lat_drone (float, optional): latitude of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node. Defaults to None.
+            lon_drone (float, optional): longitude of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node. Defaults to None.
+            height_drone (float, optional): height of the GPS antenna 1 connected to Septentrio's receiver at the DRONE node. Assuming both antennas are placed at the same height, is the altitude (in meters above sea level) of the either of the antennas. Defaults to None.
+            fmode (hexadecimal, optional): defines if the gimbal will follow the other node in Azimuth, elevation or both of them. Options are: 0x00, for Azimuth and elevation; 0x01, for Elevation, 0x02, for Azimuth. Defaults to 0x00.
+
+        Returns:
+            yaw_to_set (int, optional): yaw angle to be set at the gimbal of this node, in degrees multiplied by 10 and rounded to the closest integer (i.e. a yaw to set of 45.78 degrees is returned as the yaw value 458)
+            pitch_to_set(int, optional): pitch angle to be set at the gimbal of this node, to follow the other node. The actual value is the angle value in degrees multiplied by 10 and rounded to the closest integer (i.e. a yaw to set of 45.78 degrees is returned as the yaw value 458).
         """
 
         if self.IsGPS:
@@ -1749,26 +1703,27 @@ class HelperA2GMeasurements(object):
     
     def do_follow_mode_gimbal(self, fmode=0x00):
         """
-         Callback function when this node receives a ``FOLLOWGIMBAL`` command.
+        Callback function when this node receives a ``FOLLOWGIMBAL`` command.
         
-         The ``FOLLOWGIMBAL`` command is sent when the other node asks for this node's GPS information to be able to follow this node's movement.        
+        The ``FOLLOWGIMBAL`` command is sent when the other node asks for this node's GPS information to be able to follow this node's movement.        
 
-        :param fmode: specifies whether the other node shall follow this node's movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth, defaults to 0x00.
-        :type fmode: int (hexadecimal), optional
+        Args:
+            fmode (hexadecimal, optional): specifies whether the other node shall follow this node's movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth. Defaults to 0x00.
         """
+
         self.do_getgps_action(follow_mode_gimbal=True, fmode=0x00)
     
     def do_getgps_action(self, follow_mode_gimbal=False, fmode=0x00):
         """
-         Callback function when this node receives a ``GETGPS`` command.
+        Callback function when this node receives a ``GETGPS`` command.
         
-         The ``GETGPS`` commmand differentiates from ``FOLLOWGIMBAL`` in that when the other node only request GPS information from this node (i.e. for display the coordinates on a panel of the GUI), the ``follow_mode_gimbal`` is False as well as the ``FMODE`` key of the sent dictionary.
+        The ``GETGPS`` commmand differentiates from ``FOLLOWGIMBAL`` in that when the other node only request GPS information from this node (i.e. for display the coordinates on a panel of the GUI), the ``follow_mode_gimbal`` is False as well as the ``FMODE`` key of the sent dictionary.
 
-        :param follow_mode_gimbal: True if other node's gimbal must follow this node's movement, defaults to False
-        :type follow_mode_gimbal: bool, optional
-        :param fmode: specifies whether the other node shall follow this node's movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth, defaults to 0x00.
-        :type fmode: int (hex), optional
+        Args:
+            follow_mode_gimbal (bool, optional): True if other node's gimbal must follow this node's movement. Defaults to False.
+            fmode (hexadecimal, optional): specifies whether the other node shall follow this node's movement in: 0x00, Elevation and azimuth; 0x01, Only elevation; 0x02, Only azimuth. Defaults to 0x00.
         """
+
         if self.DBG_LVL_1:
             print(f"THIS ({self.ID}) receives a GETGPS command")
     
@@ -1824,10 +1779,10 @@ class HelperA2GMeasurements(object):
     
     def do_setgimbal_action(self, msg_data):
         """
-         Callback function when this node receives a ``SETGIMBAL`` command.
+        Callback function when this node receives a ``SETGIMBAL`` command.
 
-        :param msg_data: dictionary with keys 'YAW', 'PITCH' and 'MODE'. The 'YAW' values range between [-1800, 1800]. The 'PITCH' values are restricted (by software) to the interval [-600, 600] to avoid hits between the case and the gimbal. The 'MODE' values are: 0x00, consider 'YAW' and/or 'PITCH' values as relative to the actual position of the gimbal; 0x01, consider 'YAW' and/or 'PITCH' values as relative to the absolute 0 (in both azimuth and elevation) position.
-        :type msg_data: dictionary
+        Args:
+            msg_data (dict): dictionary with keys 'YAW', 'PITCH' and 'MODE'. The 'YAW' values range between [-1800, 1800]. The 'PITCH' values are restricted (by software) to the interval [-600, 600] to avoid hits between the case and the gimbal. The 'MODE' values are: 0x00, consider 'YAW' and/or 'PITCH' values as relative to the actual position of the gimbal; 0x01, consider 'YAW' and/or 'PITCH' values as relative to the absolute 0 (in both azimuth and elevation) position.
         """
 
         if self.IsGimbal!=0:
@@ -1858,17 +1813,17 @@ class HelperA2GMeasurements(object):
 
     def do_start_meas_drone_rfsoc(self, msg_data):
         """
-         Callback function when this node receives a ``STARTDRONERFSOC`` command.
+        Callback function when this node receives a ``STARTDRONERFSOC`` command.
         
-         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        This comand is unidirectional. It is always sent by the ground node to the drone node.
         
-         The purpose is to start the RFSoC thread (created in ``RFSoCRemoteControlFromHost`` class) responsible for retrieving the measured Channel Impulse Response from the RFSoC.
+        The purpose is to start the RFSoC thread (created in ``RFSoCRemoteControlFromHost`` class) responsible for retrieving the measured Channel Impulse Response from the RFSoC.
         
-         It is assumed that prior to this callback, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.
+        It is assumed that prior to this callback, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.
 
-        :param msg_data: dictionary with keys 'carrier_freq', 'rx_gain_ctrl_bb1', 'rx_gain_ctrl_bb2', 'rx_gain_ctrl_bb3', 'rx_gain_ctrl_bfrf'. More information about these keys can be found in method ``set_rx_rf`` from ``RFSoCRemoteControlFromHost`` class.
-        :type msg_data: dictionary
-        """        
+        Args:
+            msg_data (dict): dictionary with keys 'carrier_freq', 'rx_gain_ctrl_bb1', 'rx_gain_ctrl_bb2', 'rx_gain_ctrl_bb3', 'rx_gain_ctrl_bfrf'. More information about these keys can be found in method ``set_rx_rf`` from ``RFSoCRemoteControlFromHost`` class.
+        """
         
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to START measurement")
@@ -1877,14 +1832,13 @@ class HelperA2GMeasurements(object):
     
     def do_stop_meas_drone_rfsoc(self):
         """
-         Callback function when this node receives a ``STOPDRONERFSOC`` command.
+        Callback function when this node receives a ``STOPDRONERFSOC`` command.
         
-         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        This comand is unidirectional. It is always sent by the ground node to the drone node.
         
-         The purpose is to stop the RFSoC thread.
+        The purpose is to stop the RFSoC thread.
         
-         It is assumed that prior to this function, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.
-        
+        It is assumed that prior to this function, the ground rfsoc (tx) has started sending the its sounding signal and there were no issues.
         """
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to STOP measurement")
@@ -1893,12 +1847,11 @@ class HelperA2GMeasurements(object):
         
     def do_finish_meas_drone_rfsoc(self):
         """
-         Callback function when this node receives a ``FINISHDRONERFSOC`` command.
+        Callback function when this node receives a ``FINISHDRONERFSOC`` command.
         
-         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        This comand is unidirectional. It is always sent by the ground node to the drone node.
         
-         The purpose is to finish the experiment (as defined in "Manual A2GMeasurements"). When the experiment is finished the GUI allows the user to end (disconnect) the connection between both nodes.
-        
+        The purpose is to finish the experiment (as defined in "Manual A2GMeasurements"). When the experiment is finished the GUI allows the user to end (disconnect) the connection between both nodes.
         """
         if self.ID == 'DRONE': # double check that we are in the drone
             print("[DEBUG]: Received REQUEST to FINISH measurement")
@@ -1907,23 +1860,24 @@ class HelperA2GMeasurements(object):
     
     def do_set_irf_action(self, msg_data):
         """
-         Callback function when this node receives a ``SETIRF`` command.
+        Callback function when this node receives a ``SETIRF`` command.
         
-         This comand is unidirectional. It is always sent by the drone node to the ground node.
+        This comand is unidirectional. It is always sent by the drone node to the ground node.
         
         Receives from the drone a subsampled version of the Power Angular Profile for it to be used by the GUI to continuously plot it in its PAP panel.
         
-        :param msg_data: attribute value ``data_to_visualize`` from ``RFSoCRemoteControlFromHost`` class.
-        :type msg_data: numpy array
+        Args:
+            msg_data (numpy.ndarray): attribute value ``data_to_visualize`` from ``RFSoCRemoteControlFromHost`` class.
         """
+
         if self.ID == 'GROUND': # double checj that we are in the gnd
             self.PAP_TO_PLOT = np.asarray(msg_data)
     
     def do_closed_gui_action(self):
         """
-         Callback function when this node receives a ``CLOSEDGUI`` command.
+        Callback function when this node receives a ``CLOSEDGUI`` command.
         
-         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        This comand is unidirectional. It is always sent by the ground node to the drone node.
         
         Sets a flag indicating (the drone node) that it can end its main script, since the GUI was closed by the user at the ground node.
         """
@@ -1933,26 +1887,27 @@ class HelperA2GMeasurements(object):
         
     def do_set_remote_fm_flag(self, data=None):
         """
-         Callback function when this node receives a ``SETREMOTEFMFLAG`` command.
+        Callback function when this node receives a ``SETREMOTEFMFLAG`` command.
         
-         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        This comand is unidirectional. It is always sent by the ground node to the drone node.
 
-         Sets the ``drone_fm_flag``. When this flag is set, the drone node can start sending ``FOLLOWGIMBALL`` commands to the ground node to get ground node's coordinates and be able to follow (drone node) it (ground node).
+        Sets the ``drone_fm_flag``. When this flag is set, the drone node can start sending ``FOLLOWGIMBALL`` commands to the ground node to get ground node's coordinates and be able to follow (drone node) it (ground node).
         
-        :param data: dictionary with keys 'X', 'Y', 'Z', 'FMODE', 'MOBILITY', corresponding to geocentric coordinates, fo
-        :type data: dictionary, optional
+        Args:
+            data (dict, optional): dictionary with keys 'X', 'Y', 'Z', 'FMODE', 'MOBILITY', corresponding to geocentric coordinates. The mentioned keys and their corresponding values refer to the ground node. The coordinates will be available if the ground node ``MOBILITY`` is ``static`` (0x01). The ``FMODE`` key refers to the wheter the drone gimbal follows the ground node in azimuth (0x02), elevation (0x01) or both (0x00) .Defaults to None.
         """
+
         if self.ID == 'DRONE':
             self.drone_fm_flag = True
             self.remote_config_for_drone_fm = data
     
     def do_set_remote_stop_fm(self):
         """
-         Callback function when this node receives a ``SETREMOTESTOPFM`` command.
+        Callback function when this node receives a ``SETREMOTESTOPFM`` command.
         
-         This comand is unidirectional. It is always sent by the ground node to the drone node.
+        This comand is unidirectional. It is always sent by the ground node to the drone node.
         
-         Unsets the ``drone_fm_flag`` flag.
+        Unsets the ``drone_fm_flag`` flag.
         """
         
         if self.ID == 'DRONE':
@@ -1960,11 +1915,12 @@ class HelperA2GMeasurements(object):
 
     def process_answer_get_gps(self, data):
         """
-         Callback function when this node receives an ``ANS`` type of message (the equivalent to an acknowledment) from the other node, after this node sent to the other node a ``GETGPS`` or a ``FOLLOWGIMBAL`` command.
+        Callback function when this node receives an ``ANS`` type of message (the equivalent to an acknowledment) from the other node, after this node sent to the other node a ``GETGPS`` or a ``FOLLOWGIMBAL`` command.
 
-        :param data: dictionary with keys 'X', 'Y', 'Z', 'FMODE', 'FOLLOW_GIMBAL'. The values of 'X', 'Y', 'Z' are the geocentric coordinates from the other node. 'FMODE' is either 0x00 (Elevation and Azimuth), 0x01 (Elevation) or 0x02 (Azimuth). 'FOLLOW_GIMBAL' is either True (when the sent command by this node was ``FOLLOWGIMBAL``) or False (when the sent command by this node was ``GETGPS``)
-        :type data: dictionary
+        Args:
+            data (dict): dictionary with keys 'X', 'Y', 'Z', 'FMODE', 'FOLLOW_GIMBAL'. The values of 'X', 'Y', 'Z' are the geocentric coordinates from the other node. 'FMODE' is either 0x00 (Elevation and Azimuth), 0x01 (Elevation) or 0x02 (Azimuth). 'FOLLOW_GIMBAL' is either True (when the sent command by this node was ``FOLLOWGIMBAL``) or False (when the sent command by this node was ``GETGPS``)
         """
+
         if self.DBG_LVL_1:
             print(f"THIS ({self.ID}) receives protocol ANS")
             
@@ -2041,13 +1997,14 @@ class HelperA2GMeasurements(object):
         
     def decode_message(self, data):
         """
-         Parses an incoming TCP message and calls the appropriate function to handle it. 
+        Parses an incoming TCP message and calls the appropriate function to handle it. 
          
-         This function is called by ``socket_receive`` (the communication thread callback).
+        This function is called by ``socket_receive`` (the communication thread callback).
 
-        :param data: raw data to be decoded
-        :type data: bytes
+        Args:
+            data (bytes): raw data to be decoded
         """
+
         source_id, destination_id, message_type, cmd, length = struct.unpack('BBBBB', data[:5])
         data_bytes = data[5:]
 
@@ -2124,20 +2081,16 @@ class HelperA2GMeasurements(object):
 
     def encode_message(self, source_id, destination_id, message_type, cmd, data=None):
         """
-         Encodes a TCP message to be sent. More information about the specific commands is in the section "Communication Protocol" of the "Manual A2GMeasurements".
+        Encodes a TCP message to be sent. More information about the specific commands is in the section "Communication Protocol" of the "Manual A2GMeasurements".
 
-        :param source_id: identifies the sender node with a number (this parameter is provided for -potential- future improvements but does not have any functionality)
-        :type source_id: int
-        :param destination_id: identifies the receiver node with a numer (this parameter is provided for -potential- future improvements but does not have any functionality)
-        :type destination_id: int
-        :param message_type: 0x01, for a short type of message; 0x02, for a long type of message; 0x03, to answer/acknowledge a received request. More information about this is in "Manual A2GMeasurements".
-        :type message_type: int
-        :param cmd: one of the supported requests/commands for each ``message_type``. The list of commands is provided in "Manual A2GMeasurements" (Communication Protocl chapter).
-        :type cmd: int
-        :param data: additional data required by the request/command. The particular data sent depends on the ``message_type`` and the ``cmd``. More information on "Manual A2GMeasurements" (Communication Protocl chapter).
-        :type data: dictionary, optional
-        :return: the bytes object representing the message to be sent.
-        :rtype: bytes
+        Args:
+            source_id (int): identifies the sender node with a number (this parameter is provided for -potential- future improvements but does not have any functionality).
+            destination_id (int): identifies the receiver node with a number (this parameter is provided for -potential- future improvements but does not have any functionality).
+            message_type (hexadecimal): 0x01, for a short type of message; 0x02, for a long type of message; 0x03, to answer/acknowledge a received request. More information about this is in "Manual A2GMeasurements".
+            cmd (hexadecimal): one of the supported requests/commands for each ``message_type``. The list of commands is provided in "Manual A2GMeasurements" (Communication Protocol chapter).
+            data (dict, optional): additional data required by the request/command. The particular data sent depends on the ``message_type`` and the ``cmd``. More information on "Manual A2GMeasurements" (Communication Protocol chapter). Defaults to None.
+        Returns:
+            message (bytes): the bytes object representing the message to be sent.
         """
         
         if message_type == 0x01: # SHORT type of message
@@ -2191,14 +2144,14 @@ class HelperA2GMeasurements(object):
 
     def socket_receive(self, stop_event):
         """
-         The communication thread callback. Calls the parser to decode the most recent TCP message received.
+        The communication thread callback. Calls the parser to decode the most recent TCP message received.
           
-         The time between calls of this function is OS and hardware dependent.
+        The time between calls of this function is OS and hardware dependent.
           
-         As both nodes can send and receive messages, this thread
+        As both nodes can send and receive messages, this thread
 
-        :param stop_event: when this is set, this function has nothing to execute.
-        :type stop_event: threading.Event
+        Args:
+            stop_event (threading.Event): when this is set, this function has nothing to execute.
         """
 
         # Polling policy for detecting if there has been any message sent.
@@ -2241,12 +2194,11 @@ class HelperA2GMeasurements(object):
          
     def socket_send_cmd(self, type_cmd=None, data=None):
         """
-         Creates a message by the name of the request/command. Wrapper to ``encode_message``. 
+        Creates a message by the name of the request/command. Wrapper to ``encode_message``.
 
-        :param type_cmd: refers to the ``cmd`` parameter in ``encode_message`` , defaults to None
-        :type type_cmd: int, optional
-        :param data: refers to the ``data`` parameter in ``encode_message``, defaults to None
-        :type data: int, optional
+        Args:
+            type_cmd (int, optional): refers to the ``cmd`` parameter in ``encode_message``. Defaults to None.
+            data (int, optional): refers to the ``data`` parameter in ``encode_message``. Defaults to None.
         """
 
         if type_cmd == 'SETGIMBAL':
@@ -2286,14 +2238,18 @@ class HelperA2GMeasurements(object):
         """
         
         def fcn_to_execute(state):
-            '''
+            """
             This local function template must be replaced with the instruction to execute when the ground gimbal
             stops for 'meas_time' seconds in a given position. 
             
             The instruction to execute has to have 2 states: 
                 'On') What to execute when ground gimbal just stopped at a new position
                 'Off') What to execute when 'meas_time' finishes, and ground gimbal must start again to move to the next position
-            '''
+
+            Args:
+                state (str): ``On`` or ``Off``
+            """
+
             if state == 'On': # 'On' state
                 #self.inst.write('RF1\n')
                 print('\nOn state... just print')
@@ -2368,13 +2324,14 @@ class HelperA2GMeasurements(object):
         
     def HelperStartA2GCom(self, PORT=10000):
         """
-         Starts the socket binding, listening and accepting for server side, or connecting for client side. The ground node works as the server while the drone as the client.
+        Starts the socket binding, listening and accepting for server side, or connecting for client side. The ground node works as the server while the drone as the client.
          
-         Creates and starts the thread handling the socket messages.
+        Creates and starts the thread handling the socket messages.
 
-        :param PORT: TCP port, defaults to 10000
-        :type PORT: int, optional
+        Args:
+            PORT (int, optional): TCP port. Defaults to 10000.
         """
+
         socket_poll_cnt = 1
         
         # If we know for sure that there will be a client request for connection, we can keep this number low
@@ -2427,15 +2384,15 @@ class HelperA2GMeasurements(object):
         
     def HelperA2GStopCom(self, DISC_WHAT='ALL', stream=1):
         """
-         Stops connection with all the devices or the specified ones in the variable 'DISC_WHAT.
+        Stops connection with all the devices or the specified ones in the variable 'DISC_WHAT.
         
-         When called, no matter which is the value of ``DISC_WHAT``, always close the TCP socket.
+        When called, no matter which is the value of ``DISC_WHAT``, always close the TCP socket.
 
-        :param DISC_WHAT: specifies with which/s device/s the connection must be ended. Options are: 'GIMBAL', 'GPS', 'RFSOC', 'SG', 'ALL'. Defaults to 'ALL'.
-        :type DISC_WHAT: list or str, optional
-        :param stream: gps stream to be closed, defaults to 1. Assuming there is only one gps stream created at ``__init__`` of this class (which is the default operation) when creating the instance of the ``GpsSignaling`` class, this will close all the gps streams.
-        :type stream: int, optional
+        Args:
+            DISC_WHAT (str, optional): specifies with which/s device/s the connection must be ended. Options are: ``GIMBAL``, ``GPS``, ``RFSOC``, ``SG``, ``ALL``. Defaults to ``ALL``.
+            stream (int, optional): gps stream to be closed. Assuming there is only one gps stream created at ``__init__`` of this class (which is the default operation) when creating the instance of the ``GpsSignaling`` class, this will close all the gps streams. Defaults to 1.
         """
+
         try:   
             self.event_stop_thread_helper.set()
              
@@ -2511,37 +2468,36 @@ class NumpyArrayEncoder(JSONEncoder):
 
 class GimbalGremsyH16:
     """
-     Python Class that works as the driver for the gimbal Gremsy H16.
+    Python Class that works as the driver for the gimbal Gremsy H16.
     
-     The gimbal should be connected to the host computer through an TTL2USB connection (check "Manual A2GMeasurements"). 
+    The gimbal should be connected to the host computer through an TTL2USB connection (check "Manual A2GMeasurements"). 
      
-     It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.
+    It creates a thread (called here a gimbal thread) to handle the communication between the gimbal and this host computer.
     
-     Gimbal's rotational speed (both in yaw -azimuth-, and pitch -elevation-) depends on a value between [-100, 100] as this is the natural range of values in most Remote Controllers (i.e. FrSky X8R).
+    Gimbal's rotational speed (both in yaw -azimuth-, and pitch -elevation-) depends on a value between [-100, 100] as this is the natural range of values in most Remote Controllers (i.e. FrSky X8R).
      
-     Gmbal's rotational speed dependence on the RC controlling interval is neither linear, nor symmetrical:
+    Gmbal's rotational speed dependence on the RC controlling interval is neither linear, nor symmetrical:
      1. Non-linear:  a change from 10 to 20 is not equivalent to a change from 20 to 30
      2. Non-symmetrical: a change from 10 to 20 is not equivalent to a change from -10 to -20. A change from 10 to 20 (or -10 to -20) in yaw is not equivalent to a change from 10 to 20 (or -10 to -20) in pitch.
      
-     Gimbal's angle (either yaw or pitch) depends on: 1) the RC controlling interval and 2) the time the given RC control value is hold. This dependence is measured as described in "Manual A2GMeasurements".
+    Gimbal's angle (either yaw or pitch) depends on: 1) the RC controlling interval and 2) the time the given RC control value is hold. This dependence is measured as described in "Manual A2GMeasurements".
      
-     Gimbal's angle can only be controlled by using the *RC control value* and the *time* the serial SBUS will hold that control value.
+    Gimbal's angle can only be controlled by using the *RC control value* and the *time* the serial SBUS will hold that control value.
      
-     This class relies on heavily on the ``SBUSEncoder`` class, as that is the class decoding the sbus protocol from Gremsy. 
+    This class relies on heavily on the ``SBUSEncoder`` class, as that is the class decoding the sbus protocol from Gremsy. 
      
-     This class is meant to be equivalent to ``GimbalRS2``. Mainly by implementing the ``setPosControl`` for this gimbal.     
+    This class is meant to be equivalent to ``GimbalRS2``. Mainly by implementing the ``setPosControl`` for this gimbal.
     """
     
     def __init__(self, speed_time_azimuth_table=None, speed_time_elevation_table=None):
         """
-         Constructor for the class. 
+        Constructor for the class. 
          
-         Loads the measured angle (yaw and pitch, each one separately) dependence on RC control value and time. Replace ``load_measured_data_august_2023`` or reimplement it if newer/better measurements of this dependence are available. 
+        Loads the measured angle (yaw and pitch, each one separately) dependence on RC control value and time. Replace ``load_measured_data_august_2023`` or reimplement it if newer/better measurements of this dependence are available. 
          
-        :param speed_time_azimuth_table: array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured azimuth (yaw), defaults to None
-        :type speed_time_azimuth_table: numpy.ndarray, optional
-        :param speed_time_elevation_table: array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured elevation (pitch), defaults to None
-        :type speed_time_elevation_table: numpy.ndarray, optional
+        Args:
+            speed_time_azimuth_table (numpy.ndarray, optional): array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured azimuth (yaw). Defaults to None.
+            speed_time_elevation_table (numpy.ndarray, optional): array with whose 3 columns are: 1. RC control value (equivalent to speed). 2. Time holding the RC value. 3. Measured elevation (pitch). Defaults to None.
         """
         
         self.cnt_imu_readings = 0
@@ -2564,7 +2520,7 @@ class GimbalGremsyH16:
 
         As the gimbal controller from the manufacturer can't be accesed, imu readings are not available. An external IMU is required and any cheap raspberry pi pico is capable of providing decent IMU support. Potential magnetic interferences between the IMU readings of the raspberry pi pico and the motors of the gimbal have not been researched.
          
-         **NOTE**: this function *requires to be further tested*, if the Gremsy gimbal is to be used again as part of the channel sounder system. The reason is that when checking if the gimbal is moving, a good tolerated error (tol_err = abs(angle_now - angle_before)) must be set.
+        **NOTE**: this function *requires to be further tested*, if the Gremsy gimbal is to be used again as part of the channel sounder system. The reason is that when checking if the gimbal is moving, a good tolerated error (tol_err = abs(angle_now - angle_before)) must be set.
         """
         print("[DEBUG]: Defining HOME for Gremsy... This might take a second")
         
@@ -2601,11 +2557,15 @@ class GimbalGremsyH16:
     
     def start_imu_thread(self, COM_PORT='COM21'):
         """
-         Connects to the IMU and creates a new thread (the imu thread) to read the angle data from the IMU.
+        Connects to the IMU and creates a new thread (the imu thread) to read the angle data from the IMU.
 
-        :param COM_PORT: port where the IMU is connected. If this host computer's OS is Windows it would be 'COM#', if it is Linux it would be "/dev/ttyUSB#", defaults to 'COM21'
+        :param COM_PORT: , defaults to 'COM21'
         :type COM_PORT: str, optional
+
+        Args:
+            COM_PORT (str, optional): port where the IMU is connected. If this host computer's OS is Windows it would be ``COM#``, if it is Linux it would be ``/dev/ttyUSB#``. Defaults to ``COM21``.
         """
+
         try:
             self.imu_serial = serial.Serial(COM_PORT, 9600)
             print("[DEBUG]: Connected to IMU")
@@ -2624,11 +2584,12 @@ class GimbalGremsyH16:
     
     def receive_imu_data(self, stop_event):
         """
-         Callback function for the imu thread. Read the yaw, pitch, roll angles and stores them in the attribute ``last_imu_reading`` of this class.
+        Callback function for the imu thread. Read the yaw, pitch, roll angles and stores them in the attribute ``last_imu_reading`` of this class.
 
-        :param stop_event: when this is set, this function won't do anything
-        :type stop_event: threading.Event
+        Args:
+            stop_event (threading.Event): when this is set, this function won't do anything.
         """
+
         while not stop_event.is_set():
             data = self.imu_serial.readline().decode('utf-8').strip()
             data = data.split(',')
@@ -2643,8 +2604,9 @@ class GimbalGremsyH16:
         
     def stop_thread_imu(self):
         """
-         Stops the imu thread and closed the serial port where the IMU is connected.
+        Stops the imu thread and closed the serial port where the IMU is connected.
         """
+
         if self.thread_read_imu.is_alive():
             self.event_stop_thread_imu.set()
         
@@ -2652,16 +2614,16 @@ class GimbalGremsyH16:
         
     def fit_model_to_gimbal_angular_data(self, model='linear'):
         """
-         Fits a model to the measured angle (yaw, pitch) dependence on time and speed (RC control value). There are two models: a linear model and a gaussian regressor.
+        Fits a model to the measured angle (yaw, pitch) dependence on time and speed (RC control value). There are two models: a linear model and a gaussian regressor.
          
-         The linear model is suitable specific range of "speeds" and time, since the non-linear dependence can be linearized. However, this *range must be defined*.
+        The linear model is suitable specific range of "speeds" and time, since the non-linear dependence can be linearized. However, this *range must be defined*.
          
-         For the gaussian regressor, *more training samples (RC control value, time, angle) over the full range are required* to avoid overfitting and bad predicting behaviour.
+        For the gaussian regressor, *more training samples (RC control value, time, angle) over the full range are required* to avoid overfitting and bad predicting behaviour.
          
-         There is either a linear or gp model for the RC control positive values and another one for the RC control negative values.
+        There is either a linear or gp model for the RC control positive values and another one for the RC control negative values.
          
-        :param model: either "linear" or "gp", defaults to 'linear'
-        :type model: str, optional
+        Args:
+            model (str, optional): either ``linear`` or ``gp``. Defaults to ``linear``.
         """
         
         # Define the kernel for Gaussian Process Regressor
@@ -2708,23 +2670,29 @@ class GimbalGremsyH16:
         
     def setPosControlGPModel(self, yaw=0, pitch=0):
         """
-         Finds the RC control value and time giving the desired yaw (or pitch, or both separately) for the gaussian regressor. 
+        Finds the RC control value and time giving the desired yaw (or pitch, or both separately) for the gaussian regressor. 
          
-         Uses an iterative approach to find the RC control value and time to hold it by smartly searching in the grid composed by the RC control values and the times to hold it. The initial value of for the "speed" (RC control value) influences the convergence of the iterative method.
+        Uses an iterative approach to find the RC control value and time to hold it by smartly searching in the grid composed by the RC control values and the times to hold it. The initial value of for the "speed" (RC control value) influences the convergence of the iterative method.
                   
-         NOTE FOR DEVELOPERS: *this function requires*:
-         1) a better grid of measured "speed", time, angle. With the actual training samples, the prediction does not give physical consistent results (i.e. the time it takes to move 60 degrees at speed 20 is smaller than the one it takes to move 60 degrees at a lower speed). This is because the grid is coarse and not equally sampled.
-         2) this function should guarantee that the returned time is always positive. Negative times does not make physical sense. Furthermore, it should also guarantee that the time is above a certain threshold (i.e. 2 seconds), during which the gimbal will accelerate until reaching the desired speed. In a realistic gimbal, the acceleration of the gimbal is not infinite. On the contrary, gimbal's speed vs time dependence follows usually a trapezoidal curve, which means that there is some time required (the threshold) for the gimbal to reach the plateau of the trapezoid (desired speed).
-         3) the caller of this function (``setPosControl``) to handle when an exeception is raised.
+        NOTE FOR DEVELOPERS: *this function requires*:
+         1. a better grid of measured "speed", time, angle. With the actual training samples, the prediction does not give physical consistent results (i.e. the time it takes to move 60 degrees at speed 20 is smaller than the one it takes to move 60 degrees at a lower speed). This is because the grid is coarse and not equally sampled.
+         2. this function should guarantee that the returned time is always positive. Negative times does not make physical sense. Furthermore, it should also guarantee that the time is above a certain threshold (i.e. 2 seconds), during which the gimbal will accelerate until reaching the desired speed. In a realistic gimbal, the acceleration of the gimbal is not infinite. On the contrary, gimbal's speed vs time dependence follows usually a trapezoidal curve, which means that there is some time required (the threshold) for the gimbal to reach the plateau of the trapezoid (desired speed).
+         3. the caller of this function (``setPosControl``) to handle when an exeception is raised.
 
-        :param yaw: desired yaw angle to set, defaults to 0
-        :type yaw: int, optional
-        :param pitch: desired pitch angle to set, defaults to 0
-        :type pitch: int, optional
-        :raises Exception: when the optimization local function ``find_feature_values_for_angle`` does not converge.
-        :return: 4 floats: required RC control value to set yaw, required time to set yaw, required RC control value to set pitch, required time to set pitch.
-        :rtype: float, float, float, float
+        Args:
+            yaw (int, optional): desired yaw angle to set in the interval [-180,180]. Defaults to 0.
+            pitch (int, optional): desired pitch angle to set. Defaults to 0.
+
+        Raises:
+            Exception: when the optimization local function ``find_feature_values_for_angle`` does not converge.
+
+        Returns:
+            speed_yaw (float): required RC control value to set yaw.
+            time_yaw (float): required time to set yaw. 
+            speed_pitch (float): required RC control value to set pitch
+            time_pitch (float): required time to set pitch.
         """
+
         start_time = time.time()
         
         # Define a function to find the corresponding X values for the desired Y
@@ -2799,7 +2767,7 @@ class GimbalGremsyH16:
         
     def load_measured_drifts(self):
         """
-         Loads measured drift angles from the experiment described on "Manual A2GMeasurements".        
+        Loads measured drift angles from the experiment described on "Manual A2GMeasurements".        
         """ 
         drift_with_low_speed_counter = [[137, self.gremsy_angle(2, 1.97, 0.10)],
                                         [144, self.gremsy_angle(1.97, 1.94, 0.10)],
@@ -2833,11 +2801,11 @@ class GimbalGremsyH16:
     
     def load_measured_data_july_2023(self):
         """
-         Loads a set of measured data extracted from the experiment described on "Manual A2GMeasurements". 
+        Loads a set of measured data extracted from the experiment described on "Manual A2GMeasurements". 
                   
-         This table contains as columns the speed [-100, 100], time [s], and the azimuth angle computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in "Manual A2GMeasurements".
+        This table contains as columns the speed [-100, 100], time [s], and the azimuth angle computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in "Manual A2GMeasurements".
          
-         NOTE FOR DEVELOPERS: *the experiment described in* "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
+        NOTE FOR DEVELOPERS: *the experiment described in* "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
         """        
         speed_time_azimuth_table = [[15, 6, self.gremsy_angle(1.903, 1.949, 0.87)], 
                         [15, 7, self.gremsy_angle(1.955, 1.926, 1)],
@@ -2865,11 +2833,11 @@ class GimbalGremsyH16:
     
     def load_measured_data_august_2023(self):
         """
-         Loads a second set of measured data extracted from the experiment described on "Manual A2GMeasurements".
+        Loads a second set of measured data extracted from the experiment described on "Manual A2GMeasurements".
          
-         This table contains as columns the speed [-100, 100], time [s], and the angle (azimuth, elevation) computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in "Manual A2GMeasurements".
+        This table contains as columns the speed [-100, 100], time [s], and the angle (azimuth, elevation) computed from the 3 distances (a_{i}, a_{i+1}, b_{i}) described in "Manual A2GMeasurements".
          
-         NOTE FOR DEVELOPERS: *the experiment described in* "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
+        NOTE FOR DEVELOPERS: *the experiment described in* "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
         """        
         speed_time_azimuth_table = [[15, 6, self.gremsy_angle(1.903, 1.949, 0.87)], 
                         [15, 7, self.gremsy_angle(1.955, 1.926, 1)],
@@ -3032,39 +3000,37 @@ class GimbalGremsyH16:
     
     def gremsy_angle(self, a_i, a_ip, b_i):
         """
-         Computes the angle between the sides of the triangle given by a_i and  a_i+1. The opposite side to the angle computed is the one defined by b_i. 
+        Computes the angle between the sides of the triangle given by a_i and  a_i+1. The opposite side to the angle computed is the one defined by b_i. 
         
-         A definition of this distances can be found in "Manual A2GMeasurements".
+        A definition of this distances can be found in "Manual A2GMeasurements".
 
-         NOTE FOR DEVELOPERS: *the experiment described in * "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
-        
-        :param distance_1: defined in "Manual A2GMeasurements"
-        :type distance_1: float
-        :param distance_2: defined in "Manual A2GMeasurements"
-        :type distance_2: float
-        :param distance_3: defined in "Manual A2GMeasurements"
-        :type distance_3: float
-        :return: angle
-        :rtype: float (radians)
+        NOTE FOR DEVELOPERS: *the experiment described in * "Manual A2GMeasurements" *was done before acquiring the external IMU. With the use of the external IMU a much easier measurement of the yaw and pitch can be done using (and extending) the ``receive_imu_data`` function of this class*.
+
+        Args:
+            a_i (float): defined in "Manual A2GMeasurements".
+            a_ip (float): defined in "Manual A2GMeasurements".
+            b_i (float): defined in "Manual A2GMeasurements".
+
+        Returns:
+            Radians (float): mentioned angle in radians.
         """
+
         tmp = (a_i**2 + a_ip**2 - b_i**2)/(2*a_i*a_ip)
         return np.arccos(tmp)
     
     def plot_linear_reg_on_near_domain(self, loaded='august'):
         """
-         Generates a figure with 3 subplots with measured values (default measured values or new values measured for more (speed, time) tuples given as a parameter to the class) and with linear regression model applied to the measured values.
+        Generates a figure with 3 subplots with measured values (default measured values or new values measured for more (speed, time) tuples given as a parameter to the class) and with linear regression model applied to the measured values.
          
-         1. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> azimuth
-         
-         2. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> azimuth
-         
-         3. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> elevation
+        1. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> azimuth 
+        2. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> azimuth 
+        3. 3D Scatter Plot of (speed, time, angle) for speed < 0 and angle -> elevation
         
-         if 'loaded' is august then the figure has 4 subplots, with the 4th being
-         4. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> elevation
+        If ``loaded`` is august then the figure has 4 subplots, with the 4th being
+        4. 3D Scatter Plot of (speed, time, angle) for speed > 0 and angle -> elevation
 
-        :param loaded: which table loaded: the one from ``load_measured_data_july_2023`` or the one from ``load_measured_data_august_2023``, defaults to 'august'.
-        :type loaded: str, optional
+        Args:
+            loaded (str, optional): which table loaded: the one from ``load_measured_data_july_2023`` or the one from ``load_measured_data_august_2023``. Defaults to ``august``.
         """
         
         is_positive_azimuth = self.speed_time_azimuth_table > 0
@@ -3136,10 +3102,11 @@ class GimbalGremsyH16:
     
     def start_thread_gimbal(self):
         """
-         Creates an instance of the ``SBUSEncoder`` class responsible for encoding the actual serial signal used by sbus protocol to set an RC control value.
+        Creates an instance of the ``SBUSEncoder`` class responsible for encoding the actual serial signal used by sbus protocol to set an RC control value.
          
-         By creating such instance, the gremsy gimbal thread is created and started.
+        By creating such instance, the gremsy gimbal thread is created and started.
         """
+
         self.sbus = SBUSEncoder()
         self.sbus.start_sbus(serial_interface='COM20', period_packet=0.015)
         
@@ -3147,28 +3114,24 @@ class GimbalGremsyH16:
     
     def setPosControl(self, yaw, pitch, roll=0, mode=0x00, model='linear'):
         """
-         Moves Gremsy H16 gimbal by the input angle. This function works as the equivalent to the ``setPosControl`` function of the class ``GimbalRS2``. If movement is desired in both yaw and pitch, the gimbal will move first in either axis (i.e. yaw) and after finishing the that movement, it will move in the other axis (i.e. pitch).
+        Moves Gremsy H16 gimbal by the input angle. This function works as the equivalent to the ``setPosControl`` function of the class ``GimbalRS2``. If movement is desired in both yaw and pitch, the gimbal will move first in either axis (i.e. yaw) and after finishing the that movement, it will move in the other axis (i.e. pitch).
          
-         If the linear model is used: this function sets an RC control value ("speed") and finds the corresponding time, given the angle desired to be set.
+        If the linear model is used: this function sets an RC control value ("speed") and finds the corresponding time, given the angle desired to be set.
          
-         If the gp model is used: this function calls ``setPosControlGPModel`` to get the RC control value and time, corresponding to the input angle.
+        If the gp model is used: this function calls ``setPosControlGPModel`` to get the RC control value and time, corresponding to the input angle.
          
-         For a more accurate gimbal angle movement: 
+        For a more accurate gimbal angle movement: 
          
-         1) Provide a finer and equally sampled grid of RC control value, time with its corresponding measured angle.
-         2) Modify ``fit_model_to_gimbal_angular_data`` to tune parameters of the gp model (if gp model is chosen).
-         3) Modify  ``setPosControlGPModel`` (if gp model is chosen) if a better logic for getting RC control values and times from a given angle is available.
-         
-        :param yaw: yaw angle (in degrees) to be set. Valid range between [-180, 180].
-        :type yaw: float
-        :param pitch: pitch angle (in degrees) to be set. Valid range between [-90, 90].
-        :type pitch: float
-        :param roll: roll angle (in degrees) to be set. Roll angle is not used because desired movement of the gimbal only requires yaw and pitch angles.
-        :type roll: float, optional
-        :param mode: _description_, defaults to 0x00
-        :type mode: int (hex), optional
-        :param model: 'linear' or 'gp' model for the angle dependence on the RC control value and the time to hold it. defaults to 'linear'
-        :type model: str, optional
+        1. Provide a finer and equally sampled grid of RC control value, time with its corresponding measured angle.
+        2. Modify ``fit_model_to_gimbal_angular_data`` to tune parameters of the gp model (if gp model is chosen).
+        3. Modify  ``setPosControlGPModel`` (if gp model is chosen) if a better logic for getting RC control values and times from a given angle is available.
+
+        Args:
+            yaw (float): yaw angle (in degrees) to be set. Valid range between [-180, 180].
+            pitch (float): pitch angle (in degrees) to be set. Valid range between [-90, 90].
+            roll (int, optional): roll angle (in degrees) to be set. Roll angle is not used because desired movement of the gimbal only requires yaw and pitch angles. Defaults to 0.
+            mode (hexadecimal, optional): to be implemented. The idea is to have two modes as in the GimbalRS2 class: ``relative`` and ``absolute``. Defaults to 0x00.
+            model (str, optional): ``linear`` or ``gp`` model for the angle dependence on the RC control value and the time to hold it. For the ``gp`` model, the functionality must be implemented. Defaults to 'linear'.
         """
         
         if model == 'linear':
@@ -3227,18 +3190,19 @@ class GimbalGremsyH16:
             
     def stop_thread_gimbal(self):
         """
-         Stops the imu thread and the ``SBUSEncoder`` gremsy gimbal thread.
+        Stops the imu thread and the ``SBUSEncoder`` gremsy gimbal thread.
         """
         self.stop_thread_imu()
         self.sbus.stop_updating()
     
     def control_power_motors(self, power='on'):
         """
-         Turns gremsy gimbal motors on or off. This function is a wrapper of ``turn_on_motors`` an ``turn_off_motors`` of the ``SBUSEncoder`` class.
+        Turns gremsy gimbal motors on or off. This function is a wrapper of ``turn_on_motors`` an ``turn_off_motors`` of the ``SBUSEncoder`` class.
         
-        :param power: _description_, defaults to 'on'
-        :type power: str, optional
+        Args:
+            power (str, optional): ``on`` to power the motors, or ``off`` to shut them down. Defaults to 'on'.
         """
+
         if power == 'on':
             self.sbus.turn_on_motors()
         elif power == 'off':
@@ -3246,11 +3210,12 @@ class GimbalGremsyH16:
             
     def change_gimbal_mode(self, mode='LOCK'):
         """
-         Changes Gremsy gimbal mode. Available modes are: 'Lock' and 'Follow' (and motors off). Brief description of the modes is on the manual of the gimbal provided by the manufacturer.
+        Changes Gremsy gimbal mode. Available modes are: 'Lock' and 'Follow' (and motors off). Brief description of the modes is on the manual of the gimbal provided by the manufacturer.
 
-        :param mode: either 'LOCK' or 'FOLLOW', defaults to 'LOCK'.
-        :type mode: str, optional
+        Args:
+            mode (str, optional): either ``LOCK`` or ``FOLLOW``. Check the manual of the Gremsy H16 gimbal to understand its modes. Defaults to ``LOCK``.
         """
+
         self.sbus.change_mode(mode=mode)
         self.sbus.MODE = mode
         
@@ -3276,12 +3241,13 @@ class SBUSEncoder:
     """
     def __init__(self):
         """
-         Initializes the channels.
+        Initializes the channels.
          
-         Establishes a linear mapping between the RC control value interval (-100, 100) and the actual values seen at the osciloscoppe of a given channel (i.e rudder).
+        Establishes a linear mapping between the RC control value interval (-100, 100) and the actual values seen at the osciloscoppe of a given channel (i.e rudder).
          
-         Define some attributes of the class. The atributes related with drifting are defined in the section Gremsy H16 Gimbal of the "Manual A2GMeasurements".
+        Define some attributes of the class. The atributes related with drifting are defined in the section Gremsy H16 Gimbal of the "Manual A2GMeasurements".
         """
+
         #self.channels = [1024] * 16
         self.channels = np.ones(16, dtype=np.uint16)*1024
 
@@ -3312,21 +3278,21 @@ class SBUSEncoder:
          
     def set_channel(self, channel, data):
         """
-         Sets a value on a channel. This a "setter function".
+        Sets a value on a channel. This a "setter function".
 
-        :param channel: channel to be set
-        :type channel: int
-        :param data: value to be set at the channel
-        :type data: int
+        Args:
+            channel (int): channel to be set.
+            data (int): value to be set at the channel.
         """
+
         self.channels[channel] = data & 0x07ff    
     
     def encode_data(self):
         """
-         Encodes the values on the channels according to the sbus protocol.
+        Encodes the values on the channels according to the sbus protocol.
 
-        :return: a 24-fields packet/msg that encodes the channel values according to sbus protocol.
-        :rtype: list of int
+        Returns:
+            packet (list of int): a 24-fields packet/msg that encodes the channel values according to sbus protocol.
         """
         
         #packet = np.zeros(25, dtype=np.uint8)
@@ -3365,14 +3331,13 @@ class SBUSEncoder:
         
     def start_sbus(self, serial_interface='/dev/ttyUSB', period_packet=0.009): #period_packet=0.009
         """
-         Creates the serial connection between the host computer and the gimbal.
+        Creates the serial connection between the host computer and the gimbal.
          
-         Starts the repeating thread (RepeatTimer class instance) to send data each ``period_packet`` seconds. This mimics the behaviour between the RC transmitter and receiver.
+        Starts the repeating thread (RepeatTimer class instance) to send data each ``period_packet`` seconds. This mimics the behaviour between the RC transmitter and receiver.
 
-        :param serial_interface: serial port, defaults to '/dev/ttyUSB'
-        :type serial_interface: str, optional
-        :param period_packet: time between calls of ``self.send_sbus_msg``. It was found that the communication is decoded when this value is lower than 20 ms. The actual value observed in the oscilloscope of the interval between sbus signal is 10-13ms (More in "Manual A2GMeasurements", section Gremsy H16 Gimbal), defaults to 0.009
-        :type period_packet: float, optional
+        Args:
+            serial_interface (str, optional): serial port. Defaults to ``/dev/ttyUSB``.
+            period_packet (float, optional): time between calls of ``self.send_sbus_msg``. It was found that the communication is decoded when this value is lower than 20 ms. The actual value observed in the oscilloscope of the interval between sbus signal is 10-13ms (More in "Manual A2GMeasurements", section Gremsy H16 Gimbal). Defaults to 0.009.
         """
         
         #self.encoder = SBUSEncoder()
@@ -3390,16 +3355,16 @@ class SBUSEncoder:
 
     def stop_updating(self):
         """
-         Stops the thread to repeatedly call ``self.send_sbus_msg``. Closes the opened serial port for this communication.
+        Stops the thread to repeatedly call ``self.send_sbus_msg``. Closes the opened serial port for this communication.
         """
         self.timer_fcn.cancel()
         self.serial_port.close()
     
     def send_sbus_msg(self):
         """
-         Calls the channels encoder to write the message on the serial port.
+        Calls the channels encoder to write the message on the serial port.
          
-         Since there is a known drifting in the yaw axis, this method sets a different 0 value (no movement) to counter the drifting behaviour. This is explained in "Manual A2GMeasurements" (Gremsy H16 Gimbal section), but a kind of equivalent way to understand this, is that we try to counter drift by changing the effective duty cycle of the yaw channel value.
+        Since there is a known drifting in the yaw axis, this method sets a different 0 value (no movement) to counter the drifting behaviour. This is explained in "Manual A2GMeasurements" (Gremsy H16 Gimbal section), but a kind of equivalent way to understand this, is that we try to counter drift by changing the effective duty cycle of the yaw channel value.
         """
         if self.ENABLE_UPDATE_REST:
             self.update_rest_state_channel()
@@ -3421,9 +3386,9 @@ class SBUSEncoder:
     
     def update_rest_state_channel(self):
         """
-         Sets the no movement value (0) of the yaw channel (i.e. channel 4) to the experimentally found value that counters the drift. 
+        Sets the no movement value (0) of the yaw channel (i.e. channel 4) to the experimentally found value that counters the drift. 
          
-         Change ``parameter`` to change the "effective duty cycle" of the yaw channel value. More explanation is found in "Manual A2GMeasurements" (Gremsy H16 Gimbal section)
+        Change ``parameter`` to change the "effective duty cycle" of the yaw channel value. More explanation is found in "Manual A2GMeasurements" (Gremsy H16 Gimbal section)
         """
         parameter = 2
         if self.cnt % parameter == 0:
@@ -3435,7 +3400,7 @@ class SBUSEncoder:
     
     def not_move_command(self):
         """
-         Updates the channel so that it does not continue moving.
+        Updates the channel so that it does not continue moving.
         """
         
         self.update_channel(channel=1, value=0)
@@ -3452,21 +3417,20 @@ class SBUSEncoder:
         
     def move_gimbal(self, ele, rud, mov_time):
         """
-         Moves the gimbal a certain angle. The angle to be moved is determined by the RC control value for yaw, the RC control value for pitch, and the time those values are hold before realeasing them.
+        Moves the gimbal a certain angle. The angle to be moved is determined by the RC control value for yaw, the RC control value for pitch, and the time those values are hold before realeasing them.
          
-         The RC control values for yaw (``rud``) and pitch (``ele``) are values in the range (-100, 100) that behave as speed values: speed the gimbal will move in that particular axis (i.e. speed it will move in the yaw axis).
+        The RC control values for yaw (``rud``) and pitch (``ele``) are values in the range (-100, 100) that behave as speed values: speed the gimbal will move in that particular axis (i.e. speed it will move in the yaw axis).
          
-         Angle = Angular Speed x time
+        Angle = Angular Speed x time
          
-         Angular Speed = function of the RC control value
+        Angular Speed = function of the RC control value
 
-        :param ele: RC control value for pitch. Can be thought as the pitch axis velocity. Between -100, 100. 
-        :type ele: int
-        :param rud: RC control value for yaw. Can be thought as the yaw axis velocity. Between -100, 100. 
-        :type rud: int
-        :param mov_time: time (seconds) to hold the velocity in a particular axis. 
-        :type mov_time: int
+        Args:
+            ele (int): RC control value for pitch. Can be thought as the pitch axis velocity. Between -100, 100. 
+            rud (int): RC control value for yaw. Can be thought as the yaw axis velocity. Between -100, 100. 
+            mov_time (int): time (seconds) to hold the velocity in a particular axis. Must be a positive value.
         """
+
         self.ENABLE_UPDATE_REST = False
         self.update_channel(channel=1, value=0)
         self.update_channel(channel=2, value=ele)
@@ -3485,7 +3449,7 @@ class SBUSEncoder:
     
     def turn_off_motors(self):
         """
-         Turns off all gimbal motors.
+        Turns off all gimbal motors.
         """
         self.update_channel(channel=1, value=0)
         self.update_channel(channel=2, value=0)
@@ -3495,8 +3459,9 @@ class SBUSEncoder:
     
     def turn_on_motors(self):
         """
-         Turns on all gimbal motors.
+        Turns on all gimbal motors.
         """
+
         # Turn on motors and set the gimbal to lock mode
         self.update_channel(channel=5, value=0)
         
@@ -3505,11 +3470,12 @@ class SBUSEncoder:
         
     def change_mode(self, mode='LOCK'):
         """
-         Changes the mode of all gimbal motors. According to manufacturers H16 manual the choices are: "FOLLOW" and "LOCK".
+        Changes the mode of all gimbal motors. According to manufacturers H16 manual the choices are: ``FOLLOW`` and ``LOCK``.
 
-        :param mode: either "FOLLOW" or "LOCK". A description of each mode is on the manufacturer H16 manual, defaults to 'LOCK'
-        :type mode: str, optional
+        Args:
+            mode (str, optional): either "FOLLOW" or "LOCK". A description of each mode is on the manufacturer H16 manual. Defaults to ``LOCK``.
         """
+
         if mode == 'FOLLOW':
             self.update_channel(channel=5, value=-100)
         elif mode == 'LOCK':
@@ -3517,22 +3483,21 @@ class SBUSEncoder:
 
 class RFSoCRemoteControlFromHost():
     """
-     Python class that implements all functionality for the communication between a host computer (client) and the RFSoC (server) connected through Ethernet to it. 
+    Python class that implements all functionality for the communication between a host computer (client) and the RFSoC (server) connected through Ethernet to it. 
      
-     Configures the antenna front end (Sivers EVK) parameters. The antenna front end is responsible for upconverting the frequency, beamforming and providing the physical interface with the air.
+    Configures the antenna front end (Sivers EVK) parameters. The antenna front end is responsible for upconverting the frequency, beamforming and providing the physical interface with the air.
     
-     Implements the client side (host computer) functionality of the TCP connection. 
+    Implements the client side (host computer) functionality of the TCP connection. 
     
-     Most of the methods of this class were developed by Panagiotis Skrimponis. They were integrated in a class and extended by Julian D. Villegas G.
+    Most of the methods of this class were developed by Panagiotis Skrimponis. They were integrated in a class and extended by Julian D. Villegas G.
     """
-    
     def __init__(self, radio_control_port=8080, radio_data_port=8081, rfsoc_static_ip_address='10.1.1.40', filename='PDAPs', operating_freq=57.51e9):
         """
-         Creates two sockets: one for control commands and another for transfer data.
+        Creates two sockets: one for control commands and another for transfer data.
          
-         Establish the connection between the client and the RFSoC.
+        Establish the connection between the client and the RFSoC.
          
-         Some important attributes of this class are:
+        Some important attributes of this class are:
          
          1. ``beam_idx_for_vis``: this attribute sets the index of the beams of the measured Channel Impulse Response (CIR) that are sent from the drone node to the ground node to be displayed in the GUI.
          
@@ -3545,18 +3510,15 @@ class RFSoCRemoteControlFromHost():
          5. ``nread``: number of delay taps of the CIR to be retrieved from the server.
          
          6. ``nbytes``: number of bytes of a full CIR (1 time snapshot, 64 beams, 1024 delay taps)
-         
-        :param radio_control_port: port for "control socket", defaults to 8080
-        :type radio_control_port: int, optional
-        :param radio_data_port: port for "data socket", defaults to 8081
-        :type radio_data_port: int, optional
-        :param rfsoc_static_ip_address: static IP address of the rfsoc ethernet interface, defaults to '10.1.1.40'
-        :type rfsoc_static_ip_address: str, optional
-        :param filename: name to be used when saving the CIRs, defaults to 'PDAPs'.
-        :type filename: str, optional
-        :param operating_freq: operating frequency for the antenna array front end, defaults to 57.51e9.
-        :type operating_freq: int, optional
+        
+        Args:
+            radio_control_port (int, optional): port for "control socket". Defaults to 8080.
+            radio_data_port (int, optional): port for "data socket". Defaults to 8081.
+            rfsoc_static_ip_address (str, optional): static IP address of the rfsoc ethernet interface. Defaults to '10.1.1.40'.
+            filename (str, optional): name to be used when saving the CIRs. Defaults to 'PDAPs'.
+            operating_freq (_type_, optional): operating frequency for the antenna array front end. Defaults to 57.51e9.
         """
+
         self.operating_freq = operating_freq
         self.radio_control_port = radio_control_port
         self.radio_data_port = radio_data_port
@@ -3596,14 +3558,13 @@ class RFSoCRemoteControlFromHost():
         
     def send_cmd(self, cmd, cmd_arg=None):
         """
-         Sends a command to the RFSoC server. 
+        Sends a command to the RFSoC server. 
          
-         These commands control the Sivers EVK mode, carrier frequncy, tx gain and rx gain.
+        These commands control the Sivers EVK mode, carrier frequncy, tx gain and rx gain.
 
-        :param cmd: available commands are: 'setModeSivers', 'setCarrierFrequencySivers', 'setGainTxSivers', 'setGainRxSivers
-        :type cmd: str
-        :param cmd_arg: supported parameters for 'setModeSivers' are 'RXen_0_TXen1', 'RXen1_TXen0', 'RXen0_TXen0'; supported parameters for 'setCarrierFrequencySivers' are float number, i.e.: 57.51e9; supported parameters for 'setGainTxSivers' are dict with this structure {'tx_bb_gain': 0x00, 'tx_bb_phase': 0x00, 'tx_bb_iq_gain': 0x00, 'tx_bfrf_gain': 0x00}; supported parameters for 'setGainRxSivers' are dict with this structure {'rx_gain_ctrl_bb1':0x00, 'rx_gain_ctrl_bb2':0x00, 'rx_gain_ctrl_bb3':0x00, 'rx_gain_ctrl_bfrf':0x00}.
-        :type cmd_arg: str or float or dict, optional
+        Args:
+            cmd (str): available commands are: ``setModeSivers``, ``setCarrierFrequencySivers``, ``setGainTxSivers``, ``setGainRxSivers``.
+            cmd_arg (str | float | dict, optional): supported parameters for 'setModeSivers' are 'RXen_0_TXen1', 'RXen1_TXen0', 'RXen0_TXen0'; supported parameters for 'setCarrierFrequencySivers' are float number, i.e.: 57.51e9; supported parameters for 'setGainTxSivers' are dict with this structure {'tx_bb_gain': 0x00, 'tx_bb_phase': 0x00, 'tx_bb_iq_gain': 0x00, 'tx_bfrf_gain': 0x00}; supported parameters for 'setGainRxSivers' are dict with this structure {'rx_gain_ctrl_bb1':0x00, 'rx_gain_ctrl_bb2':0x00, 'rx_gain_ctrl_bb3':0x00, 'rx_gain_ctrl_bfrf':0x00}. Defaults to None.
         """
 
         try:
@@ -3653,20 +3614,16 @@ class RFSoCRemoteControlFromHost():
     
     def transmit_signal(self, tx_bb_gain=0x3, tx_bb_phase=0, tx_bb_iq_gain=0x77, tx_bfrf_gain=0x40, carrier_freq=57.51e9):
         """
-         Sets Tx gains and frequency of operation. Wrapper function of ``send_cmd``.
+        Sets Tx gains and frequency of operation. Wrapper function of ``send_cmd``.
          
-         More about TX gains is found in the Sivers EVK manual/reference guides.
+        More about TX gains is found in the Sivers EVK manual/reference guides.
 
-        :param tx_bb_gain: sets baseband gain according to: 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB (when sivers register tx_ctrl bit 3 (BB Ibias set) = 1), defaults to 0x3
-        :type tx_bb_gain: int (hexadecimal), optional
-        :param tx_bb_phase: _description_, defaults to 0
-        :type tx_bb_phase: int, optional
-        :param tx_bb_iq_gain: sets baseband I, Q gain according to: [0:3, I gain]: 0-6 dB, 16 steps; [4:7, Q gain]: 0-6 dB, 16 steps, defaults to 0x77
-        :type tx_bb_iq_gain: int (hexadecimal), optional
-        :param tx_bfrf_gain: sets gain after RF mixer according to: [0:3, RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps, defaults to 0x40
-        :type tx_bfrf_gain: int (hexadecimal), optional
-        :param carrier_freq: carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz), defaults to 57.51e9
-        :type carrier_freq: int, optional
+        Args:
+            tx_bb_gain (hexadecimal, optional): sets baseband gain according to: 0x00  = 0 dB, 0x01  = 3.5 dB, 0x02  = 3.5 dB, 0x03  = 6 dB (when sivers register tx_ctrl bit 3 (BB Ibias set) = 1). Defaults to 0x3.
+            tx_bb_phase (int, optional): _description_. Defaults to 0.
+            tx_bb_iq_gain (hexadecimal, optional): sets baseband I, Q gain according to: [0:3, I gain]: 0-6 dB, 16 steps; [4:7, Q gain]: 0-6 dB, 16 steps. Defaults to 0x77.
+            tx_bfrf_gain (hexadecimal, optional): sets gain after RF mixer according to: [0:3, RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps. Defaults to 0x40.
+            carrier_freq (_type_, optional): carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz). Defaults to 57.51e9.
         """
 
         dict_tx_gains = {'tx_bb_gain': tx_bb_gain, 'tx_bb_phase': tx_bb_phase, 'tx_bb_iq_gain': tx_bb_iq_gain, 'tx_bfrf_gain': tx_bfrf_gain}
@@ -3678,18 +3635,14 @@ class RFSoCRemoteControlFromHost():
         
     def set_rx_rf(self, rx_gain_ctrl_bb1=0x77, rx_gain_ctrl_bb2=0x00, rx_gain_ctrl_bb3=0x99, rx_gain_ctrl_bfrf=0xFF, carrier_freq=57.51e9):
         """
-         Sets rx gains and frequency of operation. Wrapper function of ``send_cmd``.
+        Sets rx gains and frequency of operation. Wrapper function of ``send_cmd``.
 
-        :param rx_gain_ctrl_bb1: sets the first rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x77
-        :type rx_gain_ctrl_bb1: int (hexadecimal), optional
-        :param rx_gain_ctrl_bb2: sets the second rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x00
-        :type rx_gain_ctrl_bb2: int (hexadecimal), optional
-        :param rx_gain_ctrl_bb3: sets the third rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps, defaults to 0x99
-        :type rx_gain_ctrl_bb3: int (hexadecimal), optional
-        :param rx_gain_ctrl_bfrf: sets gain after the mixer according to; [0:3,RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps, defaults to 0xFF
-        :type rx_gain_ctrl_bfrf: int (hex), optional
-        :param carrier_freq: carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz), defaults to 57.51e9
-        :type carrier_freq: int , optional
+        Args:
+            rx_gain_ctrl_bb1 (hexadecimal, optional): sets the first rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps. Defaults to 0x77.
+            rx_gain_ctrl_bb2 (hexadecimal, optional): sets the second rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps. Defaults to 0x00.
+            rx_gain_ctrl_bb3 (hexadecimal, optional): sets the third rx gain for the I,Q according to: I[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps; Q[0:3]:[0,1,3,7,F]:-6:0 dB, 4 steps. Defaults to 0x99.
+            rx_gain_ctrl_bfrf (_type_, optional): sets gain after the mixer according to; [0:3,RF gain]: 0-15 dB, 16 steps; [4:7, BF gain]: 0-15 dB, 16 steps. Defaults to 0xFF.
+            carrier_freq (_type_, optional): carrier frequency from the available frequency range for the Sivers EVK 06002/3 (in this case: 57-71 GHz). Defaults to 57.51e9.
         """
 
         dict_rx_gains = {'rx_gain_ctrl_bb1':rx_gain_ctrl_bb1, 'rx_gain_ctrl_bb2':rx_gain_ctrl_bb2, 'rx_gain_ctrl_bb3':rx_gain_ctrl_bb3, 'rx_gain_ctrl_bfrf':rx_gain_ctrl_bfrf}
@@ -3700,15 +3653,16 @@ class RFSoCRemoteControlFromHost():
     
     def receive_signal_async(self, stop_event):
         """
-         Callback for the thread responsible for retrieving CIRs from RFSoC server (rfsoc thread).
+        Callback for the thread responsible for retrieving CIRs from RFSoC server (rfsoc thread).
          
-         When enough (``self.TIME_SNAPS_TO_VIS``) CIR time snapshots are available, computes the Power Angular Profile to be sent to the ground node for displaying it in the GUI.
+        When enough (``self.TIME_SNAPS_TO_VIS``) CIR time snapshots are available, computes the Power Angular Profile to be sent to the ground node for displaying it in the GUI.
          
-         When enough (``self.TIME_SNAPS_TO_SAVE``) CIR time snapshots are available, saves the CIRs on disk.
+        When enough (``self.TIME_SNAPS_TO_SAVE``) CIR time snapshots are available, saves the CIRs on disk.
 
-        :param stop_event: when set, this function does nothing (the thread can be alived but does nothing)
-        :type stop_event: threading.Event
+        Args:
+            stop_event (threading.Event): when set, this function does nothing (the thread can be alived but does nothing)
         """
+
         while not stop_event.is_set():
             self.n_receive_calls = self.n_receive_calls + 1
             self.radio_control.sendall(b"receiveSamples")
@@ -3737,16 +3691,15 @@ class RFSoCRemoteControlFromHost():
     
     def pipeline_operations_rfsoc_rx_ndarray(self, array, axis, each_n_beams=4):
         """
-         Computes the PAP for a single snapshot CIR (64 beams * 1024 delay taps) or the PAPs of multiple snapshots CIR (snaps * 64 beams * 1024 delay taps).
+        Computes the PAP for a single snapshot CIR (64 beams * 1024 delay taps) or the PAPs of multiple snapshots CIR (snaps * 64 beams * 1024 delay taps).
 
-        :param array: CIRs. If it has 2 dimensions the CIR correspond to a single snapshot, if it has 3 dimensions, the CIR correspond to multiple snapshots.
-        :type array: numpy.ndarray
-        :param axis: delay tap axis
-        :type axis: either 0, 1 or 2
-        :param each_n_beams: subsample the 64 beams by this value, defaults to 4
-        :type each_n_beams: int, optional
-        :return: computed PAP "subsampled" version.
-        :rtype: numpy.ndarray
+        Args:
+            array (numpy.ndarray): CIRs. If it has 2 dimensions the CIR correspond to a single snapshot, if it has 3 dimensions, the CIR correspond to multiple snapshots.
+            axis (int): delay tap axis, either 0, 1 and 2.
+            each_n_beams (int, optional): subsample the 64 beams by this value. Defaults to 4.
+
+        Returns:
+            aux (numpy.ndarray): computed PAP "subsampled" version.
         """
         
         if axis >= len(array.shape):
@@ -3770,10 +3723,10 @@ class RFSoCRemoteControlFromHost():
     
     def save_hest_buffer(self, register_time=True):
         """
-         Saves the raw (time-snaps, n_beams, n_delay_taps) CIR array
+        Saves the raw (time-snaps, n_beams, n_delay_taps) CIR array.
 
-        :param register_time: parameter used for debugging purposes, defaults to True
-        :type register_time: bool, optional
+        Args:
+            register_time (bool, optional): parameter used for debugging purposes. Defaults to True.
         """
         
         datestr = datetime.datetime.now()
@@ -3794,14 +3747,14 @@ class RFSoCRemoteControlFromHost():
 
     def start_thread_receive_meas_data(self, msg_data):
         """
-         Creates and starts the rfsoc thread.
+        Creates and starts the rfsoc thread.
          
-         A thread -instead of a subprocess- is good enough since the computational expense of the task is not donde in the host computer but in the RFSoC. The host just reads the data through Ethernet.
+        A thread -instead of a subprocess- is good enough since the computational expense of the task is not donde in the host computer but in the RFSoC. The host just reads the data through Ethernet.
         
-         A new thread is started each time this function is called. It is required for the developer to call 'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
+        A new thread is started each time this function is called. It is required for the developer to call 'stop_thread_receive_meas_data' before calling again this function in order to close the actual thread before creating a new one.
 
-        :param msg_data: dictionary containing the parameters required by ``set_rx_rf`` to set a Sivers EVK configuration. 
-        :type msg_data: dict
+        Args:
+            msg_data (dict): dictionary containing the parameters required by ``set_rx_rf`` to set a Sivers EVK configuration. 
         """
         
         self.event_stop_thread_rx_irf = threading.Event()                
@@ -3820,8 +3773,9 @@ class RFSoCRemoteControlFromHost():
     
     def stop_thread_receive_meas_data(self):
         """
-         Stops the rfsoc thread and saves remaining CIRs.
+        Stops the rfsoc thread and saves remaining CIRs.
         """
+
         self.event_stop_thread_rx_irf.set()
         self.time_finish_receive_thread = time.time()
         print("[DEBUG]: receive_signal_async thread STOPPED")
@@ -3834,7 +3788,7 @@ class RFSoCRemoteControlFromHost():
         
     def finish_measurement(self):
         """
-         Kills the rfsoc if it is still alive and saves the remaining CIRs.
+        Kills the rfsoc if it is still alive and saves the remaining CIRs.
         """
         # Check if the thread is finished and if not stop it
         if self.thread_rx_irf.is_alive():
