@@ -51,15 +51,16 @@ class CustomTextEdit(QTextEdit):
 
 class SetupWindow(QDialog):
     """
-     Creates a new dialog with configuration options for the user, when is pressed the "Setup" > "Setup devices and more" menu.
+    Creates a new dialog with configuration options for the user, when is pressed the ``Setup`` > ``Setup devices and more`` menu.
     """
     def __init__(self, parent=None):
         """
-         Creates the PyQt5 components of the setup dialog and sets its layout with them.
+        Creates the PyQt5 components of the setup dialog and sets its layout with them.
 
-        :param parent: not used, defaults to None
-        :type parent: _type_, optional
+        Args:
+            parent (none, optional): not used. Defaults to None.
         """
+
         super(SetupWindow, self).__init__(parent)
         self.setWindowTitle("Setup")
         #self.setGeometry(100, 100, 300, 220)
@@ -155,11 +156,12 @@ class SetupWindow(QDialog):
 
     def enable_gnd_coords_callback(self, myinput):
         """
-         Enables the ground coordinates QLineEdits when the user inputs a "Static" mobility for the ground node in the Setup dialog.
+        Enables the ground coordinates QLineEdits when the user inputs a ``Static`` mobility for the ground node in the Setup dialog.
 
-        :param myinput: ground's mobility. Either "Static" or "Moving".
-        :type myinput: str
+        Args:
+            myinput (str): ground node mobility. Either ``Static`` or ``Moving``.
         """
+
         if myinput == "Static":
             self.gnd_lat_textEdit.setEnabled(True)
             self.gnd_lon_textEdit.setEnabled(True)
@@ -171,11 +173,12 @@ class SetupWindow(QDialog):
     
     def enable_drone_coords_callback(self, myinput):
         """
-         Enables the drone coordinates QLineEdits when the user inputs a "Static" mobility for the drone node in the Setup dialog.
+        Enables the drone coordinates QLineEdits when the user inputs a ``Static`` mobility for the drone node in the Setup dialog.
 
-        :param myinput: drone's mobility. Either "Static" or "Moving".
-        :type myinput: str
+        Args:
+            myinput (str): drone node mobility. Either ``Static`` or ``Moving``.
         """
+
         if myinput == "Static":
             self.drone_lat_textEdit.setEnabled(True)
             self.drone_lon_textEdit.setEnabled(True)
@@ -187,16 +190,17 @@ class SetupWindow(QDialog):
 
 class WidgetGallery(QMainWindow):
     """
-     Python class responsible for creating the main window of the GUI and all the functionality to handle user interaction.
+    Python class responsible for creating the main window of the GUI and all the functionality to handle user interaction.
      
     """
     def __init__(self, parent=None):
         """
-         Calls the functions to create some class attributes and the menu bar with its associated callbacks.
+        Calls the functions to create some class attributes and the menu bar with its associated callbacks.
 
-        :param parent: not used, defaults to None
-        :type parent: _type_, optional
+        Args:
+            parent (none, optional): not used, but required. Defaults to None.
         """
+
         super(WidgetGallery, self).__init__(parent)
 
         self.setWindowTitle("A2G Measurements Center")
@@ -213,9 +217,9 @@ class WidgetGallery(QMainWindow):
     
     def init_constants(self):
         """
-         Creates some class attributes. 
+        Creates some class attributes. 
          
-         The ``STATIC_DRONE_IP_ADDRESS`` is to set a static IP address for the drone. This IP address must be assigned to the drone from the router configuration interface (this IP address was set for the drone on the Archer AX router)
+        The ``STATIC_DRONE_IP_ADDRESS`` is to set a static IP address for the drone. This IP address must be assigned to the drone from the router configuration interface (this IP address was set for the drone on the Archer AX router)
          
         """
         # Parameters of the GUI
@@ -240,7 +244,7 @@ class WidgetGallery(QMainWindow):
 
     def showCentralWidget(self):
         """
-         Creates and shows the panels of the main window according to grid layout defined in this function.
+        Creates and shows the panels of the main window according to grid layout defined in this function.
         """
         
         #self.original_stdout = sys.stdout
@@ -268,7 +272,7 @@ class WidgetGallery(QMainWindow):
     
     def showSetupMenu(self):
         """
-         Creates an instance of the SetupWindow class (a Setup dialog), and create attributes for this class with the values the user input in the Setup dialog.
+        Creates an instance of the SetupWindow class (a Setup dialog), and create attributes for this class with the values the user input in the Setup dialog.
         """
         setupWin = SetupWindow()
         result = setupWin.exec_()
@@ -330,7 +334,7 @@ class WidgetGallery(QMainWindow):
     
     def createMenu(self):
         """
-         Creates the menu bar and associates the callback functions for when the user clicks on each of the menu items.          
+        Creates the menu bar and associates the callback functions for when the user clicks on each of the menu items.          
         """
         
         # Place the menus and actions here
@@ -375,8 +379,7 @@ class WidgetGallery(QMainWindow):
     
     def start_thread_gnd_gimbal_fm(self):
         """
-         Creates and starts a timer thread (periodical callback) to send periodically the ``FOLLOWGIMBAL`` command to the drone node, for (this) ground node gimbal to follow the drone node location.
-         
+        Creates and starts a timer thread (periodical callback) to send periodically the ``FOLLOWGIMBAL`` command to the drone node, for (this) ground node gimbal to follow the drone node location. 
         """
         
         if hasattr(self, 'myhelpera2g'):
@@ -397,8 +400,9 @@ class WidgetGallery(QMainWindow):
         
     def stop_thread_gnd_gimbal_fm(self):
         """
-         Stops the timer thread to send periodic ``FOLLOWGIMBAL`` commands to the drone node.
+        Stops the timer thread to send periodic ``FOLLOWGIMBAL`` commands to the drone node.
         """
+
         if hasattr(self, 'periodical_gimbal_follow_thread'):
             if self.periodical_gimbal_follow_thread.isRunning():
                 self.stop_event_gimbal_follow_thread.set()
@@ -408,10 +412,11 @@ class WidgetGallery(QMainWindow):
         
     def start_thread_drone_gimbal_fm(self):
         """
-         Sets the ``drone_fm_flag`` flag in drone's HelperA2GMeasurements class instance, so that the drone periodically send a ``FOLLOWGIMBAL`` command to the ground node, for it (drone) node's gimbal to follow the location of the ground node.
+        Sets the ``drone_fm_flag`` flag in drone's HelperA2GMeasurements class instance, so that the drone periodically send a ``FOLLOWGIMBAL`` command to the ground node, for it (drone) node's gimbal to follow the location of the ground node.
          
-         The periodical ``FOLLOWGIMBAL`` command is sent from the drone node main script (``drone_main.py``).
+        The periodical ``FOLLOWGIMBAL`` command is sent from the drone node main script (``drone_main.py``).
         """
+
         if hasattr(self, 'myhelpera2g'):
             if self.gnd_mobility == "Moving":
                 data = {'X': 0, 'Y': 0, 'Z': 0, 'FMODE': self.fm_drone_gimbal['FMODE'], 'MOBILITY': 0x00}
@@ -425,7 +430,7 @@ class WidgetGallery(QMainWindow):
         
     def stop_thread_drone_gimbal_fm(self):
         """
-         Unsets ``drone_fm_flag`` in drone's HelperA2GMeasurements class instance, so that the drone's gimbal stops following ground node location.
+        Unsets ``drone_fm_flag`` in drone's HelperA2GMeasurements class instance, so that the drone's gimbal stops following ground node location.
         """
         if hasattr(self, 'myhelpera2g'):
             self.myhelpera2g.socket_send_cmd(type_cmd='SETREMOTESTOPFM')
@@ -435,9 +440,9 @@ class WidgetGallery(QMainWindow):
         
     def start_thread_gps_visualization(self):
         """
-         Creates and starts a timer thread (repeating callback) to display in the GPS panel updated gps coordinates of drone's location.
+        Creates and starts a timer thread (repeating callback) to display in the GPS panel updated gps coordinates of drone's location.
          
-         NOTE: *the callback ``periodical_gps_display_callback`` works as expected with synthetic gps coordinates. However, this function has not been tested with the actual gps and thus, minor bugs might appear*
+        NOTE: *the callback ``periodical_gps_display_callback`` works as expected with synthetic gps coordinates. However, this function has not been tested with the actual gps and thus, minor bugs might appear*
         """
         #if hasattr(self, 'myhelpera2g'):   
         self.update_vis_time_gps = 1
@@ -451,7 +456,7 @@ class WidgetGallery(QMainWindow):
         
     def stop_thread_gps_visualization(self):
         """
-         Stops the timer thread responsible for display gps coordinates in the GPS panel.
+        Stops the timer thread responsible for display gps coordinates in the GPS panel.
         """
         if self.periodical_gps_display_thread.isActive():
             self.periodical_gps_display_thread.stop()
@@ -461,18 +466,19 @@ class WidgetGallery(QMainWindow):
 
     def check_if_ssh_2_drone_reached(self, drone_ip, username, password):
         """
-         Checks if it is possible to ping and establish an SSH connection betwwen the host computer of the ground node and the host computer of the drone node.
+        Checks if it is possible to ping and establish an SSH connection betwwen the host computer of the ground node and the host computer of the drone node.
 
-         Error checking of the input parameters SHOULD BE DONE by the caller function.
+        Error checking of the input parameters SHOULD BE DONE by the caller function.
 
-        :param drone_ip: drone's IP address for the WiFi interface.
-        :type drone_ip: str
-        :param username: SSH username
-        :type username: str
-        :param password: SSH password
-        :type password: str
-        :return: success_ping_network: True if drone node is reachable; success_air_node_ssh: True if ssh connection can be established; success_drone_fpga: True if rfsoc on drone is detected.
-        :rtype: bool, bool, bool
+        Args:
+            drone_ip (str): drone's IP address for the WiFi interface.
+            username (str): SSH username
+            password (str): SSH password
+
+        Returns:
+            success_ping_network (bool): True if drone node is reachable.
+            success_air_node_ssh (bool): True if ssh connection can be established.
+            success_drone_fpga (bool): True if rfsoc on drone is detected.
         """
         
         try:
@@ -526,14 +532,15 @@ class WidgetGallery(QMainWindow):
     
     def check_if_drone_fpga_connected(self, drone_fpga_static_ip_addr='10.1.1.40'):
         """
-         Checks if the rfsoc is detected on the drone. 
+        Checks if the rfsoc is detected on the drone. 
          
-         Caller function SHOULD check first if there is an SSH connection.
-        
-        :param drone_fpga_static_ip_addr: drone's RFSoC IP address for the Ethernet interface, defaults to '10.1.1.40'
-        :type drone_fpga_static_ip_addr: str, optional
-        :return: success_drone_fpga: True if the ping to the rfsoc IP address (Ethernet interface) is replied.
-        :rtype: bool
+        Caller function SHOULD check first if there is an SSH connection.
+
+        Args:
+            drone_fpga_static_ip_addr (str, optional): drone's RFSoC IP address for the Ethernet interface. Defaults to '10.1.1.40'.
+
+        Returns:
+            success_drone_fpga (bool): True if the ping to the rfsoc IP address (Ethernet interface) is replied.
         """
         
         # Execute the command and obtain the input, output, and error streams
@@ -560,10 +567,11 @@ class WidgetGallery(QMainWindow):
         """
         Check if the rfsoc is detected on the ground node.
 
-        :param gnd_fpga_static_ip_addr: ground's RFSoC IP address for the Ethernet interface, defaults to '10.1.1.30'
-        :type gnd_fpga_static_ip_addr: str, optional
-        :return: success_ping_gnd_fpga: True if ping is successful, False otherwise.
-        :rtype: bool
+        Args:
+            gnd_fpga_static_ip_addr (str, optional): ground's RFSoC IP address for the Ethernet interface. Defaults to '10.1.1.30'.
+
+        Returns:
+            success_ping_gnd_fpga (bool): True if ping is successful, False otherwise.
         """
         
         try:
@@ -585,10 +593,10 @@ class WidgetGallery(QMainWindow):
     
     def check_if_drone_gimbal_connected(self):
         """
-         Checks if a gimbal (Ronin RS2 or Gremsy H16) is connected to the host computer of the drone node.
+        Checks if a gimbal (Ronin RS2 or Gremsy H16) is connected to the host computer of the drone node.
 
-        :return: success_drone_gimbal: True if the gimbal is detected, False if not. None if an error appeared.
-        :rtype: bool
+        Returns:
+            success_drone_gimbal (bool): True if the gimbal is detected, False if not. None if an error appeared.
         """
         if self.remote_drone_conn is None:
             success_drone_gimbal = None
@@ -628,8 +636,8 @@ class WidgetGallery(QMainWindow):
         """
         Checks if a Ronin RS2 gimbal is connected to the host computer of the ground node.
         
-        :return: success_gnd_gimbal: True if a PCAN device is detected, False otherwise.
-        :rtype: bool
+        Returns:
+            success_gnd_gimbal (bool): True if a PCAN device is detected, False otherwise.
         """
                
         try:
@@ -646,12 +654,12 @@ class WidgetGallery(QMainWindow):
     
     def check_if_server_running_drone_fpga(self):
         """
-         Checks if the server.py daemon is running on drone's RFSoC (the PS of the RFSoC). If it is not running, this function starts it.
+        Checks if the server.py daemon is running on drone's RFSoC (the PS of the RFSoC). If it is not running, this function starts it.
         
         ASSUMES DRONE RFSOC IP STATIC ADDR FOR ETH INTERFACE IS 10.1.1.40 (THIS IS THE DEFAULT SETUP)
 
-        :return: success_server_drone_fpga: True if the server.py daemon is running. False if not. None if the daemon could not be started.
-        :rtype: bool
+        Returns:
+            success_server_drone_fpga (bool): True if the server.py daemon is running. False if not. None if the daemon could not be started.
         """
         
         if self.remote_drone_conn is None:
@@ -737,13 +745,14 @@ class WidgetGallery(QMainWindow):
 
     def check_if_server_running_gnd_fpga(self):
         """
-         Checks if the server.py daemon is running on ground's RFSoC (the PS of the RFSoC). If it is not running, this function starts it.
+        Checks if the server.py daemon is running on ground's RFSoC (the PS of the RFSoC). If it is not running, this function starts it.
         
         ASSUMES GROUND RFSOC IP STATIC ADDR FOR ETH INTERFACE IS 10.1.1.30 (THIS IS THE DEFAULT SETUP)
 
-        :return: success_server_gnd_fpga: True if the server.py daemon is running on ground's RFSoC. False otherwise.
-        :rtype: bool
+        Returns:
+            success_server_gnd_fpga (bool): True if the server.py daemon is running on ground's RFSoC. False otherwise.
         """
+
         try:
             conn_gnd_fpga = paramiko.SSHClient()
             conn_gnd_fpga.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -779,10 +788,10 @@ class WidgetGallery(QMainWindow):
 
     def check_if_gnd_gps_connected(self):
         """
-         Checks if a Septentrio gps is connected to the host computer of the ground node.
+        Checks if a Septentrio gps is connected to the host computer of the ground node.
 
-        :return: success_gnd_gps: True if a gps is detected, False otherwise
-        :rtype: bool
+        Returns:
+            success_gnd_gps (bool): True if a gps is detected, False otherwise.
         """
         
         tmp = []
@@ -799,12 +808,12 @@ class WidgetGallery(QMainWindow):
 
     def check_if_drone_gps_connected(self):
         """
-         Checks if a Septentrio gps is connected to the host computer of the drone node.
+        Checks if a Septentrio gps is connected to the host computer of the drone node.
          
-         Requires that there is a SSH connection already established.
+        Requires that there is a SSH connection already established.
 
-        :return: success_drone_gps: True if connected, False if not, None if no SSH connection
-        :rtype: bool
+        Returns:
+            success_drone_gps (bool): True if connected, False if not, None if no SSH connection.
         """
         
         # Double check
@@ -836,9 +845,9 @@ class WidgetGallery(QMainWindow):
     
     def get_gnd_ip_node_address(self):
         """
-         Gets the IP address ground's node WiFi interface.
+        Gets the IP address ground's node WiFi interface.
         
-         Caller function IS RESPONSIBLE for checking if there is a WiFi operating. 
+        Caller function IS RESPONSIBLE for checking if there is a WiFi operating. 
         """
         
         if platform.system() == "Windows":
@@ -864,7 +873,7 @@ class WidgetGallery(QMainWindow):
 
     def check_status_all_devices(self):
         """
-         Callback for when user presses the "Check" button. Gets the connection status of all devices.
+        Callback for when user presses the "Check" button. Gets the connection status of all devices.
         """
         
         pattern_ip_addresses = r'[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
@@ -923,14 +932,11 @@ class WidgetGallery(QMainWindow):
         """
         Creates ``HelperA2GMeasurements`` class instance for this (ground) node and starts the WiFi communication thread.
 
-        :param IsGPS: True if there is a Septentrio GPS connected to this (ground) host computer, defaults to False
-        :type IsGPS: bool, optional
-        :param IsGimbal: True if there is a Ronin RS2 gimbal connected to this (ground) host computer, defaults to False
-        :type IsGimbal: bool, optional
-        :param IsRFSoC: True if there is an RFSoC connected to this (ground) host computer, defaults to False
-        :type IsRFSoC: bool, optional
-        :param GPS_Stream_Interval: controls the regularity of getting GPS coordinates in this (ground) node. Available options are provided in ``GpsSignaling.start_gps_data_retrieval``, defaults to 'sec1'
-        :type GPS_Stream_Interval: str, optional
+        Args:
+            IsGPS (bool, optional): True if there is a Septentrio GPS connected to this (ground) host computer. Defaults to False.
+            IsGimbal (bool, optional): True if there is a Ronin RS2 gimbal connected to this (ground) host computer. Defaults to False.
+            IsRFSoC (bool, optional): True if there is an RFSoC connected to this (ground) host computer. Defaults to False.
+            GPS_Stream_Interval (str, optional): controls the regularity of getting GPS coordinates in this (ground) node. Available options are provided in ``GpsSignaling.start_gps_data_retrieval``. Defaults to 'sec1'.
         """
 
         # As this app is executed at the ground device...
@@ -944,7 +950,7 @@ class WidgetGallery(QMainWindow):
 
     def start_GUI_threads(self):
         """
-         Start GUI related threads. This threads are related only to the display of information
+        Start GUI related threads. This threads are related only to the display of information
         on the GUI.
         
         """
@@ -972,7 +978,7 @@ class WidgetGallery(QMainWindow):
         
     def periodical_pap_display_callback(self):
         """
-         Callback for display the PAP of the measured CIR in the PAP panel of the GUI.
+        Callback for display the PAP of the measured CIR in the PAP panel of the GUI.
         """
         
         if hasattr(self, 'myhelpera2g'):
@@ -986,11 +992,11 @@ class WidgetGallery(QMainWindow):
         
     def periodical_gps_display_callback(self):
         """
-         Displays (periodically) GPS position of the drone node on the GPS panel. 
+        Displays (periodically) GPS position of the drone node on the GPS panel. 
          
-         The period is controlled by the property "update_vis_time_gps" of this class.
+        The period is controlled by the property "update_vis_time_gps" of this class.
          
-         Uses the ``show_air_moving`` function of the class ``GpsOnMap``, meaning that such method has to implement the functionality to display gps coordinates on a given input (PyQt5 panel).
+        Uses the ``show_air_moving`` function of the class ``GpsOnMap``, meaning that such method has to implement the functionality to display gps coordinates on a given input (PyQt5 panel).
         """
         
         # Display coords
@@ -1043,8 +1049,7 @@ class WidgetGallery(QMainWindow):
 
     def create_log_terminal(self):
         """
-        Access the widget contents by using self.log_widget.setPlainText('')
-
+        Access the widget contents by using ``self.log_widget.setPlainText('')``
         """
         self.log_widget = CustomTextEdit(self)
         
@@ -1056,7 +1061,7 @@ class WidgetGallery(QMainWindow):
     
     def create_check_connections_panel(self):
         """
-         Creates the "Check connections" panel with its widgets and layout.
+        Creates the "Check connections" panel with its widgets and layout.
         """
         self.checkConnPanel = QGroupBox('Connections')
 
@@ -1140,7 +1145,7 @@ class WidgetGallery(QMainWindow):
     
     def activate_rs2_fm_flag(self):   
         """
-         Toggles the ``rs2_fm_flag``
+        Toggles the ``rs2_fm_flag``
         """     
         
         if self.rs2_fm_flag:
@@ -1150,7 +1155,7 @@ class WidgetGallery(QMainWindow):
     
     def activate_gps_display_flag(self):
         """
-         Toggles the ``gps_display_flag``
+        Toggles the ``gps_display_flag``
         """
         if self.gps_display_flag:
             self.gps_display_flag = False
@@ -1159,9 +1164,9 @@ class WidgetGallery(QMainWindow):
 
     def connect_drone_callback(self):
         """
-         Callback for when the user presses the "Connect" button.
+        Callback for when the user presses the "Connect" button.
          
-         Calls the ``create_class_instance`` method to create the Helper class in this (ground) node, depending on the availability of ground and drone devices. 
+        Calls the ``create_class_instance`` method to create the Helper class in this (ground) node, depending on the availability of ground and drone devices. 
         """
         
         if self.SUCCESS_GND_GIMBAL and self.SUCCESS_GND_FPGA and self.SUCCESS_GND_GPS:
@@ -1228,11 +1233,11 @@ class WidgetGallery(QMainWindow):
         
     def disconnect_drone_callback(self):
         """
-         Callback for when the user presses the "Disconnect" button.
+        Callback for when the user presses the "Disconnect" button.
          
-         If there is an ongoing measurement it will be finished.
+        If there is an ongoing measurement it will be finished.
          
-         The WiFi thread will be stopped and its associated socket will be closed in this node. Devices connection to this node will be closed.
+        The WiFi thread will be stopped and its associated socket will be closed in this node. Devices connection to this node will be closed.
         """
         
         if hasattr(self, 'periodical_gimbal_follow_thread'):
@@ -1270,7 +1275,7 @@ class WidgetGallery(QMainWindow):
     
     def create_fpga_and_sivers_panel(self):
         """
-         Creates the "Sivers settings" panel with its widgets and layout.
+        Creates the "Sivers settings" panel with its widgets and layout.
         """
         
         self.fpgaAndSiversSettingsPanel = QGroupBox('Sivers settings')
@@ -1350,13 +1355,15 @@ class WidgetGallery(QMainWindow):
 
     def checker_gimbal_input_range(self, angle):
         """
-         Checks if a given angle is within the allowed range.
+        Checks if a given angle is within the allowed range.
 
-        :param angle: angle
-        :type angle: float
-        :return: True if the angle is within the allowed range, False otherwise.
-        :rtype: bool
+        Args:
+            angle (float): angle in degrees.
+
+        Returns:
+            incorrect_angle_value (bool): True if the angle is within the allowed range, False otherwise.
         """
+
         incorrect_angle_value = False
         if angle > 180 or angle < -180:
             print("[DEBUG]: Angle value outside of range")
@@ -1366,11 +1373,11 @@ class WidgetGallery(QMainWindow):
 
     def move_button_gimbal_gnd_callback(self):
         """
-         Callback for when the user presses the "Move" button from the Gimbal GND panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons if the movement is absolute or relative. BOTH yaw and pitch inputs are required.
+        Callback for when the user presses the "Move" button from the Gimbal GND panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons if the movement is absolute or relative. BOTH yaw and pitch inputs are required.
 
-         Example:
+        Example:
          
-         For a yaw absolute movement to -20 deg and a pitch to 97 deg, the user MUST select the absolute radio button and enter -20 in the yaw text box and enter 97 in the pitch text box.
+        For a yaw absolute movement to -20 deg and a pitch to 97 deg, the user MUST select the absolute radio button and enter -20 in the yaw text box and enter 97 in the pitch text box.
         """
         
         if hasattr(self, 'myhelpera2g'):
@@ -1402,11 +1409,11 @@ class WidgetGallery(QMainWindow):
     
     def left_button_gimbal_gnd_callback(self):
         """
-        Callback for when the user presses the "Left" button from the Gimbal GND panel. 
+        Callback for when the user presses the ``Left`` button from the Gimbal GND panel. 
         
-        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the ``Step`` textbox. The movement is relative to the angle before the button was pressed.
         
-        If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
+        If no value is provided in the ``Step`` textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """
         
         if hasattr(self, 'myhelpera2g'):
@@ -1435,12 +1442,11 @@ class WidgetGallery(QMainWindow):
 
     def right_button_gimbal_gnd_callback(self):
         """
-         Callback for when the user presses the "Right" button from the Gimbal GND panel. 
+        Callback for when the user presses the ``Right`` button from the Gimbal GND panel. 
         
-         Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the ``Step`` textbox. The movement is relative to the angle before the button was pressed.
         
-         If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
-
+        If no value is provided in the ``Step`` textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """        
 
         if hasattr(self, 'myhelpera2g'):
@@ -1469,12 +1475,11 @@ class WidgetGallery(QMainWindow):
     
     def up_button_gimbal_gnd_callback(self):
         """
-         Callback for when the user presses the "Up" button from the Gimbal GND panel. 
+        Callback for when the user presses the ``Up`` button from the Gimbal GND panel. 
         
-         Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the ``Step`` textbox. The movement is relative to the angle before the button was pressed.
         
-         If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
-
+        If no value is provided in the ``Step`` textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """
 
         if hasattr(self, 'myhelpera2g'):
@@ -1503,11 +1508,11 @@ class WidgetGallery(QMainWindow):
 
     def down_button_gimbal_gnd_callback(self):
         """
-         Callback for when the user presses the "Down" button from the Gimbal GND panel. 
+        Callback for when the user presses the ``Down`` button from the Gimbal GND panel. 
         
-         Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the ``Step`` textbox. The movement is relative to the angle before the button was pressed.
         
-         If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
+        If no value is provided in the ``Step`` textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """
 
         if hasattr(self, 'myhelpera2g'):
@@ -1536,12 +1541,11 @@ class WidgetGallery(QMainWindow):
 
     def move_button_gimbal_drone_callback(self):
         """
-         Callback for when the user presses the "Move" button from the Gimbal Drone panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons if the movement is absolute or relative. BOTH yaw and pitch inputs are required.
+        Callback for when the user presses the "Move" button from the Gimbal Drone panel. The yaw and pitch QLineEdits control the amount of movement, and the absolute or relative QRadioButtons if the movement is absolute or relative. BOTH yaw and pitch inputs are required.
 
-         Example:
+        Example:
          
-         For a yaw absolute movement to -20 deg and a pitch to 97 deg, the user MUST select the absolute radio button and enter -20 in the yaw text box and enter 97 in the pitch text box.
-        
+        For a yaw absolute movement to -20 deg and a pitch to 97 deg, the user MUST select the absolute radio button and enter -20 in the yaw text box and enter 97 in the pitch text box.
         """
         if hasattr(self, 'myhelpera2g'):
             yaw = self.rx_yaw_value_text_edit.text()
@@ -1572,11 +1576,11 @@ class WidgetGallery(QMainWindow):
     
     def left_button_gimbal_drone_callback(self):
         """
-         Callback for when the user presses the "Left" button from the Gimbal Drone panel. 
+        Callback for when the user presses the "Left" button from the Gimbal Drone panel. 
         
-         Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
         
-         If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
+        If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """
         if hasattr(self, 'myhelpera2g'):
             movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
@@ -1608,11 +1612,11 @@ class WidgetGallery(QMainWindow):
     
     def right_button_gimbal_drone_callback(self):
         """
-         Callback for when the user presses the "Left" button from the Gimbal drone panel. 
+        Callback for when the user presses the "Left" button from the Gimbal drone panel. 
         
-         Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
         
-         If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
+        If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """
         if hasattr(self, 'myhelpera2g'):
             movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
@@ -1643,11 +1647,11 @@ class WidgetGallery(QMainWindow):
     
     def up_button_gimbal_drone_callback(self):
         """
-         Callback for when the user presses the "Left" button from the Gimbal drone panel. 
+        Callback for when the user presses the "Left" button from the Gimbal drone panel. 
         
-         Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
         
-         If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
+        If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """
         if hasattr(self, 'myhelpera2g'):
             movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
@@ -1678,11 +1682,11 @@ class WidgetGallery(QMainWindow):
     
     def down_button_gimbal_drone_callback(self):
         """
-         Callback for when the user presses the "Left" button from the Gimbal drone panel. 
+        Callback for when the user presses the "Left" button from the Gimbal drone panel. 
         
-         Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
+        Direction buttons (up, down, left, right) move the gimbal the direction they indicate, by the amount given in the "Step" textbox. The movement is relative to the angle before the button was pressed.
         
-         If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
+        If no value is provided in the "Step" textbox, the gimbal moves a value of 10 degrees in the direction indicated by this button.
         """
         if hasattr(self, 'myhelpera2g'):
             movement_step = self.rx_step_manual_move_gimbal_text_edit.text()
@@ -1719,7 +1723,7 @@ class WidgetGallery(QMainWindow):
     
     def create_Gimbal_GND_panel(self):
         """
-         Creates the ground gimbal panel with its widgets and layout.
+        Creates the ground gimbal panel with its widgets and layout.
         """
         
         self.gimbalTXPanel = QGroupBox('GND Gimbal')
@@ -1788,8 +1792,7 @@ class WidgetGallery(QMainWindow):
 
     def create_Gimbal_AIR_panel(self):
         """
-         Creates the drone gimbal panel with its widgets and layout.
-        
+        Creates the drone gimbal panel with its widgets and layout.
         """
         self.gimbalRXPanel = QGroupBox('Drone Gimbal')
         
@@ -1871,7 +1874,7 @@ class WidgetGallery(QMainWindow):
 
     def rx_lock_mode_radio_button_callback(self):
         """
-         Callback for when the user presses the "LOCK" radio button in the drone gimbal panel and when it has selected the "Gremsy H16" gimbal in the Setup dialog.
+        Callback for when the user presses the "LOCK" radio button in the drone gimbal panel and when it has selected the "Gremsy H16" gimbal in the Setup dialog.
         """
         
         if hasattr(self, 'myhelpera2g'):
@@ -1886,7 +1889,7 @@ class WidgetGallery(QMainWindow):
     
     def rx_follow_mode_radio_button_callback(self):
         """
-         Callback for when the user presses the "FOLLOW" radio button in the drone gimbal panel and when it has selected the "Gremsy H16" gimbal in the Setup dialog.
+        Callback for when the user presses the "FOLLOW" radio button in the drone gimbal panel and when it has selected the "Gremsy H16" gimbal in the Setup dialog.
         """
         
         if hasattr(self, 'myhelpera2g'):
@@ -1901,10 +1904,11 @@ class WidgetGallery(QMainWindow):
 
     def convert_dB_to_valid_hex_sivers_register_values(self):
         """
-         Converts the dB gain values (all of them) the user has input in the "Sivers settings" panel to the actual values required for the Sivers EVK registers.
+        Converts the dB gain values (all of them) the user has input in the "Sivers settings" panel to the actual values required for the Sivers EVK registers.
 
-        :return: a dictionary with the Tx gain values to be set at the Tx Sivers EVK registers, and another dictionary with the Rx gain values to be set at the RX Sivers EVK registers.
-        :rtype: dict, dict
+        Returns:
+            tx_signal_values (dict): dictionary with the Tx gain values to be set at the Tx Sivers EVK registers.
+            rx_signal_values (dict): dictionary with the Rx gain values to be set at the RX Sivers EVK registers.
         """
         
         rxbb1 = float(self.rx_bb_gain_1_text_edit.text())
@@ -1942,10 +1946,9 @@ class WidgetGallery(QMainWindow):
     
     def start_meas_button_callback(self):
         """
-         Callback for when the user presses the "START" button. Starts sending pilot signal from the TX Sivers.
+        Callback for when the user presses the "START" button. Starts sending pilot signal from the TX Sivers.
          
-         Sends the parameters to the RX sivers (RX RFSoC server) for it to be configured and start to listen incoming signals over the air.         
-         
+        Sends the parameters to the RX sivers (RX RFSoC server) for it to be configured and start to listen incoming signals over the air. 
         """
 
         tx_signal_values, rx_signal_values = self.convert_dB_to_valid_hex_sivers_register_values()
@@ -1979,7 +1982,7 @@ class WidgetGallery(QMainWindow):
     
     def stop_meas_button_callback(self):
         """
-         Callback for when the user presses the "STOP" button. Sends a ``STOPDRONERFSOC`` command to the drone, to stop its rfsoc thread.
+        Callback for when the user presses the "STOP" button. Sends a ``STOPDRONERFSOC`` command to the drone, to stop its rfsoc thread.
         """
         
         self.myhelpera2g.socket_send_cmd(type_cmd='STOPDRONERFSOC')
@@ -1991,7 +1994,7 @@ class WidgetGallery(QMainWindow):
     
     def finish_meas_button_callback(self):
         """
-         Callback for when the user presses the "FINISH" button. Sends a ``FINISHDRONERFSOC`` command to the drone, to stop its rfsoc thread.
+        Callback for when the user presses the "FINISH" button. Sends a ``FINISHDRONERFSOC`` command to the drone, to stop its rfsoc thread.
         """
         
         self.myhelpera2g.socket_send_cmd(type_cmd='FINISHDRONERFSOC')
@@ -2022,7 +2025,7 @@ class WidgetGallery(QMainWindow):
 
     def create_Planning_Measurements_panel(self):
         """
-         Creates the "Control measurements" panel with its widgets and layout.
+        Creates the "Control measurements" panel with its widgets and layout.
         """
         
         self.planningMeasurementsPanel = QGroupBox('Control measurements')
@@ -2052,12 +2055,18 @@ class WidgetGallery(QMainWindow):
         self.planningMeasurementsPanel.setLayout(layout)
     
     def create_GPS_visualization_panel(self):
+        """
+        Creates the GPS visuzliation panel. The ``gps_start_point_in_finland_json`` can be set to any coordinate.
+
+        Requires the ``gpsRESTHandler.py`` file where the REST API for the gps is implemented.
+        """
+
         self.gps_vis_panel = QGroupBox('GPS visualization')
         
         # This starting point can be anything, as it will be updated throught the PUT requests
-        gps_start_point_in_finland_json = {"lat": 60.15301542729288, "lon": 24.316255998379482}
+        gps_start_point_json = {"lat": 60.15301542729288, "lon": 24.316255998379482}
         
-        response = requests.post(self.url_post_map, json=gps_start_point_in_finland_json)
+        response = requests.post(self.url_post_map, json=gps_start_point_json)
         
         time.sleep(0.05)
         
@@ -2139,7 +2148,7 @@ class WidgetGallery(QMainWindow):
     
     def create_pap_plot_panel(self):
         """
-         Creates the "PAP" panel (responsible for ploting the Power Angular Profile of the measured CIRs).
+        Creates the "PAP" panel (responsible for ploting the Power Angular Profile of the measured CIRs).
         """
         
         self.papPlotPanel = QGroupBox('PAP')

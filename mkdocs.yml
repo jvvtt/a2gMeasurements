@@ -8,6 +8,8 @@ theme:
       info: simple/css3
       tip: simple/javascript
       quote: simple/git
+      warning: simple/powershell
+      failure: simple/python
   name: material
   features:
     - navigation.tabs
@@ -58,9 +60,9 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.tasklist:
       custom_checkbox: true
-extra_css:
-  - stylesheets/extra.css
-
+  - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
 extra:
   annotate:
     json: [.s2]
@@ -68,10 +70,26 @@ extra:
 plugins:
   - search
   - mkdocstrings
-
+  - glightbox
+extra_css:
+  - stylesheets/extra.css
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css
+extra_javascript:
+  - javascripts/katex.js
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js
 nav:
     - Home: index.md
     - Installation: GettingStarted.md
+    - Measurement system: 
+        - Devices and connections: MeasurementSystem.md
+        - Communication between nodes: CommunicationProtocol.md
+    - Guide for using the GUI: 
+        - Operation of GUI: GuideForGUI.md
+        - Panels in GUI: PanelsGUI.md
+        - Parameters of GUI: GUIparameters.md
+    - Troubleshooting: Troubleshooting.md
+    - For developers: InfoDevelopers.md
     - API reference:
         - DJI Ronin RS2 gimbal: GimbalRS2.md
         - Septentrio GPS: GpsSignaling.md
@@ -80,3 +98,5 @@ nav:
         - Gremsy H16 gimbal: GimbalGremsyH16.md
         - SBUS encoder: SBUSEncoder.md
         - RFSoC communication: RFSoCHandler.md
+        - Graphical User Interface - Setup window: GUIsetupWin.md
+        - Graphical User Interface - Main window: GUIwidgetGallery.md
