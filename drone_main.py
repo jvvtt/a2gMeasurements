@@ -5,6 +5,7 @@ import threading
 import re
 from json import JSONEncoder
 import numpy as np
+import questionary
 
 '''
 For the moment assume always that the drone gimbal will follow the gnd node ONLY in elevation 
@@ -25,10 +26,13 @@ def send_pap_for_vis():
                     drone_a2g_helper.socket_send_cmd(type_cmd='SETIRF', data=drone_a2g_helper.myrfsoc.data_to_visualize)
 
 def check_devices():
-    Q_GND_ADDRESS = input('Confirm the predefined static GND IP addr is 192.168.0.124 (y/n): ')
-    if Q_GND_ADDRESS == 'y' or Q_GND_ADDRESS == 'Y':
+    Q_GND_ADDRESS = questionary.select("GND IP addr is 192.168.0.124?:", choices=["Yes", "No"]).ask()
+    #Q_GND_ADDRESS = input('Confirm the predefined static GND IP addr is 192.168.0.124 (y/n): ')
+    #if Q_GND_ADDRESS == 'y' or Q_GND_ADDRESS == 'Y':
+    if Q_GND_ADDRESS == "Yes":
         GND_ADDRESS = '192.168.0.124'
-    elif Q_GND_ADDRESS == 'n' or Q_GND_ADDRESS == 'N':
+    #elif Q_GND_ADDRESS == 'n' or Q_GND_ADDRESS == 'N':
+    elif Q_GND_ADDRESS == "No":
         GND_ADDRESS = input('Enter the GND node IP address: ')
         is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))
 
@@ -37,35 +41,44 @@ def check_devices():
             GND_ADDRESS = input('Enter GND node IP address: ')
             is_ip_addr = bool(re.match(pattern_ip_addresses, GND_ADDRESS))
 
-    is_gps_used = input('GPS at DRONE is going to be used? (y/n): ')
-    if is_gps_used == 'y' or is_gps_used == 'Y':
+    is_gps_used = questionary.select("GPS at DRONE is going to be used?", choices=["Yes", "No"]).ask()
+    #is_gps_used = input('GPS at DRONE is going to be used? (y/n): ')
+    #if is_gps_used == 'y' or is_gps_used == 'Y':
+    if is_gps_used == "Yes":
         gps_used = True
         head_offset = input('Enter heading offset if any or 0 if there is no offset: ')
-    elif is_gps_used == 'n' or is_gps_used == 'N':
+    #elif is_gps_used == 'n' or is_gps_used == 'N':
+    elif is_gps_used == "No":
         gps_used = False
         head_offset = None
 
-    is_gimbal_used = input('Gimbal at DRONE is going to be used? (y/n): ')
-    if is_gimbal_used == 'y' or is_gimbal_used == 'Y':
+    is_gimbal_used = questionary.select("Gimbal at DRONE is going to be used?", choices=["Yes", "No"]).ask()
+    #is_gimbal_used = input('Gimbal at DRONE is going to be used? (y/n): ')
+    #if is_gimbal_used == 'y' or is_gimbal_used == 'Y':
+    if is_gimbal_used == "Yes":
         gimbal_used = True
-    elif is_gimbal_used == 'n' or is_gimbal_used == 'N':
+    elif is_gimbal_used == "No":
+    #elif is_gimbal_used == 'n' or is_gimbal_used == 'N':
         gimbal_used = False
-        
-    is_rfsoc_used = input('RFSoC at DRONE is going to be used? (y/n): ')
-    if is_rfsoc_used == 'y' or is_rfsoc_used == 'Y':
+    
+    is_rfsoc_used = questionary.select("RFSoC at DRONE is going to be used?", choices=["Yes", "No"]).ask()
+    #is_rfsoc_used = input('RFSoC at DRONE is going to be used? (y/n): ')
+    if is_rfsoc_used == "Yes":
+    #if is_rfsoc_used == 'y' or is_rfsoc_used == 'Y':
         rfsoc_used = True
-    elif is_rfsoc_used == 'n' or is_rfsoc_used == 'N':
+    elif is_rfsoc_used == "No":
+    #elif is_rfsoc_used == 'n' or is_rfsoc_used == 'N':
         rfsoc_used = False
         
     return GND_ADDRESS, gps_used, gimbal_used, rfsoc_used, head_offset
 
 not_created_class_instance = True
-not_finish_tcp_connection_attempt = True
-unsuccessful_drone2gnd_connection_attempt_cnt = 0
+
+GND_ADDRESS, gps_used, gimbal_used, rfsoc_used, head_offset = check_devices()
+print("[DEBUG]: saved user inputs")
 
 while(not_created_class_instance):
-    try:   
-        GND_ADDRESS, gps_used, gimbal_used, rfsoc_used, head_offset = check_devices()
+    try:        
         drone_a2g_helper = HelperA2GMeasurements('DRONE', GND_ADDRESS, DBG_LVL_1=False, IsGPS=gps_used, IsRFSoC=rfsoc_used, rfsoc_static_ip_address='10.1.1.40', IsGimbal=gimbal_used, heading_offset=head_offset)
     except Exception as e:
         print("[DEBUG]: There is some error creating the a2gmeasurements class instance")
@@ -73,6 +86,10 @@ while(not_created_class_instance):
         print("[DEBUG]: Check that device flag values for IsGPS, IsRFSoC, IsGimbal correspond to what is connected to the Manifold")
     else:
         not_created_class_instance = False
+        print("[DEBUG]: created HelperA2GMeasurements class instance")
+
+not_finish_tcp_connection_attempt = True
+unsuccessful_drone2gnd_connection_attempt_cnt = 0
 
 while(not_finish_tcp_connection_attempt):
     try:

@@ -13,7 +13,6 @@ import os
 import math
 from pyrosm import OSM, get_data
 
-
 class Checksum(object):
     def __init__(self):
         self.MASK_BIT_TYPE = 0XFF
@@ -216,7 +215,80 @@ def compute_block_mean_2d_array(array, block_length):
     tmp = tmp.transpose((0,2,1,3))
     tmp = np.mean(tmp, axis=(2,))
     tmp = np.squeeze(tmp)
-    return tmp       
+    return tmp      
+
+def azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest):
+    """
+    This is the angle difference between the **heading** direction (angle w.r.t the North) of the node behaving as the origin and the destination node direction (w.r.t the origin node).
+
+    The following picture provides an illustration of the angle to be computed (named here theta).
+    
+    <figure markdown="span">
+    ![Image title](assets/azimuth_difference_btw_coods.PNG){ width="400" }
+    <figcaption>Illustration of the angle difference theta</figcaption>
+    </figure>
+    
+    Args:
+        heading (float): angle between [0, 2*pi] (rads) corresponding to the heading direction of the line between the two antennas connected to Septentrio's receiver in the origin node. Defaults to None.
+        lat_origin (float): latitude of the origin node. 
+        lon_origin (float): longitude of the origin node.
+        lat_dest (float): latitude of the destination node.
+        lon_dest (float): longitude of the destination node. 
+    Returns:
+        yaw_to_set (int): azimuth angle difference.
+    """
+    
+    wgs84_geod = Geod(ellps='WGS84')
+        
+    ITFA, _, _ = wgs84_geod.inv(lon_origin, lat_origin, lon_dest, lat_dest)
+                
+    # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
+    if heading > 180:
+        heading = heading - 360
+                    
+    yaw_to_set = ITFA - heading
+
+    if yaw_to_set > 180:
+        yaw_to_set = yaw_to_set - 360
+    elif yaw_to_set < -180:
+        yaw_to_set = yaw_to_set + 360
+            
+    yaw_to_set = int(yaw_to_set*10)
+    
+    return yaw_to_set
+
+def elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, lat_dest, lon_dest, h_dest):
+    """
+    Elevation angle difference between the origin node and the destination node.
+
+    The following picture provides an illustration of the angle to be computed (named here theta).
+    
+    <figure markdown="span">
+    ![Image title](assets/elevation_difference_btw_coods.PNG){ width="400" }
+    <figcaption>Illustration of the angle difference phi</figcaption>
+    </figure>
+    
+    Args:
+        lat_origin (float): latitude of the origin node. 
+        lon_origin (float): longitude of the origin node.
+        h_origin (float): height of the origin node.
+        lat_dest (float): latitude of the destination node.
+        lon_dest (float): longitude of the destination node. 
+        h_dest (float): height of the destination node.
+    Returns:
+        pitch_to_set (int): elevation angle difference.
+    """
+    
+    wgs84_geod = Geod(ellps='WGS84')
+        
+    # dist_proj_2D is the distance between the origin node and the projection of the destination node to the plane at the height of the origin node.
+    _, _, dist_proj_2D = wgs84_geod.inv(lon_origin, lat_origin, lon_dest, lat_dest)
+    
+    pitch_to_set = np.arctan2(h_dest - h_origin, dist_proj_2D) 
+    pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
+    
+    return pitch_to_set    
+ 
 class GPSVis(object):
     """
         DEPRECATED CLASS MAINTENED FOR HISTORY [JUPYTER NOTEBOOK TESTS].

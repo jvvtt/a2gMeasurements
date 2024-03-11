@@ -100,3 +100,4 @@ nav:
         - RFSoC communication: RFSoCHandler.md
         - Graphical User Interface - Setup window: GUIsetupWin.md
         - Graphical User Interface - Main window: GUIwidgetGallery.md
+        - Utility functions: Utils.md

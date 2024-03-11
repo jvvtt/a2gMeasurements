@@ -188,6 +188,29 @@ class SetupWindow(QDialog):
             self.drone_lon_textEdit.setEnabled(False)
             self.drone_alt_textEdit.setEnabled(False)
 
+class PlanningMeasurementsWindow(QDialog):
+    """
+    Creates a new dialog with configuration options for the user, when is pressed the ``Setup`` > ``Planning measurements`` menu.
+    """
+    def __init__(self, parent=None):
+        
+        super(PlanningMeasurementsWindow, self).__init__(parent)
+        self.setWindowTitle("Planning Measurements")
+        #self.setGeometry(100, 100, 300, 220)
+
+        ground_fixed_coordinates_label = QLabel("Input the fixed coordinates of the ground node in the following format:\n\nLatitude, Longitude, Height above sea level\n\nLatitude and longitude coordinates should be in decimal degrees\n\nHeight should be in meters")
+        drone_fixed_coordinates_label = QLabel("Input the fixed coordinates of the drone node in the following format:\n\nLatitude, Longitude, Height above sea level\n\nLatitude and longitude coordinates should be in decimal degrees\n\nHeight should be in meters")
+        
+        self.ground_fixed_coordinates_textEditor = QTextEdit("")
+        self.drone_fixed_coordinates_textEditor = QTextEdit("")
+        
+        layout = QGridLayout()
+        layout.addWidget(ground_fixed_coordinates_label, 0, 0, 4, 4)
+        layout.addWidget(self.ground_fixed_coordinates_textEditor, 4, 0, 2, 4)
+        layout.addWidget(drone_fixed_coordinates_label, 0, 4, 4, 4)
+        layout.addWidget(self.drone_fixed_coordinates_textEditor, 4, 4, 2, 4)
+        self.setLayout(layout)
+
 class WidgetGallery(QMainWindow):
     """
     Python class responsible for creating the main window of the GUI and all the functionality to handle user interaction.
@@ -332,6 +355,23 @@ class WidgetGallery(QMainWindow):
         
         self.setupDevicesAndMoreAction.setDisabled(True)
     
+    def showPlanningMeasurementsMenu(self):
+        plannMeasWin = PlanningMeasurementsWindow()
+        result = plannMeasWin.exec_()
+        
+        coordinates_ground = plannMeasWin.ground_fixed_coordinates_textEditor.document().toPlainText()
+        coordinates_drone = plannMeasWin.drone_fixed_coordinates_textEditor.document().toPlainText()
+        
+        coordinates_ground = coordinates_ground.split("\n")
+        coordinates_drone = coordinates_drone.split("\n")
+        
+        print(coordinates_ground)
+        
+        coordinates_ground = [i.split(",") for i in coordinates_ground]
+        coordinates_drone = [i.split(",") for i in coordinates_drone]
+        
+        print(coordinates_ground)
+        
     def createMenu(self):
         """
         Creates the menu bar and associates the callback functions for when the user clicks on each of the menu items.          
@@ -346,6 +386,10 @@ class WidgetGallery(QMainWindow):
         self.setupDevicesAndMoreAction = QAction("&Setup devices and more", self)
         setupMenu.addAction(self.setupDevicesAndMoreAction)        
         self.setupDevicesAndMoreAction.triggered.connect(self.showSetupMenu)
+        
+        self.planningMeasurementsAction = QAction("&Plan measurements", self)
+        setupMenu.addAction(self.planningMeasurementsAction)        
+        self.planningMeasurementsAction.triggered.connect(self.showPlanningMeasurementsMenu)
         
         self.start_gnd_gimbal_fm_action = QAction("Start GND gimbal following its pair", self)
         threadsMenu.addAction(self.start_gnd_gimbal_fm_action)

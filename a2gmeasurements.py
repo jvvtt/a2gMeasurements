@@ -18,6 +18,7 @@ import threading
 import pynmea2
 import serial
 import sys
+import csv
 from serial.tools.list_ports import comports
 import pyproj as proj
 import json
@@ -26,7 +27,7 @@ import pyvisa
 import pandas as pd
 from sys import platform
 from crc import Calculator, Configuration, Crc16
-from a2gUtils import geocentric2geodetic, geodetic2geocentric, Checksum
+from a2gUtils import geocentric2geodetic, geodetic2geocentric, Checksum, azimuth_difference_between_coordinates, elevation_difference_between_coordinates
 from pyproj import Transformer, Geod
 from multiprocessing.shared_memory import SharedMemory
 from PyQt5.QtCore import pyqtSignal
@@ -1666,38 +1667,25 @@ class HelperA2GMeasurements(object):
         
         if (lat_ground is None and lat_drone is None) or (lon_ground is None and lon_drone is None) or (height_ground is None and height_drone is None):
             print("\n[ERROR]: Either ground or drone coordinates MUST be provided")
-            return self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY
+            return self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY, self.ERR_HELPER_CODE_BOTH_NODES_COORDS_CANTBE_EMPTY       
         
-        wgs84_geod = Geod(ellps='WGS84')
-        
-        if self.ID == 'GROUND':
-            ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_ground, lat_ground, lon_drone, lat_drone)
-        elif self.ID == 'DRONE':
-            ITFA,_, d_mobile_drone_2D = wgs84_geod.inv(lon_drone, lat_drone, lon_ground, lat_ground)
-        
-        pitch_to_set = int(np.rad2deg(pitch_to_set)*10)
-        
-        if fmode == 0x00 or fmode == 0x02:
-            # Restrict heading to [-pi, pi] interval. No need for < -2*pi check, cause it won't happen
-            if heading > 180:
-                heading = heading - 360
-                    
-            yaw_to_set = ITFA - heading
-
-            if yaw_to_set > 180:
-                yaw_to_set = yaw_to_set - 360
-            elif yaw_to_set < -180:
-                yaw_to_set = yaw_to_set + 360
-            
-            yaw_to_set = int(yaw_to_set*10)
-            pitch_to_set = None
-        
+        if fmode == 0x00: # Azimuth and elevation
+            if self.ID == 'DRONE':
+                yaw_to_set = azimuth_difference_between_coordinates(heading, lat_drone, lon_drone, lat_ground, lon_ground)
+                pitch_to_set = elevation_difference_between_coordinates(lat_drone, lon_drone, height_drone, lat_ground, lon_ground, height_ground)
+            elif self.ID == 'GROUND':
+                yaw_to_set = azimuth_difference_between_coordinates(heading, lat_ground, lon_ground, lat_drone, lon_drone)
+                pitch_to_set = elevation_difference_between_coordinates(lat_ground, lon_ground, height_ground, lat_drone, lon_drone, height_drone)
+        elif fmode == 0x02: # Azimuth
+            if self.ID == 'DRONE':
+                yaw_to_set = azimuth_difference_between_coordinates(heading, lat_drone, lon_drone, lat_ground, lon_ground)
+            elif self.ID == 'GROUND':
+                yaw_to_set = azimuth_difference_between_coordinates(heading, lat_ground, lon_ground, lat_drone, lon_drone)
         elif fmode == 0x01: # Elevation
-            yaw_to_set = None
-            if self.ID == 'GROUND':
-                pitch_to_set = np.arctan2(height_drone - height_ground, d_mobile_drone_2D)    
-            elif self.ID == 'DRONE':
-                pitch_to_set = np.arctan2(height_ground - height_drone, d_mobile_drone_2D)
+            if self.ID == 'DRONE':
+                pitch_to_set = elevation_difference_between_coordinates(lat_drone, lon_drone, height_drone, lat_ground, lon_ground, height_ground)
+            elif self.ID == 'GROUND':
+                pitch_to_set = elevation_difference_between_coordinates(lat_ground, lon_ground, height_ground, lat_drone, lon_drone, height_drone)
         
         return yaw_to_set, pitch_to_set
     
@@ -3510,6 +3498,8 @@ class RFSoCRemoteControlFromHost():
          5. ``nread``: number of delay taps of the CIR to be retrieved from the server.
          
          6. ``nbytes``: number of bytes of a full CIR (1 time snapshot, 64 beams, 1024 delay taps)
+         
+         7. ``beam_angles``: list of beam angles used in beamforming. Beam angle at index 0 corresponds to the omnidirectional case.
         
         Args:
             radio_control_port (int, optional): port for "control socket". Defaults to 8080.
@@ -3544,6 +3534,16 @@ class RFSoCRemoteControlFromHost():
         self.nread = 1024
         self.nbytes = self.nbeams * nbytes_per_item * self.nread * 2 # Beams x SubCarriers(delay taps) x 2Bytes from  INT16 x 2 frpm Real and Imaginary
         
+        beamforming_angles_file = "C:\\Users\\jvjulian\\OneDrive - Teknologian Tutkimuskeskus VTT\\Documents\\Aerial\\Repos\\a2gMeasurements\\data\\rx_sivers_beam_index_mapping.csv"
+    
+        self.beam_angles = [0]*64
+        
+        # Get the beamforming angles
+        with open(beamforming_angles_file, 'r') as f:
+            reader = csv.reader(f, delimiter=",")
+            for cnt, row in enumerate(reader):
+                self.beam_angles[cnt] = float(row[1])
+                
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.radio_data = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
@@ -3688,6 +3688,28 @@ class RFSoCRemoteControlFromHost():
             if len(self.hest) >= self.TIME_SNAPS_TO_SAVE:
                 print(f"[DEBUG]: Time between save callbacks: {time.time() - self.start_time_pap_callback}")
                 self.save_hest_buffer()      
+    
+    def maximum_power_direction(self, array):
+        """
+        Computes the beamforming angle (azimuth) of maximum power at the receiver.
+        
+        The time under consideration should be short or less than the inverse of the rate of change of the direction of maximum power.
+        
+        The rate of change of the direction of maximum power is not easy to compute or assume, but we can restrict the computation of the direction to a window of a given ms.
+
+        Args:
+            array (numpy.ndarray): this is the array having the IRFs. Its dimensionality is Time x 64 x 2044.
+
+        Returns:
+            angleMaxPower (list): contains the (azimuth) angles for maximum power across all the time snapshots considered. Has 64 entries.
+        """
+        aux = np.abs(array) 
+        aux = aux * aux # faster pow 2
+        aux = np.sum(aux, axis=2)
+        
+        # This is an Nbeams array
+        idx_max_power = np.argmax(aux, axis=0)
+        return self.beam_angles[idx_max_power]        
     
     def pipeline_operations_rfsoc_rx_ndarray(self, array, axis, each_n_beams=4):
         """
