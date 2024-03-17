@@ -11,19 +11,19 @@ import ping3
 import time
 import can#from fbs_runtime.application_context.PyQt5 import ApplicationContext
 from serial.tools.list_ports import comports
-from PyQt5.QtCore import Qt, QTimer, QObject, QThread, QMutex, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, QObject, QThread, QMutex, pyqtSignal, QUrl
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QGridLayout, QGroupBox, QLabel, QLineEdit,
         QPushButton, QRadioButton, QTextEdit, QVBoxLayout, QWidget, QPlainTextEdit, QToolTip, QMenu, QMenuBar, QMainWindow, QAction)
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-
+import os
 import sys
 from a2gmeasurements import HelperA2GMeasurements, RepeatTimer
-from a2gUtils import GpsOnMap, geocentric2geodetic, geodetic2geocentric
+from a2gUtils import geocentric2geodetic, geodetic2geocentric
 import folium
-from folium.plugins import realtime
+from folium.plugins import realtime, Draw
 from folium.utilities import JsCode
 
 import pyqtgraph as pg
@@ -196,21 +196,37 @@ class PlanningMeasurementsWindow(QDialog):
         
         super(PlanningMeasurementsWindow, self).__init__(parent)
         self.setWindowTitle("Planning Measurements")
-        #self.setGeometry(100, 100, 300, 220)
+        
+        #width = 800
+        #height = 800
+        #self.setFixedSize(width, height)
 
-        ground_fixed_coordinates_label = QLabel("Input the fixed coordinates of the ground node in the following format:\n\nLatitude, Longitude, Height above sea level\n\nLatitude and longitude coordinates should be in decimal degrees\n\nHeight should be in meters")
-        drone_fixed_coordinates_label = QLabel("Input the fixed coordinates of the drone node in the following format:\n\nLatitude, Longitude, Height above sea level\n\nLatitude and longitude coordinates should be in decimal degrees\n\nHeight should be in meters")
+        ground_fixed_coordinates_label = QLabel("Input the fixed coordinates of the ground node in the following format:\nLatitude, Longitude, Height above sea level\nLatitude and longitude coordinates should be in decimal degrees\nHeight should be in meters")
+        drone_fixed_coordinates_label = QLabel("Input the fixed coordinates of the drone node in the following format:\nLatitude, Longitude, Height above sea level\nLatitude and longitude coordinates should be in decimal degrees\nHeight should be in meters")
         
         self.ground_fixed_coordinates_textEditor = QTextEdit("")
         self.drone_fixed_coordinates_textEditor = QTextEdit("")
         
+        self.m = folium.Map()
+        self.drawable_map = Draw(export=True).add_to(self.m)
+        self.webview = QWebEngineView()
+        self.webview.setHtml(self.m._repr_html_())        
+        
+        #canvas_html_to_start = """<html><body><h1 sytle='font-family: system-ui; color: #f5f'>Here we put info</h1></body></hmtl>"""
+        self.info_canvas = QWebEngineView()
+        #self.info_canvas.setHtml(canvas_html_to_start)
+        self.info_canvas.load(QUrl().fromLocalFile(r"C:\Users\julia\Documents\Repositories\a2gMeasurements\canvas_info.html"))
+        
         layout = QGridLayout()
-        layout.addWidget(ground_fixed_coordinates_label, 0, 0, 4, 4)
-        layout.addWidget(self.ground_fixed_coordinates_textEditor, 4, 0, 2, 4)
-        layout.addWidget(drone_fixed_coordinates_label, 0, 4, 4, 4)
-        layout.addWidget(self.drone_fixed_coordinates_textEditor, 4, 4, 2, 4)
+        layout.addWidget(ground_fixed_coordinates_label, 0, 0, 1, 2)
+        layout.addWidget(self.ground_fixed_coordinates_textEditor, 1, 0, 3, 2)
+        layout.addWidget(drone_fixed_coordinates_label, 0, 2, 1, 2)
+        layout.addWidget(self.drone_fixed_coordinates_textEditor, 1, 2, 3, 2)
+        layout.addWidget(self.webview, 4, 0, 4, 4)
+        layout.addWidget(self.info_canvas, 4, 4, 4, 4)
         self.setLayout(layout)
-
+        
+        self.showMaximized()
 class WidgetGallery(QMainWindow):
     """
     Python class responsible for creating the main window of the GUI and all the functionality to handle user interaction.
@@ -365,12 +381,11 @@ class WidgetGallery(QMainWindow):
         coordinates_ground = coordinates_ground.split("\n")
         coordinates_drone = coordinates_drone.split("\n")
         
-        print(coordinates_ground)
-        
         coordinates_ground = [i.split(",") for i in coordinates_ground]
         coordinates_drone = [i.split(",") for i in coordinates_drone]
         
-        print(coordinates_ground)
+        plannMeasWin.m.save("index.html")
+        #plannMeasWin.m.save("map.html")
         
     def createMenu(self):
         """
