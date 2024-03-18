@@ -1,0 +1,23 @@
+.speed-selector {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5em;
+    justify-content: center;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+
+.speed-selector button {
+    background-color: rgb(255, 109, 25);
+    color: #fff;
+    font-size: 20px;
+    font-family: system-ui;
+    padding: 0.1em 0.8em;
+    margin: 0.1em 0.1em;
+    border-radius: 0.2em;
+}
+
+ul {
+    margin-top: 2rem;
+}
