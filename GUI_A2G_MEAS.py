@@ -203,13 +203,20 @@ class PlanningMeasurementsWindow(QDialog):
         
         self.ground_fixed_coordinates_textEditor = QTextEdit("")
         self.drone_fixed_coordinates_textEditor = QTextEdit("")
+        self.ok_button = QPushButton("OK")        
+        
+        self.ok_button.clicked.connect(self.process_plan_meas)        
         
         layout = QGridLayout()
         layout.addWidget(ground_fixed_coordinates_label, 0, 0, 4, 4)
         layout.addWidget(self.ground_fixed_coordinates_textEditor, 4, 0, 2, 4)
         layout.addWidget(drone_fixed_coordinates_label, 0, 4, 4, 4)
         layout.addWidget(self.drone_fixed_coordinates_textEditor, 4, 4, 2, 4)
+        layout.addWidget(self.ok_button, 6, 0, 2, 8)
         self.setLayout(layout)
+    
+    def process_plan_meas(self):
+        1
 
 class WidgetGallery(QMainWindow):
     """
@@ -365,12 +372,9 @@ class WidgetGallery(QMainWindow):
         coordinates_ground = coordinates_ground.split("\n")
         coordinates_drone = coordinates_drone.split("\n")
         
-        print(coordinates_ground)
-        
         coordinates_ground = [i.split(",") for i in coordinates_ground]
         coordinates_drone = [i.split(",") for i in coordinates_drone]
         
-        print(coordinates_ground)
         
     def createMenu(self):
         """
