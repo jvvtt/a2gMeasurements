@@ -9,7 +9,7 @@ function App() {
     <MapProvider>
       <header className='header-app'>
         <h1>Wireless Channel Measurements Planner</h1>
-        <img src="assets/vtt-logo.png" alt="VTT logo" />
+        <img src="/vtt-logo.png" alt="VTT logo" />
       </header>
       <div className='body-content'>
       <section className='open-info'>

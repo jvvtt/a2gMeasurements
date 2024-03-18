@@ -1,6 +1,6 @@
 import {MapContainer, TileLayer} from 'react-leaflet';
 import './MapToInteract.css';
-import { osm_provider } from '../constants/osm-info';
+import { osm_provider } from '../constants/constants.js';
 import { DrawControl } from './DrawControl';
 
 export function MapToInteract() {
@@ -8,8 +8,8 @@ export function MapToInteract() {
     return (
             <div className='map-container'>
             <MapContainer 
-                    center={[51.505, -0.09]}
-                    zoom={15}
+                    center={[60.167120, 24.939156]}
+                    zoom={13}
                     style={{height:"100%", width:"100%"}}>
                 <DrawControl>
                 </DrawControl>

@@ -9,15 +9,66 @@
 }
 
 .speed-selector button {
-    background-color: rgb(255, 109, 25);
     color: #fff;
     font-size: 20px;
     font-family: system-ui;
-    padding: 0.1em 0.8em;
+    padding: 0.5em 0.8em;
     margin: 0.1em 0.1em;
     border-radius: 0.2em;
+    background-color: rgb(18, 80, 36);
 }
 
-ul {
+.gnd-speed-selector input[type="radio"], .drone-speed-selector input[type="radio"]{
+    width: 0;
+    opacity:0;
+}
+
+.gnd-speed-selector label, .drone-speed-selector label {
+    color: #fff;
+    font-size: 20px;
+    font-family: system-ui;
+    padding: 0.5em 0.8em;
+    margin: 0.1em 0.1em;
+    border-radius: 0.2em;
+    cursor: pointer;
+}
+
+.gnd-speed-selector label {
+    background-color: rgb(255, 109, 25);
+}
+
+.drone-speed-selector label {
+    background-color: rgb(18, 80, 36);
+}
+
+.marker-values {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap:2em;
+    font-size: 22px;
+}
+
+.marker-values strong{
+    margin: 0.1em 2em;
+    padding: 0.5em 2.2em;
+    font-family:system-ui;
+}
+
+.marker-labels {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 2em;
+    font-family:system-ui;
+    font-size: 22px;
+    background-color:rgb(255, 109, 25);
+    border-radius: 5px;
     margin-top: 2rem;
+}
+
+.marker-labels strong{
+    margin: 0.1em 2em;
+    padding: 0.5em 2.2em;
+    color: #fff;
 }
