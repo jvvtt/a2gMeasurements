@@ -9,6 +9,8 @@ export function InfoCanvas(){
     const time = timeToPrevious(markers, 'DRONE')
     
     return (
+        <section className="meas-info">
+        <h1>Useful info from measurements perspective</h1>
         <table className="table-info">
                 <thead>
                     <tr>
@@ -35,5 +37,6 @@ export function InfoCanvas(){
                 }
                 </tbody>
         </table>
+        </section>
     )
 }

@@ -9,7 +9,6 @@ const handleHoverMarker = (e, n_states, id) => {
     // Show a tooltip with the order at which the marker was created
     e.target.editing._marker.bindTooltip(`DRONE at: ${n_states+1}`)
 
-
     // Highlight the row of the table that corresponds to this marker
     const mymarkers = document.querySelectorAll(".table-info tbody tr")
 
@@ -49,7 +48,11 @@ export const reducer = (state, action) => {
                     dist_this_marker_and_previous = layer._map.distance(L.latLng(coords.lat, coords.lng), layer._latlng)
                 } 
                 
-                //console.log(L.GeometryUtil.destination(layer._latlng, 120, 50))
+                /*
+                const aa = L.GeometryUtil.destination(layer._latlng, -190, 50)
+                console.log(aa)
+                console.log(L.GeometryUtil.bearing(layer._latlng, aa))
+                */
 
                 const newState = [
                     ...state,

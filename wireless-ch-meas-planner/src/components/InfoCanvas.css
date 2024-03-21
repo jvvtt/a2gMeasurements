@@ -23,3 +23,8 @@ th {
 td {
     padding: 0.1rem 4rem;
 }
+
+.meas-info h1 {
+    font-size: 30px;
+    font-family: var(--fontfamily-table-elements);
+}
