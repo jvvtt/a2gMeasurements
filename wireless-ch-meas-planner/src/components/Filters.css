@@ -1,0 +1,18 @@
+.filters {
+    margin: 2.5rem 5.5rem;
+    display: flex;
+    grid-template-columns: repeat(2, 1fr);
+    align-items: center;
+    font-size: 130%;
+    font-family: system-ui;
+    gap: 2rem;
+}
+
+.filters div {
+    display: flex;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    justify-content: center;
+    object-fit: cover;
+    margin: 0 3em;
+}

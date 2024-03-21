@@ -11,20 +11,20 @@ function useMapReducer(){
         payload: map
     })
 
-    const onEditMap = map => dispatch({
+    const onEditMove = map => dispatch({
         type: DRAW_ACTION_TYPES.EDIT_MARKER,
         payload: map
     })
 
-    return { state, onCreationMap, onEditMap}
+    return { state, onCreationMap, onEditMove}
 }
 
 // eslint-disable-next-line react/prop-types
 export function MapProvider({children}){
-    const {state, onCreationMap, onEditMap} = useMapReducer()
+    const {state, onCreationMap, onEditMove} = useMapReducer()
     return(
         <MapContext.Provider 
-            value={{markers: state, onCreationMap, onEditMap }}>
+            value={{ markers: state, onCreationMap, onEditMove}}>
             {children}
         </MapContext.Provider>
     )

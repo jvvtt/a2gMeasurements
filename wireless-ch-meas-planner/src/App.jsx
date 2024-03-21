@@ -2,6 +2,8 @@ import './App.css'
 import { MapToInteract } from './components/MapToInteract'
 import { MapProvider } from './context/map'
 import { InfoCanvas } from './components/InfoCanvas'
+import { Filters } from './components/Filters.jsx'
+import { FiltersProvider } from './context/filters' 
 
 function App() {
 
@@ -16,7 +18,10 @@ function App() {
         <h2>Place the coordinates in the order the transceiver will follow</h2>
       </section>
       <MapToInteract></MapToInteract>
-      <InfoCanvas></InfoCanvas>
+      <FiltersProvider>
+        <Filters></Filters>
+        <InfoCanvas></InfoCanvas>
+      </FiltersProvider>
       </div>
     </MapProvider>
   )

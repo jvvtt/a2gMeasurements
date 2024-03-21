@@ -4,24 +4,27 @@ import { useContext } from 'react';
 import { MapContext } from '../context/map';
 
 export function DrawControl () {
-    const geo_map = useMap()
+    const geo_map = useMap()   
 
-    const {onCreationMap, onEditMap} = useContext(MapContext);
+    const {onCreationMap, onEditMove} = useContext(MapContext);
 
     const handleCreated = (e) => {
         onCreationMap({layerType: e.layerType, layer: e.layer});
     }
 
-    const handleOnEditStop = () => {
-        onEditMap(geo_map);
+    const handleEditMove = () => {
+        onEditMove(geo_map);
     }
-
+    
     return (
         <FeatureGroup>
             <EditControl
+                        draw={{rectangle:false, 
+                               polyline: false,
+                               circle:false}}  
                         position='topright'
                         onCreated={(event)=>handleCreated(event)}
-                        onEditStop={(e)=>handleOnEditStop(e)}>
+                        onEditMove={(e)=>handleEditMove(e)}>
             </EditControl>
         </FeatureGroup>
     )

@@ -1,4 +1,13 @@
-# Planning Measurements web app
+# Wireless Channel Measuremnets Planner
+
+This tool provides the user a way of placing candidate coordinates for the air node through the use of markers in a map.
+
+The order in which the markers are placed in the map is assumed to be the order in which the air node will arrive at those marker locations.
+
+
+
+
+## Note on the Wireless Channel Measurements Planner
 
 Thye purpose of this web app is to place the points where both the receiver and the transmitter will be placed on a map.
 

@@ -2,6 +2,7 @@ import {MapContainer, TileLayer} from 'react-leaflet';
 import './MapToInteract.css';
 import { osm_provider } from '../constants/constants.js';
 import { DrawControl } from './DrawControl';
+import { DrawMapObjects } from './DrawMapObjects.jsx';
 
 export function MapToInteract() {
  
@@ -16,6 +17,7 @@ export function MapToInteract() {
                 <TileLayer
                     attribution={osm_provider.attribution}
                     url={osm_provider.url}/>
+                <DrawMapObjects></DrawMapObjects>
             </MapContainer>
             </div>
         )

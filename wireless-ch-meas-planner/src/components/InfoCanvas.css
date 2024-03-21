@@ -1,74 +1,25 @@
-.speed-selector {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5em;
-    justify-content: center;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    width: 100%;
+
+.table-info {
+    margin: 0 auto;
+    font-family: var(--fontfamily-table-elements);
+    box-shadow: 0px 0px 0.2rem 0px #555;
 }
 
-.speed-selector button {
-    color: #fff;
-    font-size: 20px;
-    font-family: system-ui;
-    padding: 0.5em 0.8em;
-    margin: 0.1em 0.1em;
-    border-radius: 0.2em;
-    background-color: rgb(18, 80, 36);
-}
-
-.gnd-speed-selector input[type="radio"], .drone-speed-selector input[type="radio"]{
-    width: 0;
-    opacity:0;
-}
-
-.gnd-speed-selector label, .drone-speed-selector label {
-    color: #fff;
-    font-size: 20px;
-    font-family: system-ui;
-    padding: 0.5em 0.8em;
-    margin: 0.1em 0.1em;
-    border-radius: 0.2em;
-    cursor: pointer;
-}
-
-.gnd-speed-selector label {
+.table-info thead {    
     background-color: rgb(255, 109, 25);
-}
-
-.drone-speed-selector label {
-    background-color: rgb(18, 80, 36);
-}
-
-.marker-values {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    gap:2em;
-    font-size: 22px;
-}
-
-.marker-values strong{
-    margin: 0.1em 2em;
-    padding: 0.5em 2.2em;
-    font-family:system-ui;
-}
-
-.marker-labels {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    gap: 2em;
-    font-family:system-ui;
-    font-size: 22px;
-    background-color:rgb(255, 109, 25);
-    border-radius: 5px;
-    margin-top: 2rem;
-}
-
-.marker-labels strong{
-    margin: 0.1em 2em;
-    padding: 0.5em 2.2em;
     color: #fff;
+    font-size: var(--fontsize-table-header);
+}
+
+th, td{
+    text-align: center;
+    font-size: var(--fontsize-table-text);
+}
+
+th {
+    padding: 1rem 4rem;
+}
+
+td {
+    padding: 0.1rem 4rem;
 }
