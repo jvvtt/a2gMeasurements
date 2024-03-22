@@ -1,0 +1,26 @@
+.table-info {
+    margin: 0 auto;
+    font-family: var(--fontfamily-table-elements);
+    box-shadow: 0px 0px 0.2rem 0px #555;
+}
+
+.table-info thead {    
+    background-color: rgb(255, 109, 25);
+    color: #fff;
+    font-size: var(--fontsize-table-header);
+}
+
+th, td{
+    text-align: center;
+    font-size: var(--fontsize-table-text);
+}
+
+th {
+    margin: var(--margin-table-text);
+    padding: var(--padding-table-text);
+}
+
+td {
+    margin: var(--margin-table-text);
+    padding: var(--padding-table-text)
+}

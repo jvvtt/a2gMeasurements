@@ -1,14 +1,15 @@
 import { createContext, useReducer } from "react";
-import { initialState, DRAW_ACTION_TYPES, reducer } from "../reducers/map.js";
+import { initialState, reducer } from "../reducers/dronemarkers.js";
+import { DRAW_ACTION_TYPES } from "../logic/utils.js"
 
-export const MapContext = createContext()
+export const DroneMarkersContext = createContext()
 
 function useMapReducer(){
     const [state, dispatch] = useReducer(reducer, initialState)
 
-    const onCreationMap = map => dispatch({
+    const onCreationMap = layer => dispatch({
         type: DRAW_ACTION_TYPES.ADD_MARKER,
-        payload: map
+        payload: layer
     })
 
     const onEditMove = map => dispatch({
@@ -20,12 +21,12 @@ function useMapReducer(){
 }
 
 // eslint-disable-next-line react/prop-types
-export function MapProvider({children}){
+export function DroneMarkersProvider({children}){
     const {state, onCreationMap, onEditMove} = useMapReducer()
     return(
-        <MapContext.Provider 
+        <DroneMarkersContext.Provider 
             value={{ markers: state, onCreationMap, onEditMove}}>
             {children}
-        </MapContext.Provider>
+        </DroneMarkersContext.Provider>
     )
 }

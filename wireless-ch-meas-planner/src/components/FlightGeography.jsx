@@ -1,5 +1,5 @@
 import { useContext } from "react"
-import { MapContext } from "../context/map"
+import { DroneMarkersContext } from "../context/dronemarkers.jsx"
 import GeometryUtil from "leaflet-geometryutil"
 import { Polygon } from "react-leaflet"
 import { flight_geography_opts } from "../constants/constants.js"
@@ -55,7 +55,7 @@ const computeRectangle = (d, thisCoords, nextCoords) => {
 }
 
 export function FlightGeography () {
-    const { markers } = useContext(MapContext)
+    const { markers } = useContext(DroneMarkersContext)
 
     const distBoundFlightGeography = DroneRegulationDefinitions.Scv
 

@@ -4,8 +4,8 @@
 
 
 :root {
-    --margin-table-text:0.1em 1.5em;
-    --padding-table-text: 0.5em 2.2em;
+    --margin-table-text:0.1rem 0.9rem;
+    --padding-table-text: 0.5rem 0.9rem;
     --fontsize-table-header: 2rem;
     --fontsize-table-text: 1.5rem;
     --gap-table-elements: 1em;

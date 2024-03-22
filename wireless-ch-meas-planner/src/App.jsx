@@ -1,14 +1,16 @@
 import './App.css'
 import { MapToInteract } from './components/MapToInteract'
-import { MapProvider } from './context/map'
+import { DroneMarkersProvider } from './context/dronemarkers.jsx'
 import { InfoCanvas } from './components/InfoCanvas'
 import { Filters } from './components/Filters.jsx'
 import { FiltersProvider } from './context/filters' 
+import { GroundMarkersProvider } from './context/groundmarkers.jsx'
 
 function App() {
 
   return (
-    <MapProvider>
+    <GroundMarkersProvider>
+    <DroneMarkersProvider>
       <header className='header-app'>
         <h1>Wireless Channel Measurements Planner</h1>
         <img src="/vtt-logo.png" alt="VTT logo" />
@@ -23,7 +25,8 @@ function App() {
         <InfoCanvas></InfoCanvas>
       </FiltersProvider>
       </div>
-    </MapProvider>
+    </DroneMarkersProvider>
+    </GroundMarkersProvider>
   )
 }
 

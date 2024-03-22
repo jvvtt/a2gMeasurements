@@ -1,0 +1,17 @@
+.legends-info {
+    width: 30%;
+    margin-top: 1.5rem;
+    margin-left: 2.5rem;
+    text-align: center;
+}
+
+.legends-info-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 2rem;
+}
+
+.img-info-item {
+    background-color: #555;
+}

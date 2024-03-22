@@ -1,80 +1,39 @@
-//import GeometryUtil from "leaflet-geometryutil"
-
-export const DRAW_ACTION_TYPES  = {
-    ADD_MARKER: 'ADD_MARKER',
-    EDIT_MARKER: 'EDIT_MARKER',
-}
-
-const handleHoverMarker = (e, n_states, id) => {
-    // Show a tooltip with the order at which the marker was created
-    e.target.editing._marker.bindTooltip(`DRONE at: ${n_states+1}`)
-
-    // Highlight the row of the table that corresponds to this marker
-    const mymarkers = document.querySelectorAll(".table-info tbody tr")
-
-    for (const [, rows] of Object.entries(mymarkers)){
-        if (rows.children[0].innerText === `${id}` ){
-            rows.style.backgroundColor = 'rgb(255, 109, 25)';
-            rows.style.color = '#fff';
-        }
-        else {
-            rows.style.backgroundColor = "";
-            rows.style.color = '#000'
-        }
-    }
-}
-
-const handleHoverCircleMarker = (e) =>{
-    e.target.editing._shape.bindTooltip('GND at: 1')
-}
+import { handleHoverMarker, DRAW_ACTION_TYPES } from "../logic/utils.js"
 
 export const initialState = []
+
+const handleHoverDroneMarker = (e, n_states, id) => {
+    handleHoverMarker(e, n_states, id, 'table-drone')
+}
+
 export const reducer = (state, action) => {
     const {type: actionType, payload: this_map} = action
     
     switch (actionType) {
-        case DRAW_ACTION_TYPES.ADD_MARKER: { 
-            const { layerType, layer } = this_map
-            
-            if (layerType === 'marker') {
-                // Defining interactivity for when the user hovers over the marker
-                const n_states = state.length
-                const id = layer._leaflet_id
-                layer.editing._marker.on('mouseover', (e)=> handleHoverMarker(e, n_states, id)) 
+        case DRAW_ACTION_TYPES.ADD_MARKER: {                    
+            const { layer } = this_map
+            const id = layer._leaflet_id
+            const n_states = state.length
+                    
+            // Defining interactivity for when the user hovers over the marker
+            layer.editing._marker.on('mouseover', (e)=> handleHoverDroneMarker(e, n_states, id)) 
                 
-                let dist_this_marker_and_previous = 0
-                if (n_states > 0) {
-                    const coords = state[state.length-1]
-                    dist_this_marker_and_previous = layer._map.distance(L.latLng(coords.lat, coords.lng), layer._latlng)
-                } 
+            let dist_this_marker_and_previous = 0
+            if (n_states > 0) {
+                const coords = state[state.length-1]
+                dist_this_marker_and_previous = layer._map.distance(L.latLng(coords.lat, coords.lng), layer._latlng)
+            } 
                 
-                /*
-                const aa = L.GeometryUtil.destination(layer._latlng, -190, 50)
-                console.log(aa)
-                console.log(L.GeometryUtil.bearing(layer._latlng, aa))
-                */
-
-                const newState = [
-                    ...state,
-                    {
-                        lat: layer._latlng.lat,
-                        lng: layer._latlng.lng,
-                        id: id,
-                        distToPrevious: dist_this_marker_and_previous,
-                    }
-                ]
-                return newState
-            }
-
-            else if (layerType === 'polygon') {
-                1
-            }
-
-            else if (layerType === 'circlemarker') {
-                layer.editing._shape.on('mouseover', (e)=> handleHoverCircleMarker(e)) 
-            }
-
-            return state            
+            const newState = [
+                ...state,
+                {
+                    lat: layer._latlng.lat,
+                    lng: layer._latlng.lng,
+                    id: id,
+                    distToPrevious: dist_this_marker_and_previous,
+                }
+            ]
+            return newState
         }
 
         case DRAW_ACTION_TYPES.EDIT_MARKER: {
