@@ -5,6 +5,7 @@ import { InfoCanvas } from './components/InfoCanvas'
 import { Filters } from './components/Filters.jsx'
 import { FiltersProvider } from './context/filters' 
 import { GroundMarkersProvider } from './context/groundmarkers.jsx'
+import { PDRSZonesProvider } from './context/pdrszones.jsx'
 
 function App() {
 
@@ -16,14 +17,16 @@ function App() {
         <img src="/vtt-logo.png" alt="VTT logo" />
       </header>
       <div className='body-content'>
-      <section className='open-info'>
-        <h2>Place the coordinates in the order the transceiver will follow</h2>
-      </section>
-      <MapToInteract></MapToInteract>
-      <FiltersProvider>
-        <Filters></Filters>
-        <InfoCanvas></InfoCanvas>
-      </FiltersProvider>
+        <section className='open-info'>
+          <h2>Place the coordinates in the order the transceiver will follow</h2>
+        </section>
+        <PDRSZonesProvider>
+          <MapToInteract></MapToInteract>
+          <FiltersProvider>
+            <Filters></Filters>
+            <InfoCanvas></InfoCanvas>
+          </FiltersProvider>
+        </PDRSZonesProvider>
       </div>
     </DroneMarkersProvider>
     </GroundMarkersProvider>

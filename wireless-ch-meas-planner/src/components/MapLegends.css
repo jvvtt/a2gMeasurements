@@ -1,6 +1,6 @@
 .legends-info {
     width: 30%;
-    margin-top: 1.5rem;
+    margin-top: 5rem;
     margin-left: 2.5rem;
     text-align: center;
 }
@@ -9,9 +9,36 @@
     display: flex;
     flex-direction: row;
     align-items: center;
+    justify-content: right;
     gap: 2rem;
+    margin-right: 3.5rem;
 }
 
-.img-info-item {
-    background-color: #555;
+.img-info-item{
+    justify-content: right;
+}
+
+
+#fg-item {
+    background: rgb(80, 80, 80);
+}
+
+#cv-item {
+    background-color: rgb(251, 255, 0);
+}
+
+#grb-item {
+    background-color: rgb(255, 16, 16);
+}
+
+#dl-item {
+    background-color: chartreuse;
+}
+
+#gl-item {
+    background-color: chocolate;
+}
+
+#dr-item {
+    background-color: bisque;
 }

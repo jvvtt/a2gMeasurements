@@ -7,7 +7,7 @@
     --margin-table-text:0.1rem 0.9rem;
     --padding-table-text: 0.5rem 0.9rem;
     --fontsize-table-header: 2rem;
-    --fontsize-table-text: 1.5rem;
+    --fontsize-table-text: 1.2rem;
     --gap-table-elements: 1em;
-    --fontfamily-table-elements: system-ui;
+    --fontfamily-table-elements: Arial, Helvetica, sans-serif;;
 }

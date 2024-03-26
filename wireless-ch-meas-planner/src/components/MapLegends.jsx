@@ -5,27 +5,27 @@ export function MapLegends () {
             <section className='legends-info'>
                 <div className='legends-info-item'>
                     <strong>Flight Geography</strong>
-                    <div className='img-info-item'>hhhh</div>
+                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='fg-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
                 </div>
                 <div className='legends-info-item'>
                     <strong>Contingency Volume</strong>
-                    <div className='img-info-item'>hhhh</div>
+                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='cv-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
                 </div>
                 <div className='legends-info-item'>
                     <strong>Ground Risk Buffer</strong>
-                    <div className='img-info-item'>hhhh</div>
+                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='grb-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
                 </div>
                 <div className='legends-info-item'>
                     <strong>Drone location</strong>
-                    <div className='img-info-item'>hhhh</div>
+                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='dl-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
                 </div>
                 <div className='legends-info-item'>
                     <strong>Ground location</strong>
-                    <div className='img-info-item'>hhhh</div>
+                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='gl-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
                 </div>
                 <div className='legends-info-item'>
                     <strong>Drone route</strong>
-                    <div className='img-info-item'>hhhh</div>
+                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='dr-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
                 </div>
         </section>
     )

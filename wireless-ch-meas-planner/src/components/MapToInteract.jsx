@@ -2,8 +2,8 @@ import {MapContainer, TileLayer} from 'react-leaflet';
 import './MapToInteract.css';
 import { osm_provider } from '../constants/constants.js';
 import { DrawControl } from './DrawControl';
-import { DrawDronePath } from './DrawMapObjs.jsx';
-import { FlightGeography } from './FlightGeography.jsx';
+import { DrawDronePath, DrawDroneGimbalYaw } from './DrawMapObjs.jsx';
+import { FlightGeography2 } from './PDRSZones.jsx';
 import { MapLegends } from './MapLegends.jsx';
 
 export function MapToInteract() {
@@ -19,7 +19,8 @@ export function MapToInteract() {
                     attribution={osm_provider.attribution}
                     url={osm_provider.url}/>
                 <DrawDronePath></DrawDronePath>
-                <FlightGeography></FlightGeography>
+                <DrawDroneGimbalYaw></DrawDroneGimbalYaw>
+                <FlightGeography2></FlightGeography2>
             </MapContainer>
             <MapLegends></MapLegends>
             </div>
