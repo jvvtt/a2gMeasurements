@@ -17,7 +17,7 @@ export function MapLegends () {
                 </div>
                 <div className='legends-info-item'>
                     <strong>Drone location</strong>
-                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='dl-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
+                    <img className='img-info-item' id='dl-item' alt='DL' src='/drone-marker.png' />
                 </div>
                 <div className='legends-info-item'>
                     <strong>Ground location</strong>
@@ -26,6 +26,10 @@ export function MapLegends () {
                 <div className='legends-info-item'>
                     <strong>Drone route</strong>
                     <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='dr-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
+                </div>
+                <div className='legends-info-item'>
+                    <strong>Drone gimbal yaw</strong>
+                    <svg  xmlns="http://www.w3.org/2000/svg" className='img-info-item' id='dgyaw-item' viewBox="0 0 1 1" width='1rem' height='1rem'></svg>
                 </div>
         </section>
     )

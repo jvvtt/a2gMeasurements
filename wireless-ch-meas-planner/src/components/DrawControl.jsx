@@ -19,10 +19,12 @@ export function DrawControl () {
             onCreationMap({layer: e.layer});
         }
         else if (e.layerType == 'circlemarker') {
+            // Set the color of the circle marker
+            e.layer.editing._shape.setStyle({color: 'chocolate'})
             onCreationGroundMarker({layer: e.layer})
         }        
         else if (e.layerType == 'polygon'){
-            // Flight Geography
+            /* Flight Geography */
             const fg = []
             e.layer._latlngs[0].map(entry=> fg.push([entry.lat, entry.lng]))
             setFgVertex(fg)
@@ -33,14 +35,14 @@ export function DrawControl () {
             const scalingFactorForContVol = 1 + DroneRegulationDefinitions.Scv/L.GeometryUtil.distance(e.layer._map, L.latLng(fg[0][0], fg[0][1]),
                                                                                              L.latLng(fg[1][0], fg[1][1]))
 
-            // Contingency Volume
+            /* Contingency Volume */
             let cv = transformScale(polygon([fg]), scalingFactorForContVol)
             cv = cv.geometry.coordinates[0]
 
             const scalingFactorForGRB = 1 + DroneRegulationDefinitions.Sgrb/L.GeometryUtil.distance(e.layer._map, L.latLng(cv[0][0], cv[0][1]),
                                                                                              L.latLng(cv[1][0], cv[1][1]))
             
-                                                                                             // Ground Risk Buffer
+            /* Ground Risk Buffer */
             let grb = transformScale(polygon([cv]), scalingFactorForGRB)
             grb = grb.geometry.coordinates[0]
                                                                                              

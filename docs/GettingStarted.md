@@ -1,5 +1,13 @@
 # Installations
-r
+
+## Requirements Python
+
+## Requirements Planning Tool
+
+1. 
+```sh
+npm install --save fs-extra
+```
 
 # Git
 In the ``.gitignore`` file the ``data`` folder is added to avoid uploading the measured files, since there can be synch troubles due to their size.

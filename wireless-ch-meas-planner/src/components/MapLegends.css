@@ -20,7 +20,7 @@
 
 
 #fg-item {
-    background: rgb(80, 80, 80);
+    background: rgb(45, 135, 236);
 }
 
 #cv-item {
@@ -28,11 +28,12 @@
 }
 
 #grb-item {
-    background-color: rgb(255, 16, 16);
+    background-color: rgb(168, 51, 204);
 }
 
 #dl-item {
-    background-color: chartreuse;
+    width: 1rem;
+    height: 1rem;
 }
 
 #gl-item {
@@ -40,5 +41,9 @@
 }
 
 #dr-item {
-    background-color: bisque;
+    background-color: lime;
+}
+
+#dgyaw-item {
+    background-color: red;
 }

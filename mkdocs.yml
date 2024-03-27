@@ -90,6 +90,9 @@ nav:
         - Parameters of GUI: GUIparameters.md
     - Troubleshooting: Troubleshooting.md
     - For developers: InfoDevelopers.md
+    - Measurements Planning: 
+        - Planning tool: PlanningMeasurements.md
+        - Flight plan: FlightPlan.md
     - API reference:
         - DJI Ronin RS2 gimbal: GimbalRS2.md
         - Septentrio GPS: GpsSignaling.md
