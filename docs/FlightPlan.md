@@ -24,7 +24,7 @@ Before proceding with the measurement information, enter the start time and date
 * A **car operator** is the person resposible for driving the car. 
 
 ### Node locations
-The following table displays the coordinates for both nodes in the order by which the node will move:
+The following table displays the coordinates for both nodes in the order by which each node will move (i.e. the drone will move first to the coordinates having the `Order ID` 1, then it will move to the coordinates having the `Order ID` 2, and so on).
 
 <section style="display:flex;justify-content:center;align-items:center;gap:3rem">
     <table id="drone-route" style="text-align:center">
@@ -44,6 +44,23 @@ The following table displays the coordinates for both nodes in the order by whic
       </tr>
     </thead>
     <tbody id="ground-route-body">
+      <!-- Table body will be populated dynamically -->
+    </tbody>
+  </table>
+</section>
+
+### Distances
+
+The following table displays the distances:
+
+<section style="display:flex;justify-content:center;align-items:center">
+<table id="dists-info">
+    <thead>
+      <tr id="dists-headers">
+        <!-- Header cells will be added dynamically -->
+      </tr>
+    </thead>
+    <tbody id="dists-body">
       <!-- Table body will be populated dynamically -->
     </tbody>
   </table>

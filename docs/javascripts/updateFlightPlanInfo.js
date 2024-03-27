@@ -107,7 +107,7 @@ const bodyDroneRoute = "drone-route-body"
 // Call the function to update table entries
 updateTableEntries(drone_locations, columnHeadersDroneRoute, tableDroneRoute, headerDroneRoute, bodyDroneRoute);
 
-// Sample data for updating the scheduler table
+//
 const ground_locations = [
     { Order_ID: 1, Latitude: 60.2554, Longitude: 2.4744},
     { Order_ID: 2, Latitude: 60.33448, Longitude: 2.844},
@@ -121,3 +121,20 @@ const bodyGndLocations = "ground-route-body"
 
 // Call the function to update table entries
 updateTableEntries(ground_locations, columnHeadersGroundRoute, tableGndLocations, headerGndLocations, bodyGndLocations);
+
+//
+const relevant_distances = [
+    { DroneLocID: 1, MinDistRoad: 32, ClosestRouteLatitude: 60.2554, ClosestRouteLongitude: 2.4744},
+    { DroneLocID: 1, MinDistRoad: 32, ClosestRouteLatitude: 60.2554, ClosestRouteLongitude: 2.4744},
+    { DroneLocID: 1, MinDistRoad: 32, ClosestRouteLatitude: 60.2554, ClosestRouteLongitude: 2.4744},
+    { DroneLocID: 1, MinDistRoad: 32, ClosestRouteLatitude: 60.2554, ClosestRouteLongitude: 2.4744},
+    // Add more data as needed
+];
+
+const columnHeadersRelevantDists = ['Drone location ID', 'Min. distance to road', 'Road lat point', 'Road lon point']
+const tableRelevantDists = "dists-info"
+const headerRelevantDists = "dists-headers"
+const bodyRelevantDists = "dists-body"
+
+// Call the function to update table entries
+updateTableEntries(relevant_distances, columnHeadersRelevantDists, tableRelevantDists, headerRelevantDists, bodyRelevantDists);
