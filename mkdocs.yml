@@ -1,5 +1,5 @@
 site_name: A2G Measurements Software
-theme: 
+theme:
   icon:
     admonition:
       example: simple/react
@@ -22,7 +22,7 @@ theme:
     - content.code.annotate
   language: en
   palette:
-  # Palette toggle for light mode
+    # Palette toggle for light mode
     - scheme: default
       primary: indigo
       toggle:
@@ -79,28 +79,29 @@ extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js
   - https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js
 nav:
-    - Home: index.md
-    - Installation: GettingStarted.md
-    - Measurement system: 
-        - Devices and connections: MeasurementSystem.md
-        - Communication between nodes: CommunicationProtocol.md
-    - Guide for using the GUI: 
-        - Operation of GUI: GuideForGUI.md
-        - Panels in GUI: PanelsGUI.md
-        - Parameters of GUI: GUIparameters.md
-    - Troubleshooting: Troubleshooting.md
-    - For developers: InfoDevelopers.md
-    - Measurements Planning: 
-        - Planning tool: PlanningMeasurements.md
-        - Flight plan: FlightPlan.md
-    - API reference:
-        - DJI Ronin RS2 gimbal: GimbalRS2.md
-        - Septentrio GPS: GpsSignaling.md
-        - Anritsu Spectrum Analyzer: AnritsuSA.md
-        - Nodes communication: NodesCommunication.md
-        - Gremsy H16 gimbal: GimbalGremsyH16.md
-        - SBUS encoder: SBUSEncoder.md
-        - RFSoC communication: RFSoCHandler.md
-        - Graphical User Interface - Setup window: GUIsetupWin.md
-        - Graphical User Interface - Main window: GUIwidgetGallery.md
-        - Utility functions: Utils.md
+  - Home: index.md
+  - Installation: GettingStarted.md
+  - Measurement system:
+      - Devices and connections: MeasurementSystem.md
+      - Communication between nodes: CommunicationProtocol.md
+  - Guide for using the GUI:
+      - Operation of GUI: GuideForGUI.md
+      - Panels in GUI: PanelsGUI.md
+      - Parameters of GUI: GUIparameters.md
+  - Troubleshooting: Troubleshooting.md
+  - For developers: InfoDevelopers.md
+  - Measurements Planning:
+      - Planning tool: PlanningMeasurements.md
+      - Flight plan: FlightPlan.md
+      - Measurements methodology: MeasMethodology.md
+  - API reference:
+      - DJI Ronin RS2 gimbal: GimbalRS2.md
+      - Septentrio GPS: GpsSignaling.md
+      - Anritsu Spectrum Analyzer: AnritsuSA.md
+      - Nodes communication: NodesCommunication.md
+      - Gremsy H16 gimbal: GimbalGremsyH16.md
+      - SBUS encoder: SBUSEncoder.md
+      - RFSoC communication: RFSoCHandler.md
+      - Graphical User Interface - Setup window: GUIsetupWin.md
+      - Graphical User Interface - Main window: GUIwidgetGallery.md
+      - Utility functions: Utils.md
