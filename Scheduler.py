@@ -1,5 +1,6 @@
 from datetime import datetime
 from a2gmeasurements import RFSoCRemoteControlFromHost, GimbalRS2
+import questionary
 
 start_meas_date = ""
 start_meas_time = ""
@@ -10,15 +11,21 @@ conservative_speed_drone_gimbal = 30; # in deg/s
 speed_drone_gimbal = conservative_speed_drone_gimbal; # let's assume a conservative speed for the gimbal
 speed_gnd_gimbal = speed_drone_gimbal; # both nodes use the same gimbal
 
-rfsoc = RFSoCRemoteControlFromHost()
-gimbal = GimbalRS2()
+drone_node_rfsoc_static_ip_address='10.1.1.40'
+gnd_node_rfsoc_static_ip_address='10.1.1.40'
 
 gnd_msg_data = {"carrier_freq": 59.5e9,
                 "rx_gain_ctrl_bb1": 2,
                 "rx_gain_ctrl_bb2": 1,
                 "rx_gain_ctrl_bb3":1,
                 "rx_gain_ctrl_bfrf":1}
+
 keep_scheduler_alive = True
+
+rfsoc = RFSoCRemoteControlFromHost()
+gimbal = GimbalRS2()
+
+gimbal.start_thread_gimbal()
 
 # Software operator actions
 SOFTWARE_OPERATOR_ACTIONS = {
@@ -47,13 +54,18 @@ SOFTWARE_OPERATOR_ACTIONS = {
       "CALLBACK": lambda kwargs: gimbal.setPosControl(**kwargs)}}
 
 # Each specific schedule is loaded from the file produced by the Scheduler planner at the page "https://jvvtt.github.io/wireless-meas-planner/"
-# If no file is available to load, a preset file will be loaded.
-# Software operator schedule example for ground node
-# EACH ACTION SHOULD DO A SPECIFIC PROCEDURE (i.e):
-# The "STOP_RF" action will stop the action initiated by the "START_RF" action. 
-# Until the "START_TIME" of "STOP_RF" action hasn't come yet, the measurement will continue.
-software_operator_schedule = [{"ACTION": "MOVE_GND_GIMBAL", "START_TIME": [22,54,47], "CALLBACK_PARAMS": {"yaw": 457, "roll": 0, "pitch": -124 }},
-                              {"ACTION": "START_RF", "START_TIME":[22,55,1], "CALLBACK_PARAMS": {"msg_data":gnd_msg_data}}]
+
+# Define the start time of experiment
+print(f"Time now is: {datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}")
+Start_time_of_all_experiment = questionary.select("Enter hour:", choices=["7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"]).ask()
+
+
+software_operator_schedule = [{"ACTION": "MOVE_GND_GIMBAL",
+                               "START_TIME": [22,54,47], 
+                               "CALLBACK_PARAMS": {"yaw": 457, "roll": 0, "pitch": -124 }},
+                              {"ACTION": "START_RF", 
+                               "START_TIME":[22,55,1], 
+                               "CALLBACK_PARAMS": {"msg_data":gnd_msg_data}}]
 
 actions_done = [False]*len(software_operator_schedule)
 
@@ -81,3 +93,6 @@ while (keep_scheduler_alive):
     # Finish scheduler loop if all actions where done
     if (all(actions_done)):
         keep_scheduler_alive = False
+
+gimbal.stop_thread_gimbal()
+rfsoc.finish_measurement()
