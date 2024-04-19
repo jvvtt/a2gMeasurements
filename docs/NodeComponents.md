@@ -22,7 +22,7 @@ The case containing all of the devices in the drone node is shown in the followi
   ![Image title](assets/3d_printed_case_2.jpg){ width="400" }
   <figcaption>Front view of the 3d printed case</figcaption>
 </figure>
-<div>
+</div>
 
 In what follows we list photos of each device in use in the node.
 
