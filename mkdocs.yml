@@ -82,7 +82,8 @@ nav:
   - Home: index.md
   - Installation: GettingStarted.md
   - Measurement system:
-      - Devices and connections: MeasurementSystem.md
+      - Description & connections: MeasurementSystem.md
+      - Node components: NodeComponents.md
       - Communication between nodes: CommunicationProtocol.md
   - Guide for using the GUI:
       - Operation of GUI: GuideForGUI.md
