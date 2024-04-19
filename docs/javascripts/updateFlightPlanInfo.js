@@ -1,4 +1,4 @@
-fetch('../assets/data.json')
+fetch('https://jvvtt.github.io/wireless-meas-planner/mydataex.json')
     .then((response) => response.json())
     .then((json) => console.log(json));
 
