@@ -3539,10 +3539,10 @@ class RFSoCRemoteControlFromHost():
         self.beam_angles = [0]*64
         
         # Get the beamforming angles
-        with open(beamforming_angles_file, 'r') as f:
-            reader = csv.reader(f, delimiter=",")
-            for cnt, row in enumerate(reader):
-                self.beam_angles[cnt] = float(row[1])
+        #with open(beamforming_angles_file, 'r') as f:
+        #    reader = csv.reader(f, delimiter=",")
+        #    for cnt, row in enumerate(reader):
+        #        self.beam_angles[cnt] = float(row[1])
                 
         self.radio_control = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
         self.radio_control.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

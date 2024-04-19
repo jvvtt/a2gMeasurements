@@ -1,0 +1,27 @@
+Drone flight behaviour
+----------
+
+
+PAYLOAD: NYU EMPTY DRONE - no payload at all
+TOTAL DISTANCE OF FLIGHT: 656m
+NUMBER OF POINTS: 6
+BATTERY LEVEL AT START OF TEST: 95 %
+TOTAL TIME ACCORDING TO LITCHIE APP: 13 min
+BATTERY LEVEL AT END OF TEST: 69 %
+------------
+PAYLOAD: Wireless Ch Sounder complete set
+TOTAL DISTANCE OF FLIGHT: 661m
+NUMBER OF POINTS: 6
+BATTERY LEVEL AT START OF TEST: 100 %
+TOTAL TIME ACCORDING TO LITCHIE APP: 13 min
+BATTERY LEVEL AT END OF TEST: 40 %
+------------
+
+4% battery drop per 100 m at avg. 2m/s when drone fully loaded 
+with all system components.
+
+
+Power consumption Drone devices
+-------------
+
+WiFi Adapter: 4.63V, 
