@@ -11,20 +11,15 @@ The node represented by the block diagram in [Measurement system](MeasurementSys
 
 ### Case
 
-The case containing all of the devices in the drone node is shown in the following picture:
-
-<div style="display:flex;justify-content: space-between">
 <figure markdown="span">
   ![Image title](assets/3d_printed_case_1.jpg){ width="400" }
   <figcaption>Top view of the case with its 3 slots to place the cards with the devices attached to them</figcaption>
 </figure>
+
 <figure markdown="span">
   ![Image title](assets/3d_printed_case_2.jpg){ width="400" }
   <figcaption>Front view of the 3d printed case</figcaption>
 </figure>
-</div>
-
-In what follows we list photos of each device in use in the node.
 
 ### Voltage regulator
 
@@ -197,21 +192,21 @@ Click on each row (under the column "Component") to see a picture of the compone
 | [PCAN device + cable](NodeComponents.md#pcan-device) | 106 |
 | [PDU cable](NodeComponents.md#pdu-cable) | 12 |
 | [USB Hub](NodeComponents.md#usb-hub) | 58 |
-| [Manifold](NodeComponents.md#host-computer) | 200 |
+| [Host computer](NodeComponents.md#host-computer) | 200 |
 | [WiFi adapter](NodeComponents.md#wifi-adapter) | 28 |
 | [ADC board and cables](NodeComponents.md#adc-wideband-balun-board-and-cables) | 130 |
 | [ADC to TI board RF cable](NodeComponents.md#adc-to-board-rf-cable) | 22 |
-| [TI board to antenna frontend ](NodeComponents.md#board-to-antenna-frontend-rf-cable) | 8 |
+| [TI board to antenna frontend RF cable](NodeComponents.md#board-to-antenna-frontend-rf-cable) | 8 |
 | [TI board](NodeComponents.md#adc-wideband-balun-board) | 12 |
 | [Slot card with RFSoC](NodeComponents.md#slot-card-with-rfsoc) | 310 |
 | [Antenna frontend](NodeComponents.md#antenna-frontend) | 246 |
 | [Gimbal payload adapter](NodeComponents.md#gimbal-payload-adapter) | 120 |
 | [3D printed case](NodeComponents.md#case) | 402 |
-| [Gimbal](NodeComponents#gimbal) | 1346 |
-| [Red metallic ring adapter](NodeComponents#adapter-1) | 22 |
-| [Black Tilta adapter](NodeComponents#adapter-2) | 394 |
-| [6S battery cable](NodeComponents#6s-lipo-battery-cable) | 46 |
-| [4S battery cable](NodeComponents#4s-lipo-battery-cable) | 54 |
+| [Gimbal](NodeComponents.md#gimbal) | 1346 |
+| [Red metallic ring adapter](NodeComponents.md#adapter-1) | 22 |
+| [Black Tilta adapter](NodeComponents.md#adapter-2) | 394 |
+| [6S battery cable](NodeComponents.md#6s-lipo-battery-cable) | 46 |
+| [4S battery cable](NodeComponents.md#4s-lipo-battery-cable) | 54 |
 | Drone tag | 18 |
 | 6S LiPo battery  | 776 |
 | 4S LiPo battery  | 466 |
