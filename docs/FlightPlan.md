@@ -13,17 +13,18 @@ Before proceding with the measurement information, enter the start time and date
 
 ### Definitions used in this report
 
-* A **measurement** comprises the channel sounding process *from* the moment the receiver RFSoC is listening to incoming signals *until* it stops listening.
+- A **measurement** comprises the channel sounding process _from_ the moment the receiver RFSoC is listening to incoming signals _until_ it stops listening.
 
-* An **experiment** is a collection of **measurements**.
+- An **experiment** is a collection of **measurements**.
 
-* A **drone operator** is the person responsible for controlling the drone.
+- A **drone operator** is the person responsible for controlling the drone.
 
-* A **software operator** is the person responsible for using Wireless Channels sounder software.
+- A **software operator** is the person responsible for using Wireless Channels sounder software.
 
-* A **car operator** is the person resposible for driving the car. 
+- A **car operator** is the person resposible for driving the car.
 
 ### Node locations
+
 The following table displays the coordinates for both nodes in the order by which each node will move (i.e. the drone will move first to the coordinates having the `Order ID` 1, then it will move to the coordinates having the `Order ID` 2, and so on).
 
 <section style="display:flex;justify-content:center;align-items:center;gap:3rem">

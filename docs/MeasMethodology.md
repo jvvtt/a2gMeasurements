@@ -63,3 +63,33 @@ Therefore, a list of each Group of Ordered and Simulatenous Actions (GOSA) perfo
 ### Group C
 
 - Action: `Move the vehicle`. Actor: Vehicle operator
+
+## Types of measurements
+
+### Case 1
+
+<figure markdown="span">
+  ![Image title](assets/meas_method_case_1.png){ width="400" }
+  <figcaption>Measurement procedure for static ground node and moving drone node (with unique height)</figcaption>
+</figure>
+
+### Case 2
+
+<figure markdown="span">
+  ![Image title](assets/meas_method_case_2.png){ width="400" }
+  <figcaption>Measurement procedure for static ground node and moving drone node (with variable heights)</figcaption>
+</figure>
+
+### Case 3
+
+<figure markdown="span">
+  ![Image title](assets/meas_method_case_3.png){ width="400" }
+  <figcaption>Measurement procedure for static drone location (at unique height) and moving ground node</figcaption>
+</figure>
+
+### Case 4
+
+<figure markdown="span">
+  ![Image title](assets/meas_method_case_4.png){ width="400" }
+  <figcaption>Measurement procedure for static drone location (at multiple heights) and moving ground node</figcaption>
+</figure>
