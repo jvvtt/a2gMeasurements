@@ -17,13 +17,14 @@ plt.rcParams['text.usetex'] = True
 plt.rcParams['text.latex.preamble'] = r'\usepackage{{amsmath}}'
 ONE_FIGURE_SWITCH = False
 
-rx_sivers_beam_index_mapping_file = open('rx_sivers_beam_index_mapping.csv')
+rx_sivers_beam_index_mapping_file = open('./data/rx_sivers_beam_index_mapping.csv')
 csvreader = csv.reader(rx_sivers_beam_index_mapping_file)
 beam_idx_map = [float(i[1]) for cnt,i in enumerate(csvreader) if cnt != 0]
 ticks = beam_idx_map[::8]
 tickla = [f'{tick:1.2f}°' for tick in ticks]
 
-directory = "C:\\Users\\manifold-uav-vtt\\Documents\\Measurement Files\\Nivelles October 2023\\V2V"
+#directory = "C:\\Users\\manifold-uav-vtt\\Documents\\Measurement Files\\Nivelles October 2023\\V2V"
+directory = "D:\\Measurement Files\\Nivelles October 2023\\V2V"
 
 n_time_snaps_file = []
 dates_last_irf_array_per_measurement = []
@@ -92,19 +93,20 @@ for filename_i in os.listdir(directory):
                 fig1.colorbar(pap_plt, ax=ax1[r,c], label='Normalized Power [dB]')
                 
             else:
+                print("Here")
                 fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(27,40))
                 #fig.suptitle("V2V Measurements", fontsize=, fontweight='bold', fontfamily='sans-serif')
                 pap_plt = ax.imshow(np.transpose(normalized_pap[:, 1:]), aspect=10)
-                ax.set_ylabel(ylabel="Beamsteering angle [deg]", fontsize=85)
-                ax.set_xlabel(xlabel="Time snapshot number", fontsize=85)
-                #ax.set_title(V2V_Measurement_Titles[cnt], fontsize=60, fontfamily='sans-serif', fontweight="bold")
+                ax.set_ylabel(ylabel="Beamsteering angle [deg]", fontsize=40)
+                ax.set_xlabel(xlabel="Time snapshot number", fontsize=40)
+                ax.set_title(V2V_Measurement_Titles[cnt], fontsize=50, fontfamily='sans-serif', fontweight="bold")
                 ax.yaxis.set_ticks(np.arange(0, 64, 8))
                 ax.yaxis.set_ticklabels(tickla)
-                ax.tick_params(axis='x', labelsize=75)  # Adjust the labelsize as needed
-                ax.tick_params(axis='y', labelsize=70)  # Adjust the labelsize as needed
+                ax.tick_params(axis='x', labelsize=40)  # Adjust the labelsize as needed
+                ax.tick_params(axis='y', labelsize=40)  # Adjust the labelsize as needed
                 cbar = fig.colorbar(pap_plt, ax=ax, shrink=0.8)
-                cbar.set_label('Normalized Power [dB]', fontsize=85)
-                cbar.ax.tick_params(axis='both', which='both', labelsize=70)  # Adjust labelsize as needed
+                cbar.set_label('Normalized Power [dB]', fontsize=45)
+                cbar.ax.tick_params(axis='both', which='both', labelsize=40)  # Adjust labelsize as needed
         else:
             if ONE_FIGURE_SWITCH:    
                 pap_plt = ax2[cnt2].imshow(normalized_pap[:, 1:], aspect=0.1)
@@ -124,16 +126,16 @@ for filename_i in os.listdir(directory):
                 fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(27,40))
                 #fig.suptitle("Open space close measurements", fontsize=45, fontweight='bold', fontfamily='sans-serif')
                 pap_plt = ax.imshow(np.transpose(normalized_pap[:, 1:]), aspect=10)
-                ax.set_ylabel(ylabel="Beamsteering angle [deg]", fontsize=85)
-                ax.set_xlabel(xlabel="Time snapshot number", fontsize=85)
-                #ax.set_title(OPEN_FIELD_Measurement_Titles[cnt2], fontsize=60, fontfamily='sans-serif', fontweight="bold")
+                ax.set_ylabel(ylabel="Beamsteering angle [deg]", fontsize=40)
+                ax.set_xlabel(xlabel="Time snapshot number", fontsize=40)
+                ax.set_title(OPEN_FIELD_Measurement_Titles[cnt2], fontsize=50, fontfamily='sans-serif', fontweight="bold")
                 ax.yaxis.set_ticks(np.arange(0,64,8))
                 ax.yaxis.set_ticklabels(tickla)           
-                ax.tick_params(axis='x', labelsize=75)  # Adjust the labelsize as needed
-                ax.tick_params(axis='y', labelsize=70)  # Adjust the labelsize as needed    
+                ax.tick_params(axis='x', labelsize=40)  # Adjust the labelsize as needed
+                ax.tick_params(axis='y', labelsize=40)  # Adjust the labelsize as needed    
                 cbar = fig.colorbar(pap_plt, ax=ax, shrink=0.8)
-                cbar.set_label('Normalized Power [dB]', fontsize=85)
-                cbar.ax.tick_params(axis='both', which='both', labelsize=70)  # Adjust labelsize as needed
+                cbar.set_label('Normalized Power [dB]', fontsize=45)
+                cbar.ax.tick_params(axis='both', which='both', labelsize=40)  # Adjust labelsize as needed
             cnt2 = cnt2+1
         cnt = cnt + 1     
 
