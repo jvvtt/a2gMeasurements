@@ -63,7 +63,7 @@ Below are shown the Power Angular Profiles over time for the measurements done w
 
 ## Open space scenario
 
-In contrast to previous scenario, in this scenario there are reflectors close to the transceivers.
+In contrast to previous scenario, in this scenario there are NO reflectors close to the transceivers.
 
 <figure markdown="span">
   ![Image title](assets/open_space_nivelles_oct_2023_scenario.PNG){ width="400" }
