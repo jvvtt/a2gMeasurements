@@ -109,6 +109,6 @@ For this case the order of precedence is:
 The previous order is represented in the following diagram, for an example in which the drone will visit 3 different heights, the ground will visit 3 different locations, and the drone will visit 2 different locations. However, the same measurement methodology applies **regardless** of the number of heights, ground locations and drone locations.
 
 <figure markdown="span">
-  ![Image title](assets/meas_method_general_case_order_1.png){ width="400" }
+  ![Image title](assets/meas_method_general_case_order_1.PNG){ width="400" }
   <figcaption>Measurement methodology for the Case 1 of the order of precedence for node movements </figcaption>
 </figure>
