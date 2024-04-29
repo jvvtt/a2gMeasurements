@@ -31,6 +31,12 @@ The software operator can perform the following actions:
 - `Rotate the ground gimbal`: rotates the ground gimbal by a given attitude (yaw, pitch)
 - `Rotate the drone gimbal`: rotates the drone gimbal by a given attitude (yaw, pitch)
 
+There is a software operator at each node of the system.
+
+The `Start RF` action, as described before, will perform slightly different actions on each node: in the drone (RX) it will start the receiver and in the ground (TX), it will start the transmitter.
+
+However, due to the FPGA implementation of the transmitter, once this node starts its transmission, it will continue transmitting. Therefore, the `Start RF` action will only take place once in the TX.
+
 ## Vehicle operator
 
 The "vehicle operator"/drinver can perform the following actions:
