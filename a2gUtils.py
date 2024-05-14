@@ -289,6 +289,48 @@ def elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, l
     
     return pitch_to_set
 
+def convert_dB_to_valid_hex_sivers_register_values(rx_bb_gain_1, rx_bb_gain_2, rx_bb_gain_3, rx_bfrf_gain, tx_bb_gain, tx_bb_iq_gain, tx_bb_phase, tx_bfrf_gain):
+        """
+        Converts the dB gain values (all of them) the user has input in the "Sivers settings" panel to the actual values required for the Sivers EVK registers.
+
+        Returns:
+            tx_signal_values (dict): dictionary with the Tx gain values to be set at the Tx Sivers EVK registers.
+            rx_signal_values (dict): dictionary with the Rx gain values to be set at the RX Sivers EVK registers.
+        """
+        
+        rxbb1 = float(rx_bb_gain_1)
+        rxbb2 = float(rx_bb_gain_2)
+        rxbb3 = float(rx_bb_gain_3)
+        rxbfrf = float(rx_bfrf_gain)
+
+        txbb = tx_bb_gain
+        txbbiq = float(tx_bb_iq_gain)
+        txbbphase = tx_bb_phase
+        txbf = float(tx_bfrf_gain)
+        
+        valid_values_rx_bb = [0x00, 0x11, 0x33, 0x77, 0xFF]
+        valid_values_rx_bb_dB = np.linspace(-6, 0, 5)
+
+        valid_values_rx_bb3_bf = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        valid_values_rx_bb3_dB = np.linspace(0,6,16)
+        valid_values_rx_bf_dB = np.linspace(0,15,16)
+
+        valid_values_tx_bbiq_bf = [0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        valid_values_tx_bbiq_dB = np.linspace(0,6,16)
+        valid_values_tx_bf_dB = np.linspace(0,15,16)        
+
+        tx_signal_values = {'tx_bb_gain':int(txbb,16), 
+                            'tx_bb_iq_gain':valid_values_tx_bbiq_bf[np.abs(txbbiq - valid_values_tx_bbiq_dB).argmin()],
+                            'tx_bb_phase':int(txbbphase,16), 
+                            'tx_bfrf_gain':valid_values_tx_bbiq_bf[np.abs(txbf - valid_values_tx_bf_dB).argmin()]}
+
+        rx_signal_values = {'rx_gain_ctrl_bb1': valid_values_rx_bb[np.abs(rxbb1 - valid_values_rx_bb_dB).argmin()],
+                'rx_gain_ctrl_bb2': valid_values_rx_bb[np.abs(rxbb2 - valid_values_rx_bb_dB).argmin()],
+                'rx_gain_ctrl_bb3': valid_values_rx_bb3_bf[np.abs(rxbb3 - valid_values_rx_bb3_dB).argmin()],
+                'rx_gain_ctrl_bfrf': valid_values_rx_bb3_bf[np.abs(rxbfrf - valid_values_rx_bf_dB).argmin()]}
+        
+        return tx_signal_values, rx_signal_values
+
 class GpsOnMap(object):
     
     def __init__(self, path_to_osmpbf, canvas=None,fig=None, ax=None, air_coord=None, gnd_coord=None):

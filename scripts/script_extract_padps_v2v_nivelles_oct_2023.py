@@ -35,7 +35,8 @@ tickla = [f'{tick:1.2f}°' for tick in ticks]
 
 #directory = "C:\\Users\\manifold-uav-vtt\\Documents\\Measurement Files\\Nivelles October 2023\\V2V"
 #directory = "D:\\Measurement Files\\Nivelles October 2023\\V2V"
-directory = args.pathToMeasFolder + "/V2V"
+directory = args.pathToMeasFolder
+print([i for i in os.listdir(directory)])
 
 n_time_snaps_file = []
 dates_last_irf_array_per_measurement = []
