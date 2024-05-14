@@ -2,25 +2,21 @@ from datetime import datetime
 from a2gmeasurements import RFSoCRemoteControlFromHost, GimbalRS2
 import numpy as np
 
-start_meas_date = ""
-start_meas_time = ""
-min_action_preset_time = 2
-
 battery_drop_ratio = 4.5 / 50
-conservative_speed_drone_gimbal = 30; # in deg/s
-speed_drone_gimbal = conservative_speed_drone_gimbal; # let's assume a conservative speed for the gimbal
-speed_gnd_gimbal = speed_drone_gimbal; # both nodes use the same gimbal
+conservative_speed_drone_gimbal = 30 # in deg/s
+speed_drone_gimbal = conservative_speed_drone_gimbal # let's assume a conservative speed for the gimbal
+speed_gnd_gimbal = speed_drone_gimbal # both nodes use the same gimbal
 
 drone_node_rfsoc_static_ip_address='10.1.1.40'
-gnd_node_rfsoc_static_ip_address='10.1.1.40'
+gnd_node_rfsoc_static_ip_address='10.1.1.30'
 
-gnd_msg_data = {"carrier_freq": 59.5e9,
-                "rx_gain_ctrl_bb1": 2,
-                "rx_gain_ctrl_bb2": 1,
-                "rx_gain_ctrl_bb3":1,
-                "rx_gain_ctrl_bfrf":1}
+gnd_msg_data = {"carrier_freq": 57.51e9,
+                "rx_gain_ctrl_bb1": 0x00,
+                "rx_gain_ctrl_bb2": 0x00,
+                "rx_gain_ctrl_bb3": 0x00,
+                "rx_gain_ctrl_bfrf": 0x00}
 
-rfsoc = RFSoCRemoteControlFromHost()
+rfsoc = RFSoCRemoteControlFromHost(rfsoc_static_ip_address=drone_node_rfsoc_static_ip_address)
 gimbal = GimbalRS2()
 
 gimbal.start_thread_gimbal()
@@ -56,13 +52,15 @@ SOFTWARE_OPERATOR_ACTIONS = {
 # Define the start time of experiment
 print(f"Time now is: {datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}")
 
+start_time = input('ENTER MEASUREMENT START TIME IN FORMAT: HH-MM-SS. i.e.: 9-6-0')
+start_time = [int(i) for i in start_time.split('-')]
+
 software_operator_schedule = [{"ACTION": "MOVE_GND_GIMBAL",
                                "START_TIME": [22,54,47], 
                                "CALLBACK_PARAMS": {"yaw": 457, "roll": 0, "pitch": -124 }},
                               {"ACTION": "START_RF", 
                                "START_TIME":[22,55,1], 
                                "CALLBACK_PARAMS": {"msg_data":gnd_msg_data}}]
-
 
 # Scheduler loop
 for action_dict in software_operator_schedule:

@@ -29,13 +29,13 @@ rx_bb_gain_3 = '1.6'
 rx_bfrf_gain = '7'
 
 _, rx_signal_values = convert_dB_to_valid_hex_sivers_register_values(rx_bb_gain_1, 
-                                                                                    rx_bb_gain_2, 
-                                                                                    rx_bb_gain_3, 
-                                                                                    rx_bfrf_gain, 
-                                                                                    tx_bb_gain, 
-                                                                                    tx_bb_iq_gain, 
-                                                                                    tx_bb_phase, 
-                                                                                    tx_bfrf_gain)
+                                                                     rx_bb_gain_2, 
+                                                                     rx_bb_gain_3, 
+                                                                     rx_bfrf_gain, 
+                                                                     tx_bb_gain, 
+                                                                     tx_bb_iq_gain, 
+                                                                     tx_bb_phase, 
+                                                                     tx_bfrf_gain)
 
 myrfsoc_node_ip_addr = '10.1.1.40'
 

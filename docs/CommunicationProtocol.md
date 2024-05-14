@@ -1,6 +1,6 @@
 # Communication protocol
 
-A TCP communication is established between the ground and drone nodes. This link is bidirectional and is used to retrieve information, send control and configuration instructions. 
+A TCP communication is established between the ground and drone nodes. This link is bidirectional and is used to retrieve information, send control and configuration instructions.
 
 In the communication link, the ground node works as the server while the drone node works as the client.
 
@@ -34,7 +34,7 @@ The list of available commands are shown in the following Table.
 | ``0x01`` | ``0x03`` | ``ANS`` to ``GETGPS`` | Answer to a ``GETGPS`` command. The answer contains a ``data`` field with the sub-fields shown in next Table |
 </div>
 
-The data field of the messages send is used under specific commands. The length of the data field depends specifically on the command. The information send in the ``data`` field for the different commands is shown in the following Table:
+The data field of the messages sent is used under specific commands. The length of the data field depends specifically on the command. The information sent in the `data` field for the different commands is shown in the following Table:
 
 <div class="center-table" markdown>
 | Data field | Command name | Available options |
@@ -55,4 +55,7 @@ The data field of the messages send is used under specific commands. The length 
 | ``MOBILITY`` | ``SETREMOTEFMFLAG`` | ``0x00``: ground node is moving,  ``0x01`` ground node is static |
 </div>
 
-NOTE: it seems that the Raspbian OS (64 bits) restricts TCP messages to have a maximum of 1472 bytes, no matter if the MTU is bigger. This issue has to be solved if it is desired to send a Power Angular Profile (PAP) that contains more than 23 time snapshots and/or more than 16 beams.
+!!! failure "Maximum MTU on Raspbian"
+    ```sh
+    It seems that the Raspbian OS (64 bits) restricts TCP messages to have a maximum of 1472 bytes, no matter if the MTU is bigger. This issue has to be solved if it is desired to send a Power Angular Profile (PAP) that contains more than 23 time snapshots and/or more than 16 beams.
+    ```

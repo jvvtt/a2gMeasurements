@@ -112,7 +112,9 @@ For this case the order of precedence is:
 - Ground changes its location then
 - Drone changes its location then
 
-The previous order is represented in the following diagram, for an example in which the drone will visit 3 different heights, the ground will visit 3 different locations, and the drone will visit 2 different locations. However, the same measurement methodology applies **regardless** of the number of heights, ground locations and drone locations.
+The following diagram shows the sequence of movements of both nodes (ground and drone) for an example measurement in which the drone will visit 3 different heights, the ground will visit 3 different locations, and the drone will visit 2 different locations. 
+
+The same measurement methodology is used **regardless** of the number of heights, ground locations and drone locations.
 
 <figure markdown="span">
   ![Image title](assets/meas_method_general_case_order_1.PNG){ width="400" }
