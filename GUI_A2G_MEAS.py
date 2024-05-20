@@ -1,3 +1,5 @@
+import uvicorn
+import multiprocessing
 import requests
 import threading
 import numpy as np
@@ -27,7 +29,6 @@ from folium.plugins import realtime, Draw
 from folium.utilities import JsCode
 
 import pyqtgraph as pg
-
 
 class TimerThread(QThread):
     update = pyqtSignal()
@@ -178,7 +179,7 @@ class SetupWindow(QDialog):
         layout.addWidget(gnd_gps_att_offset_label, 15, 0, 1, 3)
         layout.addWidget(self.gnd_gps_att_offset_textEdit, 15, 3, 1, 3)
                          
-        layout.addWidget(self.ok_button, 15, 0, 1, 6)
+        layout.addWidget(self.ok_button, 16, 0, 1, 6)
         self.setLayout(layout)  
 
     def setup_window_add_drone_coord_callback(self):
@@ -237,50 +238,11 @@ class SetupWindow(QDialog):
             self.drone_lon_textEdit.setEnabled(False)
             self.drone_alt_textEdit.setEnabled(False)
 
-class PlanningMeasurementsWindow(QDialog):
-    """
-    Creates a new dialog with configuration options for the user, when is pressed the ``Setup`` > ``Planning measurements`` menu.
-    """
-    def __init__(self, parent=None):
-        
-        super(PlanningMeasurementsWindow, self).__init__(parent)
-        self.setWindowTitle("Planning Measurements")
-        
-        #width = 800
-        #height = 800
-        #self.setFixedSize(width, height)
-
-        ground_fixed_coordinates_label = QLabel("Input the fixed coordinates of the ground node in the following format:\nLatitude, Longitude, Height above sea level\nLatitude and longitude coordinates should be in decimal degrees\nHeight should be in meters")
-        drone_fixed_coordinates_label = QLabel("Input the fixed coordinates of the drone node in the following format:\nLatitude, Longitude, Height above sea level\nLatitude and longitude coordinates should be in decimal degrees\nHeight should be in meters")
-        
-        self.ground_fixed_coordinates_textEditor = QTextEdit("")
-        self.drone_fixed_coordinates_textEditor = QTextEdit("")
-        
-        self.m = folium.Map()
-        self.drawable_map = Draw(export=True).add_to(self.m)
-        self.webview = QWebEngineView()
-        self.webview.setHtml(self.m._repr_html_())        
-        
-        #canvas_html_to_start = """<html><body><h1 sytle='font-family: system-ui; color: #f5f'>Here we put info</h1></body></hmtl>"""
-        self.info_canvas = QWebEngineView()
-        #self.info_canvas.setHtml(canvas_html_to_start)
-        self.info_canvas.load(QUrl().fromLocalFile(r"C:\Users\julia\Documents\Repositories\a2gMeasurements\canvas_info.html"))
-        
-        layout = QGridLayout()
-        layout.addWidget(ground_fixed_coordinates_label, 0, 0, 1, 2)
-        layout.addWidget(self.ground_fixed_coordinates_textEditor, 1, 0, 3, 2)
-        layout.addWidget(drone_fixed_coordinates_label, 0, 2, 1, 2)
-        layout.addWidget(self.drone_fixed_coordinates_textEditor, 1, 2, 3, 2)
-        layout.addWidget(self.webview, 4, 0, 4, 4)
-        layout.addWidget(self.info_canvas, 4, 4, 4, 4)
-        self.setLayout(layout)
-        
-        self.showMaximized()
 class WidgetGallery(QMainWindow):
     """
     Python class responsible for creating the main window of the GUI and all the functionality to handle user interaction.
      
-    """
+    """        
     def __init__(self, parent=None):
         """
         Calls the functions to create some class attributes and the menu bar with its associated callbacks.
@@ -290,7 +252,10 @@ class WidgetGallery(QMainWindow):
         """
 
         super(WidgetGallery, self).__init__(parent)
-
+        
+        self.uvicorn_server_process = threading.Thread(target=self.start_uvicorn_server)
+        self.uvicorn_server_process.start()
+    
         self.setWindowTitle("A2G Measurements Center")
 
         self.init_constants()
@@ -299,9 +264,16 @@ class WidgetGallery(QMainWindow):
          
         self.dummyWidget = QWidget()
         self.setCentralWidget(self.dummyWidget)
+        
         #self.setLayout(mainLayout)
 
         self.showMaximized()
+        
+    def start_uvicorn_server(self):
+        """
+        Callback to start the uvicorn server responsible for connecting to the OpenStreetMap interface to plot GPS coordinates.
+        """
+        uvicorn.run("gpsRESTHandler:app", host="127.0.0.1", port=8000, log_level="info")
     
     def init_constants(self):
         """
@@ -422,23 +394,7 @@ class WidgetGallery(QMainWindow):
         self.showCentralWidget()
         
         self.setupDevicesAndMoreAction.setDisabled(True)
-    
-    def showPlanningMeasurementsMenu(self):
-        plannMeasWin = PlanningMeasurementsWindow()
-        result = plannMeasWin.exec_()
-        
-        coordinates_ground = plannMeasWin.ground_fixed_coordinates_textEditor.document().toPlainText()
-        coordinates_drone = plannMeasWin.drone_fixed_coordinates_textEditor.document().toPlainText()
-        
-        coordinates_ground = coordinates_ground.split("\n")
-        coordinates_drone = coordinates_drone.split("\n")
-        
-        coordinates_ground = [i.split(",") for i in coordinates_ground]
-        coordinates_drone = [i.split(",") for i in coordinates_drone]
-        
-        plannMeasWin.m.save("index.html")
-        #plannMeasWin.m.save("map.html")
-        
+            
     def createMenu(self):
         """
         Creates the menu bar and associates the callback functions for when the user clicks on each of the menu items.          
@@ -453,11 +409,6 @@ class WidgetGallery(QMainWindow):
         self.setupDevicesAndMoreAction = QAction("&Setup devices and more", self)
         setupMenu.addAction(self.setupDevicesAndMoreAction)        
         self.setupDevicesAndMoreAction.triggered.connect(self.showSetupMenu)
-        
-        self.planningMeasurementsAction = QAction("&Plan measurements", self)
-        setupMenu.addAction(self.planningMeasurementsAction)        
-        self.planningMeasurementsAction.triggered.connect(self.showPlanningMeasurementsMenu)
-        self.planningMeasurementsAction.setDisabled(True)
         
         self.start_gnd_gimbal_fm_action = QAction("Start GND gimbal following its pair", self)
         threadsMenu.addAction(self.start_gnd_gimbal_fm_action)
@@ -1831,21 +1782,23 @@ class WidgetGallery(QMainWindow):
         lat_origin, lon_origin, h_origin = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
         lat_dest, lon_dest, h_dest = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
         
-        yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
+        #yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
         pitch_to_set = elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, lat_dest, lon_dest, h_dest)
         
         print(f"[DEBUG]: FROM TX: ORIGIN: LAT: {lat_origin}, LON: {lon_origin}, ALT: {h_origin}")
         print(f"[DEBUG]: FROM TX: DESTINATION: LAT: {lat_dest}, LON: {lon_dest}, ALT: {h_dest}")
+        print(f"[DEBUG]: PITCH: {pitch_to_set}")
         
     def rx_move_according_coords_push_button_callback(self):
         lat_origin, lon_origin, h_origin = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
         lat_dest, lon_dest, h_dest = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
         
-        yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
+        #yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
         pitch_to_set = elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, lat_dest, lon_dest, h_dest)
         
         print(f"[DEBUG]: FROM RX: ORIGIN: LAT: {lat_origin}, LON: {lon_origin}, ALT: {h_origin}")
         print(f"[DEBUG]: FROM RX: DESTINATION: LAT: {lat_dest}, LON: {lon_dest}, ALT: {h_dest}")
+        print(f"[DEBUG]: PITCH: {pitch_to_set}")
     
     def create_Gimbal_GND_panel(self):
         """

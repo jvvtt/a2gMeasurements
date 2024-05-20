@@ -1,5 +1,5 @@
 
-# Open GPS server
+# Quick Start
 
 1) Open an Anaconda prompt (in Windows) and set the current directory to the `a2gMeasurements` folder.
 
@@ -12,9 +12,9 @@
 
 In the Raspberry Pi 4B (64bits) the name of the already created conda environment is `groundnode`. 
 
-On the Manifold 2C the name of the already created conda environment is `uavCom`.
+In the Manifold 2C the name of the already created conda environment is `uavCom`.
 
-3) Start the GPS server:
+3) Open another Anaconda prompt and set the current directory to the `a2gMeasurements` folder. From there start the GPS server:
 
 !!! warning "Start GPS server"
     ```sh
