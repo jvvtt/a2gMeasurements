@@ -21,7 +21,7 @@ from matplotlib.figure import Figure
 import os
 import sys
 from a2gmeasurements import HelperA2GMeasurements, RepeatTimer
-from a2gUtils import geocentric2geodetic, geodetic2geocentric
+from a2gUtils import geocentric2geodetic, geodetic2geocentric, azimuth_difference_between_coordinates, elevation_difference_between_coordinates
 import folium
 from folium.plugins import realtime, Draw
 from folium.utilities import JsCode
@@ -64,6 +64,8 @@ class SetupWindow(QDialog):
         super(SetupWindow, self).__init__(parent)
         self.setWindowTitle("Setup")
         #self.setGeometry(100, 100, 300, 220)
+        self.drone_static_coords_list_array = []
+        self.gnd_static_coords_list_array = []
 
         self.droneGimbalChoiceTDMenu = QComboBox()
         self.droneGimbalChoiceTDMenu.addItems(["DJI Ronin RS2", "Gremsy H16"])
@@ -96,6 +98,14 @@ class SetupWindow(QDialog):
         gnd_lon_label = QLabel("Enter lon of static (ground) node:")
         self.gnd_alt_textEdit = QLineEdit('')
         gnd_alt_label = QLabel("Enter altitude of static (ground) node:")
+        
+        gnd_list_coords_label = QLabel("List of static gnd coordinates:")
+        self.gnd_list_coords_textEdit = QTextEdit("")
+        self.gnd_list_coords_textEdit.setEnabled(False)
+        
+        self.button_add_gnd_coord = QPushButton("Add coordinate")
+        self.button_add_gnd_coord.clicked.connect(self.setup_window_add_gnd_coord_callback)
+        
         self.gnd_lat_textEdit.setEnabled(False)
         self.gnd_lon_textEdit.setEnabled(False)
         self.gnd_alt_textEdit.setEnabled(False)
@@ -113,6 +123,14 @@ class SetupWindow(QDialog):
         drone_lon_label = QLabel("Enter lon of static (drone) node:")
         self.drone_alt_textEdit = QLineEdit('')
         drone_alt_label = QLabel("Enter alt of static (drone) node:")
+        
+        drone_list_coords_label = QLabel("List of static drone coordinates:")
+        self.drone_list_coords_textEdit = QTextEdit("")
+        self.drone_list_coords_textEdit.setEnabled(False)
+        
+        self.button_add_drone_coord = QPushButton("Add coordinate")
+        self.button_add_drone_coord.clicked.connect(self.setup_window_add_drone_coord_callback)
+        
         self.drone_lat_textEdit.setEnabled(False)
         self.drone_lon_textEdit.setEnabled(False)
         self.drone_alt_textEdit.setEnabled(False)
@@ -139,21 +157,52 @@ class SetupWindow(QDialog):
         layout.addWidget(self.gnd_lon_textEdit, 5, 3, 1, 3)
         layout.addWidget(gnd_alt_label, 6, 0, 1, 3)
         layout.addWidget(self.gnd_alt_textEdit, 6, 3, 1, 3)
+        
+        layout.addWidget(gnd_list_coords_label, 7, 0, 1, 3)
+        layout.addWidget(self.button_add_gnd_coord, 8, 0, 1, 3)
+        layout.addWidget(self.gnd_list_coords_textEdit, 7, 3, 2, 3)   
 
-        layout.addWidget(drone_mobility_label, 7, 0, 1, 3)
-        layout.addWidget(self.drone_mobility_TDMenu, 7, 3, 1, 3)
-        layout.addWidget(drone_lat_label, 8, 0, 1, 3)
-        layout.addWidget(self.drone_lat_textEdit, 8, 3, 1, 3)
-        layout.addWidget(drone_lon_label, 9, 0, 1, 3)
-        layout.addWidget(self.drone_lon_textEdit, 9, 3, 1, 3)
-        layout.addWidget(drone_alt_label, 10, 0, 1, 3)
-        layout.addWidget(self.drone_alt_textEdit, 10, 3, 1, 3)
-        layout.addWidget(gnd_gps_att_offset_label, 11, 0, 1, 3)
-        layout.addWidget(self.gnd_gps_att_offset_textEdit, 11, 3, 1, 3)
+        layout.addWidget(drone_mobility_label, 9, 0, 1, 3)
+        layout.addWidget(self.drone_mobility_TDMenu, 9, 3, 1, 3)
+        layout.addWidget(drone_lat_label, 10, 0, 1, 3)
+        layout.addWidget(self.drone_lat_textEdit, 10, 3, 1, 3)
+        layout.addWidget(drone_lon_label, 11, 0, 1, 3)
+        layout.addWidget(self.drone_lon_textEdit, 11, 3, 1, 3)
+        layout.addWidget(drone_alt_label, 12, 0, 1, 3)
+        layout.addWidget(self.drone_alt_textEdit, 12, 3, 1, 3)
+        
+        layout.addWidget(drone_list_coords_label, 13, 0, 1, 3)
+        layout.addWidget(self.button_add_drone_coord, 14, 0, 1, 3)
+        layout.addWidget(self.drone_list_coords_textEdit, 13, 3, 2, 3)        
+        
+        layout.addWidget(gnd_gps_att_offset_label, 15, 0, 1, 3)
+        layout.addWidget(self.gnd_gps_att_offset_textEdit, 15, 3, 1, 3)
                          
-        layout.addWidget(self.ok_button, 12, 0, 1, 6)
+        layout.addWidget(self.ok_button, 15, 0, 1, 6)
         self.setLayout(layout)  
 
+    def setup_window_add_drone_coord_callback(self):
+        self.drone_static_coords_list_array.append([float(self.drone_lat_textEdit.text()), 
+                                                    float(self.drone_lon_textEdit.text()), 
+                                                    float(self.drone_alt_textEdit.text())])
+        
+        if (self.drone_list_coords_textEdit.toPlainText() == ""):
+            newText = f"LAT: {self.drone_lat_textEdit.text()}, LON: {self.drone_lon_textEdit.text()}, ALT: {self.drone_alt_textEdit.text()}"
+        else:
+            newText = self.drone_list_coords_textEdit.toPlainText() + "\n" + f"LAT: {self.drone_lat_textEdit.text()}, LON: {self.drone_lon_textEdit.text()}, ALT: {self.drone_alt_textEdit.text()}"
+        self.drone_list_coords_textEdit.setText(newText)
+        
+    def setup_window_add_gnd_coord_callback(self):
+        self.gnd_static_coords_list_array.append([float(self.gnd_lat_textEdit.text()), 
+                                                    float(self.gnd_lon_textEdit.text()), 
+                                                    float(self.gnd_alt_textEdit.text())])
+        
+        if (self.gnd_list_coords_textEdit.toPlainText() == ""):
+            newText = f"LAT: {self.gnd_lat_textEdit.text()}, LON: {self.gnd_lon_textEdit.text()}, ALT: {self.gnd_alt_textEdit.text()}"
+        else:
+            newText = self.gnd_list_coords_textEdit.toPlainText() + "\n" + f"LAT: {self.gnd_lat_textEdit.text()}, LON: {self.gnd_lon_textEdit.text()}, ALT: {self.gnd_alt_textEdit.text()}"
+        self.gnd_list_coords_textEdit.setText(newText)
+    
     def enable_gnd_coords_callback(self, myinput):
         """
         Enables the ground coordinates QLineEdits when the user inputs a ``Static`` mobility for the ground node in the Setup dialog.
@@ -315,6 +364,9 @@ class WidgetGallery(QMainWindow):
         """
         setupWin = SetupWindow()
         result = setupWin.exec_()
+        
+        self.drone_static_coords_list = setupWin.drone_static_coords_list_array
+        self.gnd_static_coords_list = setupWin.gnd_static_coords_list_array
         
         # Save the gps attitude offset for both nodes
         self.gnd_gps_att_offset = setupWin.gnd_gps_att_offset_textEdit
@@ -1776,10 +1828,24 @@ class WidgetGallery(QMainWindow):
             print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
     def tx_move_according_coords_push_button_callback(self):
-        1
-    
+        lat_origin, lon_origin, h_origin = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
+        lat_dest, lon_dest, h_dest = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
+        
+        yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
+        pitch_to_set = elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, lat_dest, lon_dest, h_dest)
+        
+        print(f"[DEBUG]: FROM TX: ORIGIN: LAT: {lat_origin}, LON: {lon_origin}, ALT: {h_origin}")
+        print(f"[DEBUG]: FROM TX: DESTINATION: LAT: {lat_dest}, LON: {lon_dest}, ALT: {h_dest}")
+        
     def rx_move_according_coords_push_button_callback(self):
-        1
+        lat_origin, lon_origin, h_origin = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
+        lat_dest, lon_dest, h_dest = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
+        
+        yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
+        pitch_to_set = elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, lat_dest, lon_dest, h_dest)
+        
+        print(f"[DEBUG]: FROM RX: ORIGIN: LAT: {lat_origin}, LON: {lon_origin}, ALT: {h_origin}")
+        print(f"[DEBUG]: FROM RX: DESTINATION: LAT: {lat_dest}, LON: {lon_dest}, ALT: {h_dest}")
     
     def create_Gimbal_GND_panel(self):
         """
@@ -1801,13 +1867,16 @@ class WidgetGallery(QMainWindow):
         
         thisLatLabel = QLabel('This Lat:')
         thisLonLabel = QLabel('This Lon:')
-        otherLatLabel = QLabel('Other Lat:')
-        otherLonLabel = QLabel('Other Lon:')
+        
+        avaialbleGndCoordsLabel = QLabel("Available GND coordinates:")
+        self.gnd_coord_list_ComboBox = QComboBox()
+        self.gnd_coord_list_ComboBox.addItems([str(i) for i in self.gnd_static_coords_list])
         
         self.tx_this_lat_text_edit = QLineEdit('')
         self.tx_this_lon_text_edit = QLineEdit('')
-        self.tx_other_lat_text_edit = QLineEdit('')
-        self.tx_other_lon_text_edit = QLineEdit('')
+        
+        self.tx_this_lat_text_edit.setEnabled(False)
+        self.tx_this_lon_text_edit.setEnabled(False)
         
         self.tx_move_according_coords_push_button = QPushButton('Coords Move')
         self.tx_move_according_coords_push_button.clicked.connect(self.tx_move_according_coords_push_button_callback)
@@ -1842,10 +1911,8 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.tx_this_lat_text_edit, 0, 7, 1, 2)
         layout.addWidget(thisLonLabel, 1, 6, 1, 1)
         layout.addWidget(self.tx_this_lon_text_edit, 1, 7, 1, 2)
-        layout.addWidget(otherLatLabel, 2, 6, 1, 1)        
-        layout.addWidget(self.tx_other_lat_text_edit, 2, 7, 1, 2)
-        layout.addWidget(otherLonLabel, 3, 6, 1, 1)
-        layout.addWidget(self.tx_other_lon_text_edit, 3, 7, 1, 2)
+        layout.addWidget(avaialbleGndCoordsLabel, 2, 6, 2, 1)        
+        layout.addWidget(self.gnd_coord_list_ComboBox, 2, 7, 2, 2)
         layout.addWidget(self.tx_move_according_coords_push_button, 4, 6, 1, 3)
         
         self.gimbalTXPanel.setLayout(layout)
@@ -1893,13 +1960,15 @@ class WidgetGallery(QMainWindow):
         
         thisLatLabel = QLabel('This Lat:')
         thisLonLabel = QLabel('This Lon:')
-        otherLatLabel = QLabel('Other Lat:')
-        otherLonLabel = QLabel('Other Lon:')
+        
+        avaialbleDroneCoordsLabel = QLabel("Available drone coordinates:")
+        self.drone_coord_list_ComboBox = QComboBox()
+        self.drone_coord_list_ComboBox.addItems([str(i) for i in self.drone_static_coords_list])
         
         self.rx_this_lat_text_edit = QLineEdit('')
         self.rx_this_lon_text_edit = QLineEdit('')
-        self.rx_other_lat_text_edit = QLineEdit('')
-        self.rx_other_lon_text_edit = QLineEdit('')        
+        self.rx_this_lat_text_edit.setEnabled(False)
+        self.rx_this_lon_text_edit.setEnabled(False)
         
         layout = QGridLayout()
         layout.addWidget(self.rx_gimbal_move_up_push_button, 0, 0, 1, 3)
@@ -1924,10 +1993,8 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.rx_this_lat_text_edit, 0, 7, 1, 2)
         layout.addWidget(thisLonLabel, 1, 6, 1, 1)
         layout.addWidget(self.rx_this_lon_text_edit, 1, 7, 1, 2)
-        layout.addWidget(otherLatLabel, 2, 6, 1, 1)        
-        layout.addWidget(self.rx_other_lat_text_edit, 2, 7, 1, 2)
-        layout.addWidget(otherLonLabel, 3, 6, 1, 1)
-        layout.addWidget(self.rx_other_lon_text_edit, 3, 7, 1, 2)
+        layout.addWidget(avaialbleDroneCoordsLabel, 2, 6, 2, 1)        
+        layout.addWidget(self.drone_coord_list_ComboBox, 2, 7, 2, 2)
         layout.addWidget(self.rx_move_according_coords_push_button, 4, 6, 1, 3)
         
         self.gimbalRXPanel.setLayout(layout)

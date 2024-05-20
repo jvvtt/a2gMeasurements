@@ -86,7 +86,8 @@ nav:
       - Node components: NodeComponents.md
       - Communication between nodes: CommunicationProtocol.md
   - Guide for using the GUI:
-      - Operation of GUI: GuideForGUI.md
+      - Introduction: GuideForGUI.md
+      - Quick Start: QuickStart.md
       - Panels in GUI: PanelsGUI.md
       - Parameters of GUI: GUIparameters.md
   - Troubleshooting: Troubleshooting.md
