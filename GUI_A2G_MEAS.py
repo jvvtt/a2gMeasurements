@@ -1779,26 +1779,99 @@ class WidgetGallery(QMainWindow):
             print("[DEBUG]: No HelperA2GMeasurements class instance is available")
     
     def tx_move_according_coords_push_button_callback(self):
-        lat_origin, lon_origin, h_origin = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
-        lat_dest, lon_dest, h_dest = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
+        # The coordinates in the text edit have higher priority than the coordinates entered in the Setup window        
+        lat_origin_priority = self.tx_this_lat_text_edit.text()
+        lon_origin_priority = self.tx_this_lon_text_edit.text()
+        h_origin_priority = self.tx_this_height_text_edit.text()
         
-        #yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
+        lat_dest_priority = self.rx_this_lat_text_edit.text()
+        lon_dest_priority = self.rx_this_lon_text_edit.text()
+        h_dest_priority = self.rx_this_height_text_edit.text()
+        
+        if ((lat_origin_priority != '') & (lon_origin_priority != '') & (h_origin_priority != '') & (lat_dest_priority != '') & (lon_dest_priority != '') & (h_dest_priority != '')):
+            try:
+                lat_origin_priority = float(lat_origin_priority)
+                lon_origin_priority = float(lon_origin_priority)
+                h_origin_priority = float(h_origin_priority)
+                
+                lat_dest_priority = float(lat_dest_priority)
+                lon_dest_priority = float(lon_dest_priority)
+                h_dest_priority = float(h_dest_priority)    
+            except Exception as e:
+                print("[DEBUG]: Exception", e)
+            else:
+                lat_origin = lat_origin_priority
+                lon_origin = lon_origin_priority
+                h_origin = h_origin_priority
+                
+                lat_dest = lat_dest_priority
+                lon_dest = lon_dest_priority
+                h_dest = h_dest_priority
+        else:
+            lat_origin, lon_origin, h_origin = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
+            lat_dest, lon_dest, h_dest = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
+        
+        heading = float(self.gnd_node_heading_text_edit.text())        
+        yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
         pitch_to_set = elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, lat_dest, lon_dest, h_dest)
         
         print(f"[DEBUG]: FROM TX: ORIGIN: LAT: {lat_origin}, LON: {lon_origin}, ALT: {h_origin}")
         print(f"[DEBUG]: FROM TX: DESTINATION: LAT: {lat_dest}, LON: {lon_dest}, ALT: {h_dest}")
-        print(f"[DEBUG]: PITCH: {pitch_to_set}")
+        print(f"[DEBUG]: YAW, {yaw_to_set}, PITCH: {pitch_to_set}")
+        
+        try:
+            self.myhelpera2g.myGimbal.setPosControl(yaw=yaw_to_set, roll=0, pitch=pitch_to_set, ctrl_byte=0x01)
+        except Exception as e:
+            print("[DEBUG]: Exception, ", e)
         
     def rx_move_according_coords_push_button_callback(self):
-        lat_origin, lon_origin, h_origin = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
-        lat_dest, lon_dest, h_dest = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
+        # The coordinates in the text edit have higher priority than the coordinates entered in the Setup window
+        lat_origin_priority = self.rx_this_lat_text_edit.text()
+        lon_origin_priority = self.rx_this_lon_text_edit.text()
+        h_origin_priority = self.rx_this_height_text_edit.text()
         
-        #yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
+        lat_dest_priority = self.tx_this_lat_text_edit.text()
+        lon_dest_priority = self.tx_this_lon_text_edit.text()
+        h_dest_priority = self.tx_this_height_text_edit.text()
+        
+        if ((lat_origin_priority != '') & (lon_origin_priority != '') & (h_origin_priority != '') & (lat_dest_priority != '') & (lon_dest_priority != '') & (h_dest_priority != '')):
+            try:
+                lat_origin_priority = float(lat_origin_priority)
+                lon_origin_priority = float(lon_origin_priority)
+                h_origin_priority = float(h_origin_priority)
+                
+                lat_dest_priority = float(lat_dest_priority)
+                lon_dest_priority = float(lon_dest_priority)
+                h_dest_priority = float(h_dest_priority)               
+                
+            except Exception as e:
+                print("[DEBUG]: Exception", e)
+            else:
+                lat_origin = lat_origin_priority
+                lon_origin = lon_origin_priority
+                h_origin = h_origin_priority
+                
+                lat_dest = lat_dest_priority
+                lon_dest = lon_dest_priority
+                h_dest = h_dest_priority
+        else:
+            lat_origin, lon_origin, h_origin = self.drone_static_coords_list[self.drone_coord_list_ComboBox.currentIndex()]
+            lat_dest, lon_dest, h_dest = self.gnd_static_coords_list[self.gnd_coord_list_ComboBox.currentIndex()]
+        
+        heading = float(self.drone_node_heading_text_edit.text())
+        
+        yaw_to_set = azimuth_difference_between_coordinates(heading, lat_origin, lon_origin, lat_dest, lon_dest)
         pitch_to_set = elevation_difference_between_coordinates(lat_origin, lon_origin, h_origin, lat_dest, lon_dest, h_dest)
         
         print(f"[DEBUG]: FROM RX: ORIGIN: LAT: {lat_origin}, LON: {lon_origin}, ALT: {h_origin}")
         print(f"[DEBUG]: FROM RX: DESTINATION: LAT: {lat_dest}, LON: {lon_dest}, ALT: {h_dest}")
-        print(f"[DEBUG]: PITCH: {pitch_to_set}")
+        print(f"[DEBUG]: YAW, {yaw_to_set}, PITCH: {pitch_to_set}")
+        
+        try:
+            data = {'YAW': yaw_to_set, 'PITCH': pitch_to_set, 'ROLL': 0,'MODE': 0x01} 
+            self.myhelpera2g.socket_send_cmd(type_cmd='SETGIMBAL', data=data)
+        except Exception as e:
+            print("[DEBUG]: Exception, ", e)
     
     def create_Gimbal_GND_panel(self):
         """
@@ -1826,10 +1899,15 @@ class WidgetGallery(QMainWindow):
         self.gnd_coord_list_ComboBox.addItems([str(i) for i in self.gnd_static_coords_list])
         
         self.tx_this_lat_text_edit = QLineEdit('')
-        self.tx_this_lon_text_edit = QLineEdit('')
+        self.tx_this_lon_text_edit = QLineEdit('')        
+        self.tx_this_lat_text_edit.setEnabled(True)
+        self.tx_this_lon_text_edit.setEnabled(True)
         
-        self.tx_this_lat_text_edit.setEnabled(False)
-        self.tx_this_lon_text_edit.setEnabled(False)
+        txNodeHeadingLabel = QLabel("Node heading")
+        self.gnd_node_heading_text_edit = QLineEdit('')
+        
+        gndHeightLabel = QLabel("This height")
+        self.tx_this_height_text_edit = QLineEdit('')
         
         self.tx_move_according_coords_push_button = QPushButton('Coords Move')
         self.tx_move_according_coords_push_button.clicked.connect(self.tx_move_according_coords_push_button_callback)
@@ -1852,8 +1930,10 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.tx_gimbal_move_right_push_button, 3, 0, 1, 3)
         layout.addWidget(self.tx_gimbal_move_down_push_button, 4, 0, 1, 3)
         
-        layout.addWidget(self.tx_abs_radio_button, 0, 3, 1, 3)
-        layout.addWidget(self.tx_rel_radio_button, 1, 3, 1, 3)
+        layout.addWidget(self.tx_abs_radio_button, 0, 3, 1, 1)
+        layout.addWidget(self.tx_rel_radio_button, 0, 4, 1, 2)
+        layout.addWidget(gndHeightLabel, 1, 3, 1, 1)
+        layout.addWidget(self.tx_this_height_text_edit, 1, 4, 1, 2)        
         layout.addWidget(yaw_label, 2, 3, 1, 1)
         layout.addWidget(self.tx_yaw_value_text_edit, 2, 4, 1, 2)
         layout.addWidget(pitch_label, 3, 3, 1, 1)        
@@ -1864,8 +1944,10 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.tx_this_lat_text_edit, 0, 7, 1, 2)
         layout.addWidget(thisLonLabel, 1, 6, 1, 1)
         layout.addWidget(self.tx_this_lon_text_edit, 1, 7, 1, 2)
-        layout.addWidget(avaialbleGndCoordsLabel, 2, 6, 2, 1)        
-        layout.addWidget(self.gnd_coord_list_ComboBox, 2, 7, 2, 2)
+        layout.addWidget(avaialbleGndCoordsLabel, 2, 6, 1, 1)        
+        layout.addWidget(self.gnd_coord_list_ComboBox, 2, 7, 1, 2)
+        layout.addWidget(txNodeHeadingLabel, 3, 6, 1, 1)
+        layout.addWidget(self.gnd_node_heading_text_edit, 3, 7, 1, 2)
         layout.addWidget(self.tx_move_according_coords_push_button, 4, 6, 1, 3)
         
         self.gimbalTXPanel.setLayout(layout)
@@ -1920,8 +2002,14 @@ class WidgetGallery(QMainWindow):
         
         self.rx_this_lat_text_edit = QLineEdit('')
         self.rx_this_lon_text_edit = QLineEdit('')
-        self.rx_this_lat_text_edit.setEnabled(False)
-        self.rx_this_lon_text_edit.setEnabled(False)
+        self.rx_this_lat_text_edit.setEnabled(True)
+        self.rx_this_lon_text_edit.setEnabled(True)
+        
+        rxNodeHeadingLabel = QLabel("Node heading")
+        self.drone_node_heading_text_edit = QLineEdit('')
+        
+        droneHeightLabel = QLabel("This height")
+        self.rx_this_height_text_edit = QLineEdit('')
         
         layout = QGridLayout()
         layout.addWidget(self.rx_gimbal_move_up_push_button, 0, 0, 1, 3)
@@ -1931,11 +2019,13 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.rx_gimbal_move_down_push_button, 4, 0, 1, 3)
         
         if self.droneGimbalChoice == "DJI Ronin RS2":
-            layout.addWidget(self.rx_abs_radio_button, 0, 3, 1, 3)
-            layout.addWidget(self.rx_rel_radio_button, 1, 3, 1, 3)
+            layout.addWidget(self.rx_abs_radio_button, 0, 3, 1, 1)
+            layout.addWidget(self.rx_rel_radio_button, 0, 4, 1, 2)
         elif self.droneGimbalChoice == "Gremsy H16":
-            layout.addWidget(self.rx_lock_mode_radio_button, 0, 3, 1, 3)
-            layout.addWidget(self.rx_follow_mode_radio_button, 1, 3, 1, 3)
+            layout.addWidget(self.rx_lock_mode_radio_button, 0, 3, 1, 1)
+            layout.addWidget(self.rx_follow_mode_radio_button, 0, 4, 1, 2)
+        layout.addWidget(droneHeightLabel, 1, 3, 1, 1)
+        layout.addWidget(self.rx_this_height_text_edit, 1, 4, 1, 2)        
         layout.addWidget(yaw_label, 2, 3, 1, 1)
         layout.addWidget(self.rx_yaw_value_text_edit, 2, 4, 1, 2)
         layout.addWidget(pitch_label, 3, 3, 1, 1)        
@@ -1946,8 +2036,10 @@ class WidgetGallery(QMainWindow):
         layout.addWidget(self.rx_this_lat_text_edit, 0, 7, 1, 2)
         layout.addWidget(thisLonLabel, 1, 6, 1, 1)
         layout.addWidget(self.rx_this_lon_text_edit, 1, 7, 1, 2)
-        layout.addWidget(avaialbleDroneCoordsLabel, 2, 6, 2, 1)        
-        layout.addWidget(self.drone_coord_list_ComboBox, 2, 7, 2, 2)
+        layout.addWidget(avaialbleDroneCoordsLabel, 2, 6, 1, 1)        
+        layout.addWidget(self.drone_coord_list_ComboBox, 2, 7, 1, 2)
+        layout.addWidget(rxNodeHeadingLabel, 3, 6, 1, 1)
+        layout.addWidget(self.drone_node_heading_text_edit, 3, 7, 1, 2)
         layout.addWidget(self.rx_move_according_coords_push_button, 4, 6, 1, 3)
         
         self.gimbalRXPanel.setLayout(layout)
