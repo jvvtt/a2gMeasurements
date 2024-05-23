@@ -87,9 +87,8 @@ Additionally, we configure the Ethernet network (composed by a host computer and
 ### Windows
 
 !!! success "Note"
-    ```
     The following instructions have already been set up for the Manifold.
-    ```
+    
 
 In Windows, follow these steps to make the host computer communicate through both Ethernet and WiFi:
 
@@ -114,9 +113,7 @@ These additional steps are required to finish the configuration:
 ### RaspbianOS
 
 !!! success "Note"
-    ```
     The following instructions have already been set up for the Raspberry Pi 4B 64 bits.
-    ```
 
 Follow these steps:
 
@@ -127,6 +124,22 @@ Follow these steps:
 * In a newline write `static routers=10.1.1.1`
 * In a newline write `static domain_name_servers=10.1.1.1`
 
+### SSH host computer and RFSOC
+
+To check that the Ethernet network between the host computer and its associated RFSoC is working properly, we can try to establish an SSH connection. To do so, open a terminal or command line in the host computer. There type the following command:
+
+!!! warning "Connect to RFSoC"
+    ```sh
+    ssh xilinx@ipaddress
+    ```
+
+where `ipaddress` should be replaced with `10.1.1.30` if the host computer is the Raspberry Pi, and `ipaddress` should be replaced with `10.1.1.40` if the host computer is the Manifold.
+
+The password required for the SSH connection is:
+??? warning "Enter password"
+    xilinx
+
+This will allow you to use the command line of the RFSoC from the host computer.
 
 ## Host WiFi to router connection 
 
@@ -191,20 +204,4 @@ Such address reservation is configured in the available routers as shown below:
     Both routers have configured to have the same address range (`192.168.0.100` - `192.168.0.249`), so if for any reason they have to be used simultaneously, the address range should be exclusive for each router.
     ```
 
-## Ethernet RFSoC to host connection
 
-Open a terminal or command line in the host computer. Type the following command:
-
-!!! warning "Connect to RFSoC"
-    ```sh
-    ssh xilinx@10.1.1.30
-    ```
-
-When asked for password, type:
-
-!!! warning "Enter password"
-    ```sh
-    xilinx
-    ```
-
-This will allow you to use the command line of the RFSoC from the host computer.
