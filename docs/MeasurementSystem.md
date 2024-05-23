@@ -27,7 +27,7 @@ The specific devices used for each of the components in the previous Figure are 
 | RF System | Sivers EVK06002 + Sivers TRX BF/01 RFIC |
 </div>
 
-In addition to the mentioned devices, we use a TP-Link AX1500 5GHz router as an access point for both nodes. The router is already configured to assign specific static addresses to each node.
+In addition to the mentioned devices, we use a router (TP-Link AX1500 or RUTX11) as an access point for both nodes. The router is already configured to assign specific static addresses to each node.
 
 ## Software
 
@@ -73,26 +73,74 @@ Connect the USB port from the Septentrio gps to any USB port of the host compute
 
 ## RFSoC to host connection
 
-Connect any of the RFSoC Ethernet ports to any of th Ethernet ports of the host computer, as indicated in the following Figure.
+Connect any of the RFSoC Ethernet ports to any of the Ethernet ports of the host computer, as indicated in the following Figure.
 
 <figure markdown="span">
   ![Image title](assets/a2g_node_components.PNG){ width="400" }
   <figcaption>Connection between the RFSoC and the host</figcaption>
 </figure>
 
+Since each node uses both the Ethernet port (to communicate with each RFSoC) and the WiFi (to communicate with the other node), the host computer should be configured so that it supports both types of communication simultaneously. 
+
+Additionally, we configure the Ethernet network (composed by a host computer and an RFSoC) to have static IP addresses different from the WiFi network.
+
+### Windows
+
+!!! success "Note"
+    ```
+    The following instructions have already been set up for the Manifold.
+    ```
+
+In Windows, follow these steps to make the host computer communicate through both Ethernet and WiFi:
+
+* In the Control Panel open the `Network and Sharing Center`
+* Click on `Change adapter settings`
+* Right-click on the Ethernet adpater icon and choose `Properties`. (You have to repeat this process for the WiFi adapter as well)
+* Click on the `Configure` button, under the `Network` tab
+* Click on the `Advanced` tab
+* From the left choices, select `Priority and VLAN`
+* From the right drop-down menu, select `Priority and VLAN disabled`
+* Press `Ok`
+
+
+These additional steps are required to finish the configuration:
+
+* Open a PowerShell window
+* Type `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`
+* Type `Start-Service sshd`
+* Type `Get-Service sshd`
+* Type `Set-Service -Name sshd -StartupType 'Automatic'`
+
+### RaspbianOS
+
+!!! success "Note"
+    ```
+    The following instructions have already been set up for the Raspberry Pi 4B 64 bits.
+    ```
+
+Follow these steps:
+
+* Open the `/etc/dhcpd.conf` file
+* Go to the end of the file
+* In a newline write `interface eth0`
+* In a newline write `static ip_address=10.1.1.50/24`
+* In a newline write `static routers=10.1.1.1`
+* In a newline write `static domain_name_servers=10.1.1.1`
+
+
 ## Host WiFi to router connection 
 
-In order to have a communication between the two nodes, each host computer (Manifold, Raspberry) will connect to a router wirelessly. The router will act as a centralized device automatically handling any message exchange between both hosts, as illustrated below:
+In order to have a communication between the two nodes, each host computer (Manifold, Raspberry) will connect to the same router wirelessly. The router will act as a centralized device automatically handling any message exchange between both hosts, as illustrated below:
 
 <figure markdown="span">
   ![Image title](assets/nodes_communication_through_router.PNG){ width="400" }
-  <figcaption>Communication between nodes made through router</figcaption>
+  <figcaption>Communication between nodes made through router. Either of the shown routers will be used (not both)</figcaption>
 </figure>
 
 At the moment this documentation was written, the following router settings are available:
 
 <div class="center-table" markdown>
-| Property | Value TP-LINK| Value RUTX11
+| Property | TP-LINK| RUTX11 |
 | :------------: | :--------------------: | :----------------: |
 | URL (router configuration)     | `192.168.0.1`  | `192.168.0.10` |
 | Username (router configuration)     |  | admin |
@@ -117,7 +165,7 @@ The following pictures show how to disable the 2GHz network for the routers avai
 
 In order to automatize the connections between both host computers, the chosen router has been configured so that the IP addressing of the DHCP server assigns always the same IP address to the host computers (Manifold and Raspberry) identified by their MAC addresses. 
 
-The address assign by the DHCP server are shown in the following table:
+The address assignment by the DHCP server is shown in the following table:
 
 <div class="center-table" markdown>
 | MAC Address | Static IP address asigned | 
@@ -139,22 +187,24 @@ Such address reservation is configured in the available routers as shown below:
 </figure>
 
 !!! success "Multiple routers at the same time"
-  Both routers have configured to have the same address range (`192.168.0.100` - `192.168.0.249`), so if for any reason they have to be used simultaneously, the address range should be exclusive for each router.
+    ```
+    Both routers have configured to have the same address range (`192.168.0.100` - `192.168.0.249`), so if for any reason they have to be used simultaneously, the address range should be exclusive for each router.
+    ```
 
 ## Ethernet RFSoC to host connection
 
 Open a terminal or command line in the host computer. Type the following command:
 
 !!! warning "Connect to RFSoC"
-  ```sh
-  ssh xilinx@10.1.1.30
-  ```
+    ```sh
+    ssh xilinx@10.1.1.30
+    ```
 
 When asked for password, type:
 
 !!! warning "Enter password"
-  ```sh
-  xilinx
-  ```
+    ```sh
+    xilinx
+    ```
 
 This will allow you to use the command line of the RFSoC from the host computer.
