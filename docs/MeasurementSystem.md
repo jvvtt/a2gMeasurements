@@ -80,29 +80,81 @@ Connect any of the RFSoC Ethernet ports to any of th Ethernet ports of the host 
   <figcaption>Connection between the RFSoC and the host</figcaption>
 </figure>
 
-## Host WiFi to router connection
+## Host WiFi to router connection 
 
-To guarantee that the connection between each of the host computers (Manifold and Raspberry or their replacements) to the router is done through the 5GHz network, we have only enabled the 5GHz band in the router configuration website.
+In order to have a communication between the two nodes, each host computer (Manifold, Raspberry) will connect to a router wirelessly. The router will act as a centralized device automatically handling any message exchange between both hosts, as illustrated below:
 
-- The website to configure the router is the address: `192.168.0.1`
+<figure markdown="span">
+  ![Image title](assets/nodes_communication_through_router.PNG){ width="400" }
+  <figcaption>Communication between nodes made through router</figcaption>
+</figure>
 
-- The password to login is: jvvtt2937
+At the moment this documentation was written, the following router settings are available:
 
-In order to automatize the connections between both host computers, the TP-Link AX1500 5GHz Router has been configured so that the IP addressing of the DHCP server assigns always the same IP address to the host computers (Manifold and Raspberry) identified by their MAC addresses.
+<div class="center-table" markdown>
+| Property | Value TP-LINK| Value RUTX11
+| :------------: | :--------------------: | :----------------: |
+| URL (router configuration)     | `192.168.0.1`  | `192.168.0.10` |
+| Username (router configuration)     |  | admin |
+| Password (router configuration)    | jvvtt2937 | Jvvtt2937 |
+| SSID (5GHz) | TP-Link_F2EC_5G | RUT_5A15_5G |
+| Password (SSID) | 00700122 | n1GYa3u7 |
+</div>
 
-- The IP address of the drone host computer (Manifold) has been set to: `192.168.0.157`
+To guarantee that the connection between each of the host computers (Manifold and Raspberry or their replacements) to the router is done through the 5GHz network, only the 5GHz band is enabled in the router configuration website.
 
-- The IP address of the ground host computer (Raspberry) has been set to: `192.168.0.124`
+The following pictures show how to disable the 2GHz network for the routers available at the moment this documentation was written:
+
+<figure markdown="span">
+  ![Image title](assets/tplink_router_config_wireless.PNG){ width="400" }
+  <figcaption>Disable 2GHz wireless network on TPLink</figcaption>
+</figure>
+
+<figure markdown="span">
+  ![Image title](assets/rutx11_router_config_disable_2GHz.PNG){ width="400" }
+  <figcaption>Disable 2GHz wireless network on RUTX11</figcaption>
+</figure>
+
+In order to automatize the connections between both host computers, the chosen router has been configured so that the IP addressing of the DHCP server assigns always the same IP address to the host computers (Manifold and Raspberry) identified by their MAC addresses. 
+
+The address assign by the DHCP server are shown in the following table:
+
+<div class="center-table" markdown>
+| MAC Address | Static IP address asigned | 
+| :------------: | :--------------------: | 
+| 34-60-F9-76-EB-B6 (Manifold) | `192.168.0.157`  | 
+| E4-5F-01-A1-1D-E8 (Raspberry Pi 4B 64bits) | `192.168.0.124`
+</div>
+
+Such address reservation is configured in the available routers as shown below:
+
+<figure markdown="span">
+  ![Image title](assets/tplink_router_config_address_reservation.PNG){ width="400" }
+  <figcaption>Address reservation on TPLink</figcaption>
+</figure>
+
+<figure markdown="span">
+  ![Image title](assets/rutx11_router_config_address_reservation.PNG){ width="400" }
+  <figcaption>Address reservation on RUTX11</figcaption>
+</figure>
+
+!!! success "Multiple routers at the same time"
+  Both routers have configured to have the same address range (`192.168.0.100` - `192.168.0.249`), so if for any reason they have to be used simultaneously, the address range should be exclusive for each router.
 
 ## Ethernet RFSoC to host connection
 
 Open a terminal or command line in the host computer. Type the following command:
 
 !!! warning "Connect to RFSoC"
-ssh xilinx@10.1.1.30 // the address of the node to be checked
+  ```sh
+  ssh xilinx@10.1.1.30
+  ```
 
 When asked for password, type:
+
 !!! warning "Enter password"
-xilinx
+  ```sh
+  xilinx
+  ```
 
 This will allow you to use the command line of the RFSoC from the host computer.
