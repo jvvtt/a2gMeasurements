@@ -44,10 +44,10 @@ Using Visual Studio Code:
 * Open Visual Studio Code
 * By default it has been setup to use the correct python environment, but (if needed) to set it up, press the highlighted section of the bottom bar:
 
-  <figure markdown="span">
-    ![Image title](assets/conda_env_visual_studio_code.PNG){ width="400" }
-    <figcaption>Change python environment in Visual Studio Code</figcaption>
-  </figure>
+<figure markdown="span">
+  ![Image title](assets/conda_env_visual_studio_code.png){ width="400" }
+  <figcaption>Change python environment in Visual Studio Code</figcaption>
+</figure>
   
 * From the options that appear, choose the one that has the string `groundnode` on it
 
