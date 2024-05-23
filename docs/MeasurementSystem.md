@@ -129,11 +129,11 @@ Follow these steps:
 To check that the Ethernet network between the host computer and its associated RFSoC is working properly, we can try to establish an SSH connection. To do so, open a terminal or command line in the host computer. There type the following command:
 
 !!! warning "Connect to RFSoC"
-    ```sh
+    ```bash
     ssh xilinx@ipaddress
     ```
 
-where `ipaddress` should be replaced with `10.1.1.30` if the host computer is the Raspberry Pi, and `ipaddress` should be replaced with `10.1.1.40` if the host computer is the Manifold.
+where `ipaddress` should be replaced with `10.1.1.30` if the host computer is in the ground node (Raspberry Pi), and `ipaddress` should be replaced with `10.1.1.40` if the host computer is in the drone node (Manifold).
 
 The password required for the SSH connection is:
 ??? warning "Enter password"
