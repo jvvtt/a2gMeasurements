@@ -46,7 +46,7 @@ In the next subsections the components of the panel are shown.
 The components shown in the figure below allow the user to control the gimbal by moving it with respect to its current value. 
 
 <figure markdown="span">
-  ![Image title](assets/a2gMeas_gimbal_panel_joystick.PNG){ width="400" }
+  ![Image title](assets/a2gMeas_gimbal_panel_joystick.PNG){ width="200" }
   <figcaption>Control the gimbal with this buttons as a joystick</figcaption>
 </figure>
 
@@ -56,7 +56,7 @@ The textbox is used so that the user can input the amount by which he wants to m
     If the user doesn't input any value in the textbox, the gimbal will move a default value of `10` degrees in the chosen direction.
 
 !!! success "Range of values admitted"
-  For the yaw, the range of values accepted lies between `-180` and `180`. For the pitch the maximum and minimum value will be determined by the gimbal configuration. However, when the gimbal has payload, it is recommended to not enter pitch values that potentially can make the gimbal stuck due to the payload size.
+    For the yaw, the range of values accepted lies between `-180` and `180`. For the pitch the maximum and minimum value will be determined by the gimbal configuration. However, when the gimbal has payload, it is recommended to not enter pitch values that potentially can make the gimbal stuck due to the payload size.
 
 ### Yaw, Pitch
 
@@ -67,22 +67,26 @@ The components shown in the figure below allow the user to control the gimbal by
   <figcaption>Control the gimbal by providing yaw, pitch and type of movement</figcaption>
 </figure>
 
-If `Absolute` radiobutton is chosen, the input values of yaw and pitch will be relative to reference of the gimbal (the 0 degrees direction of the gimbal, i.e. the heading of the gimbal).
+If `Absolute` radiobutton is chosen, the input values of yaw and pitch will be relative to the reference of the gimbal (the 0 degrees direction of the gimbal, i.e. the heading of the gimbal).
 
-If `Relative` radiobutton is chosen, the input values of yaw and pitch will be relative to last position of the gimbal.
+If `Relative` radiobutton is chosen, the input values of yaw and pitch will be relative to the last position of the gimbal.
 
-Therefore, for example, if the use inputs `0` in the `Yaw` text box and `0` in the `Pitch` text box, the gimbal won't move if the `Relative` radiobutton is chosen, or it will move to the reference of the gimbal if the `Absolute` radiobutton is chosen.
+!!! success "Example"
+    If the user inputs `0` in the `Yaw` text box and `0` in the `Pitch` text box, the gimbal won't move if the `Relative` radiobutton is chosen, or it will move to the reference of the gimbal if the `Absolute` radiobutton is chosen.
 
 ### Available coordinates
 
 The components in the figure below allow the user to move the gimbal to any of the coordinates that were input in the [Setup window](PanelsGUI.md#setup-window) for the corresponding node.
 
 <figure markdown="span">
-  ![Image title](assets/a2gMeas_gimbal_panel_available_coords.PNG){ width="400" }
+  ![Image title](assets/a2gMeas_gimbal_panel_available_coords.PNG){ width="300" }
   <figcaption>Control the gimbal by chhosing among the coordinates entered in the Setup Window</figcaption>
 </figure>
 
-The user has to be provide in the texbox `Node heading` which is the heading of the gimbal (the direction of the reference of the gimbal). The admitted values are in the range `0-359`, with `0` being the case when the reference of the gimbal is pointing to the North.
+In the texbox `Node heading` the user has to be provide the heading of the gimbal (the direction of the reference of the gimbal). 
+
+!!! success "Admitted values for Node heading"
+    The admitted values are in the range `0-359`, with `0` being the case when the reference of the gimbal is pointing to the North.
 
 ### Input coordinates
 
@@ -93,7 +97,7 @@ The componentes in the figure below allow the user to move the gimbal to a speci
   <figcaption>Control the gimbal by providing latitude, longitude and height</figcaption>
 </figure>
 
-The user must provide the latitude and longitude in decimal degrees (i.e. `62.2541144` and `2.6842464`), the height in meters. It also has to provide the `Node heading` as explained in the previous subsection.
+The user must provide the latitude and longitude in decimal degrees (i.e. `62.2541144` and `2.6842464`) and the height in meters. It also has to provide the `Node heading` as explained in the previous subsection.
 
 ## Sivers settings panel
 
