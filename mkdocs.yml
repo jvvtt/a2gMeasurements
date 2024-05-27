@@ -92,7 +92,10 @@ nav:
       - Panels in GUI: PanelsGUI.md
       - Parameters of GUI: GUIparameters.md
   - Troubleshooting: Troubleshooting.md
-  - For developers: InfoDevelopers.md
+  - For developers: 
+      - Extend/change communication protocol: ChangeComProtocol.md
+      - Change the GUI: EditGUITour.md
+      - Transition to web app: GimbalWebApp.md
   - Measurements:
       - Planning tool: PlanningMeasurements.md
       - Flight plan: FlightPlan.md

@@ -1,3 +1,6 @@
+# Setup window
+Here goes the setiup window.
+
 # Main window
 
 Following Figure shows the main window where the user controls the different devices:

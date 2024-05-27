@@ -1,109 +1,4 @@
-# Developers guide
-
-## Communication protocol
-
-It is possible to extend the communication protocol by implementing new functionality in the methods ``encode_message()``, ``socket_send_cmd()`` and ``decode_message()`` in the class ``HelperA2GMeasurements`` of the file ``a2gmeasurements.py``.
-
-New functionality means new messages exchanged between both nodes. As to now, there are three types of messages implemented (shown under row ``message_type`` in one of the Tables in [Communication protocol](CommunicationProtocol.md#communication-protocol). New messages introduced by the developer can be short messages without requiring any answer back from the receiver, long messages without requiring the answer from the receiver (long messages make use of the ``data`` field of the communication process to send additional data, i.e. a vector with channel impulse response related information), or messages that require an answer from the receiver.
-
-Developers need to modify ``encode_message()``, as shown in the following snippet of code:
-
-!!! failure "Change encoder to extend available messages"
-    ```py
-    def encode_message(self, source_id, destination_id, message_type, cmd, data=None):
-        if message_type == 0x01: 
-        //...
-            elif cmd == 0x0A:
-            # INSERT HERE HOW TO ENCODE YOUR NEW MESSAGE IF IT IS A SHORT MESSAGE WITHOUT ANSWER FROM THE RECEIVER
-        elif message_type == 0x02:
-        //...
-            elif cmd == 0x02:
-            # INSERT HERE HOW TO ENCODE YOUR NEW MESSAGE IF IT IS A LONG MESSAGE WITHOUT ANSWER FROM THE RECEIVER
-        elif message_type == 0x03:
-        //...
-            elif cmd == 0x02:
-            # INSERT HERE HOW TO ENCODE YOUR NEW MESSAGE IF IT IS A MESSAGE REQUIRING AN ANSWER FROM THE RECEIVER    
-    ```
-
-Then modify ``decode_message()``, as shown in the following snippet:
-
-!!! failure "Change decoder to extend available messages"
-    ```py
-    def decode_message(self, data):
-        if message_type == 0x01: 
-        # ...
-            elif cmd == 0x0A:
-            # INSERT HERE HOW TO DECODE YOUR NEW MESSAGE IF IT IS A SHORT MESSAGE WITHOUT ANSWER FROM THE RECEIVER. # IT SHOULD MATCH THE ENCODING FORMAT
-        elif message_type == 0x02:
-        # ...
-            elif cmd == 0x02:
-            # INSERT HERE HOW TO DECODE YOUR NEW MESSAGE IF IT IS A LONG MESSAGE WITHOUT ANSWER FROM THE RECEIVER
-            # IT SHOULD MATCH THE ENCODING FORMAT
-        elif message_type == 0x03:
-        # ...
-            elif cmd == 0x02:
-            # INSERT HERE HOW TO DECODE YOUR NEW MESSAGE IF IT IS A MESSAGE REQUIRING AN ANSWER FROM THE RECEIVER
-            # IT SHOULD MATCH THE ENCODING FORMAT
-    ```
-
-Finally, modify ``socket_send_cmd()``. This method is a wrapper for the ``encode_message()`` method, and assigns a string name to each message, so that it is easier to identify them:
-
-!!! failure "Change socket sender to extend available messages"
-    ```py
-    def socket_send_cmd(self, type_cmd=None, data=None):
-        if type_cmd == 'SETGIMBAL': 
-        # ...
-        elif type_cmd == '': # ENTER HERE THE NAME WITH WHICH YOU WILL IDENTIFY THE NEW MESSAGE
-            frame = self.encode_message(source_id= , destination_id= ,message_type= , cmd= , data= ,) 
-            # FILL THE PREVIOUS LINE WITH THE CORRESPONDING INFORMATION FOR THE NEW MESSAGE
-    ```
-
-## Web app
-
-If it is of interest of the developer to migrate all the functionality done in PyQt5 (comprised in the files mentioned in section [Files in directory](MeasurementSystem.md#files-in-directory) ), to a web application, a *starting point* can be the web application developed to control the DJI Ronin RS2 gimbal. 
-
-The web application was done using the Django framework, and its backbone (the directory structure shown as follows) can be further extended if it is required.
-
-```
-.
-|- a2gmeasurements
- |- GimbalRS2WebApp
-  |- gimbalcontrol  
-   |- migrations
-    |- __init__.py
-    |- 0001_initial.py
-   |- static
-    |- css
-     |- bootstrap.min.css
-     |- styles.css
-    |- js
-     |- bootstrap.min.js
-   |- templates
-    |- automatic_move.html
-    |- base_generic.html
-    |- bs4_form.html
-    |- index.html
-    |- manual_move.html
-   |- __init__.py
-   |- admin.py
-   |- apps.py
-   |- forms.py
-   |- models.py
-   |- tests.py
-   |- urls.py
-   |- views.py
-  |- webAppRS2
-   |- __init__.py
-   |- asgi.py
-   |- settings.py
-   |- urls.py
-   |- wsgi.py
-  | manage.py
-```
-
-Extending this web app mainly requires to modify the files ``forms.py``, ``models.py``, ``urls.py``, ``views.py`` and add the new html files (responsible for all the user interface functionality) under the ``templates`` directory, the new css files (if any) to the ``css`` directory, and the new javascript files (if any) to the ``js`` directory.
-
-## Gremsy H16 gimbal
+# Gremsy H16 gimbal
 
 If Gremsy H16 gimbal must be used as drone's gimbal, this section provides useful information to understand the classes ``GimbalGremsyH16`` and ``SBUSEncoder`` responsible to control gimbal's orientation (yaw, pitch, roll). Information about the classes is provided in the html document containing information about all the API developed.
 
@@ -115,7 +10,7 @@ Due to the fact that the RC control value is not actually a speed value, a chara
 
 As it is not possible to access Gremsy gimbal's controller (and thus its IMU) an external IMU is required to read gimbal's angle for the characterization. Alternatively, the characterization can be done as described in what follows without the need of an external IMU. 
 
-### Characterization of Gremsy H16 angle dependece on the RC control value and the time holding it
+## Characterization of Gremsy H16 angle dependece on the RC control value and the time holding it
 
 NOTE: *this characterization was designed before the arrival of an external IMU. The angle characterization can be done in an easier manner by using the external IMU, a cheap host MCU (i.e. a Raspberry Pi Pico running CircuitPython with an implemented function reading IMU values is available) and the methods* ``start_imu_thread``, ``receive_imu_data``, ``stop_thread_imu`` of the class ``GimbalGremsyH16`` (described in the API html document).
 
@@ -164,7 +59,7 @@ $$
   <figcaption>Zoom-in at one of the "triangles" defined in the previous Figure</figcaption>
 </figure>
 
-### SBUS Encoder
+## SBUS Encoder
 
 The SBUS encoder at the host computer mimics the behaviour of a Remote Controller (RC) transmitter. Specifically, it mimics the behaviour of the transmitter for which a X8R FrSky receiver is paired.
 
@@ -183,7 +78,7 @@ The 11 bit were measured with an oscilloscope at the X8R receiver for the case w
   <figcaption>Python dictionaries for different values of a given channel at the RC TX. 'A' refers to the Aileron channel, 'E' for Elevation, 'T' for Throttle and 'R' for Rudder. In this case the channel that was changed at the RC TX was 'A', but the same procedure applies to either 'E', 'R' or 'T'. The numbers '1', '2', ... '25' are the 22 channels that conform a SBUS frame, excluding the SYNC ('1') and 2 STOP packets ('24, '25)</figcaption>
 </figure>
 
-### Drifting
+## Drifting
 
 When the gimbal is controlled remotely (Lock Mode) there is a drift towards the right w.r.t to the reference along the azimuth axis. Rudder (azimuth) positive values make the gimbal move to the left, while negative values make the gimbal move to the right.
 
@@ -253,14 +148,3 @@ $$
 where $0<k<2$. A value of $k = 0.1$ means that the actual period during which the velocity was $v_{2}$ was 0.1 times the period during which velocity was $v_{1}$, and a value of $k = 1.9$ means that the actual period during which the velocity was $v_{2}$ was 90$\%$ longer than the period during which velocity was $v_{1}$.
 
 In practice, it is hard to have control over this period mismatch. What this means is that the value of $k$ can't be predicted easily, and will vary between a value lower than 1 and a value higher than 1 (but lower to 2).
-
-## Connections handling
-
-To modify the layout of the panel modify  the method ``create_check_connections_panel()``.
-
-If any bug encounter (or the developer wants to extend any functionality) in the methods used to check the connections between the devices and each node, modify one of the following functions (the one/s corresponding to the device/s) : ``check_if_ssh_2_drone_reached()``, 
-``check_if_drone_fpga_connected()``, ``check_if_gnd_fpga_connected()``, ``check_if_drone_gimbal_connected()``, ``check_if_gnd_gimbal_connected()``, ``check_if_server_running_drone_fpga()``, ``check_if_server_running_gnd_fpga()``, ``check_if_gnd_gps_connected()``, ``check_if_drone_gps_connected()``.
-
-To modify any implemented functionality in the panel (i.e. if the developer wants that the ``Connect`` button is activated only when both RFSoCs are detected, ...) modify the callbacks ``check_status_all_devices()``, ``connect_drone_callback()`` and ``disconnect_drone_callback()`` corresponding to the buttons ``Check``, ``Connect`` and ``Disconnect`` respectively. 
-
-Also might be necessary to modify the method ``create_class_instances()`` called under some conditions after pressing the ``Connect`` button.

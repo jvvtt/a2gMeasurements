@@ -200,8 +200,6 @@ Such address reservation is configured in the available routers as shown below:
 </figure>
 
 !!! success "Multiple routers at the same time"
-    ```
     Both routers have configured to have the same address range (`192.168.0.100` - `192.168.0.249`), so if for any reason they have to be used simultaneously, the address range should be exclusive for each router.
-    ```
 
 
