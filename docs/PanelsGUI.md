@@ -13,7 +13,7 @@ The following figure shows the main window where relevant information is display
 The enumerated panels of the main window are:
 
 1. Check connections panel (section [Check connections](PanelsGUI.md#check-connections-panel))
-2. Ground gimbal control panel (section [Ground gimbal](PanelsGUI.md#ground-gimbal-panel--drone-gimbal-panel))
+2. Ground gimbal control panel (section [Ground gimbal](PanelsGUI.md#gimbals-panel))
 3. Drone gimbal control panel (section [Drone gimbal](PanelsGUI.md#ground-gimbal-panel--drone-gimbal-panel))
 4. Sivers settings configuration panel (section [Sivers settings](PanelsGUI.md#sivers-settings-panel))
 5. Power Angular Profile visualization panel (section [Visualize PAP](PanelsGUI.md#power-angular-profile-panel))
@@ -35,7 +35,7 @@ As a consequence of this, after the user sees the state of the connections under
 
 For implement changes to this behaviour of the GUI, see the section [Dev connections](InfoDevelopers.md#connections-handling).
 
-## Ground gimbal panel / Drone gimbal panel
+## Gimbals panel
 
 The panels for the ground gimbal and the drone gimbal are identical if the Ronin RS2 was chosen for the drone node in the [Setup Window](PanelsGUI.md#setup-window). We will assume that is the case (the case when the user choose the Gremsy H16 gimbal is shown later in this section).
 
