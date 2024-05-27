@@ -13,8 +13,8 @@ The following figure shows the main window where relevant information is display
 The enumerated panels of the main window are:
 
 1. Check connections panel (section [Check connections](PanelsGUI.md#check-connections-panel))
-2. Ground gimbal control panel (section [Ground gimbal](PanelsGUI.md#ground-gimbal-panel))
-3. Drone gimbal control panel (section [Drone gimbal](PanelsGUI.md#drone-gimbal-panel))
+2. Ground gimbal control panel (section [Ground gimbal](PanelsGUI.md#ground-gimbal-panel--drone-gimbal-panel))
+3. Drone gimbal control panel (section [Drone gimbal](PanelsGUI.md#ground-gimbal-panel--drone-gimbal-panel))
 4. Sivers settings configuration panel (section [Sivers settings](PanelsGUI.md#sivers-settings-panel))
 5. Power Angular Profile visualization panel (section [Visualize PAP](PanelsGUI.md#power-angular-profile-panel))
 6. GPS visualization panel (section [Visualize GPS](PanelsGUI.md#gps-visualization-panel))
@@ -83,10 +83,13 @@ The components in the figure below allow the user to move the gimbal to any of t
   <figcaption>Control the gimbal by chhosing among the coordinates entered in the Setup Window</figcaption>
 </figure>
 
-In the texbox `Node heading` the user has to be provide the heading of the gimbal (the direction of the reference of the gimbal). 
+In the texbox `Node heading` the user has to provide the heading of the gimbal (the direction of the reference of the gimbal). 
 
 !!! success "Admitted values for Node heading"
     The admitted values are in the range `0-359`, with `0` being the case when the reference of the gimbal is pointing to the North.
+
+!!! success "NOTE"
+    The gimbal will NOT move if the user has NOT chosen the coordinates for *both* nodes (the dropdown menus next to the `Available GND coordinates` and `Available drone coordinates` labels). Alternatively, the user can choose among the available coordinates in one node (i.e. GND gimbal panel) and enter himself the coordinates for the other node (i.e. drone gimbal panel).
 
 ### Input coordinates
 
