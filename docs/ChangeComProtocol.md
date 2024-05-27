@@ -2,7 +2,16 @@
 
 It is possible to extend the communication protocol by implementing new functionality in the methods ``encode_message()``, ``socket_send_cmd()`` and ``decode_message()`` in the class ``HelperA2GMeasurements`` of the file ``a2gmeasurements.py``.
 
-New functionality means new messages exchanged between both nodes. As to now, there are three types of messages implemented (shown under row ``message_type`` in one of the Tables in [Communication protocol](CommunicationProtocol.md#communication-protocol). New messages introduced by the developer can be short messages without requiring any answer back from the receiver, long messages without requiring the answer from the receiver (long messages make use of the ``data`` field of the communication process to send additional data, i.e. a vector with channel impulse response related information), or messages that require an answer from the receiver.
+New functionality means new messages exchanged between both nodes. As to now, there are three types of messages implemented (shown under row ``message_type`` in one of the Tables in [Communication protocol](CommunicationProtocol.md#communication-protocol). 
+
+New messages introduced by the developer can be:
+
+1. Short messages without requiring any answer back from the receiver.
+2. Short messages that require an answer from the receiver.
+3. Long messages without requiring the answer from the receiver (long messages make use of the ``data`` field of the communication process to send additional data, i.e. a vector with channel impulse response related information)
+
+!!! success "Acknowledgements"
+    Be aware that as there is a TCP connection established, the acknowledgement/answer messsages mentioned previously refer to  additional acknowledgement/answer messages on top (at the application layer) of the handshake and acknowledgement process used by TCP at its communication layer. 
 
 Developers need to modify ``encode_message()``, as shown in the following snippet of code:
 

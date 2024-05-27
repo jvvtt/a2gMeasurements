@@ -58,16 +58,19 @@ In the Manifold, follow these steps:
 
 ## Run the software
 
-For the Manifold:
+### For the Manifold:
 
 * In the terminal where you have previously activated the python environment, set the current directory to the `a2gMeasurements` folder
 * Write `python drone_main.py`
 * When asked `GND IP addr is 192.168.0.124?` choose with the arrow keys `Yes` if that is the case or `No` otherwise, and press `ENTER`. If you choose `No`, you will have to enter the ground IP address *in the correct format* (i.e. `[0-255].[0-255].[0-255].[0-255]`)
 * When asked `GPS at DRONE is going to be used?` choose accordingly and press `ENTER`. If `Yes`, then enter the heading offset of the baseline between the two antennas in the proper format (i.e. `[0-360]`). If there is no offset or only one antenna is used, write `0` and press `ENTER`
 * When asked `Gimbal at DRONE is going to be used?` choose accordingly and press `ENTER`
-* When asked `RFSoC at DRONE is going to be used?` choose accordingly but *DO NOT* press `ENTER` yet. First you need to run the software on the ground node (Raspberry). Down below, it will be highlighted when you can press `ENTER`, after you have follow some steps in the ground node (Raspberry)
+* When asked `RFSoC at DRONE is going to be used?` choose accordingly but *DO NOT* press `ENTER` yet. First you need to run the software on the ground node (Raspberry). 
 
-For the Raspberry:
+!!! success "When should I press enter?"
+Down below in this guide, it will be highlighted when you can press `ENTER`.
+
+### For the Raspberry:
 
 Choose how to execute the software: through the command line or by using a python IDE like Visual Studio Code (recommended as from there you will be able to modify, debug, source control, and run the software).
 
@@ -195,4 +198,6 @@ You will have to wait until the software check if the devices shown in the panel
 !!! success "Check"
     If the ping and SSH requests to the drone are answered, the `Connect drone` button will become available.
 
-* Press `Connect drone` and after doing that **NOW IS THE TIME WHEN YOU CAN PRESS ENTER IN THE COMMAND PROMPT OF THE MANIFOLD** [Run the software: For the Manifold: Last step](QuickStart.md#run-the-software)
+* Press `Connect drone` and after doing that:
+
+**NOW IS THE TIME WHEN YOU CAN PRESS ENTER IN THE COMMAND PROMPT OF THE MANIFOLD** ([Last step](QuickStart.md#for-the-manifold))
