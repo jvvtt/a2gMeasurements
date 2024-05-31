@@ -53,32 +53,30 @@ The file `drone_main.py` is only required to be placed in the working directory 
 
 ## GimbalRS2 to host connection
 
-Connect the CAN port of the gimbal RS2 to any USB port of the host computer, using the DJI Ronin Focus Wheel and the PEAK System PCAN-USB bridge, as indicated in the following Figure.
+Connect the PCAN-USB bridge to the DJI Ronin Focus Wheel such that the `GND` signal of the Focus Wheel is connected to the `GND` signal of the PCAN-USB bridge, the `CANL` signal of the focus wheel is connected to the `CANL` signal of the PCAN-USB bridge, and the `CANH` signal of the focus wheel is connected to the `CANH` signal of the PCAN-USB bridge.
+
+The Figures below show the pin assignment for the Focus Wheel and for the PCAN-USB bridge. 
 
 <figure markdown="span">
-  ![Image title](assets/a2g_node_components.PNG){ width="400" }
-  <figcaption>Connection between the gimbal RS2 and the host</figcaption>
+  ![Image title](assets/gimbal_rs2_focus_wheel.PNG){ width="400" }
+  <figcaption>Pin assignement for the Ronin Focus Wheel</figcaption>
+</figure>
+
+<figure markdown="span">
+  ![Image title](assets/pin_assignement_pcan.PNG){ width="400" }
+  <figcaption>Pin assignement for the PCAN-USB</figcaption>
 </figure>
 
 ## GPS to host connection
 
-Connect the USB port from the Septentrio gps to any USB port of the host computer, as indicated in Figure.
+Connect the USB port from the Septentrio gps to any USB port of the host computer.
 
-<figure markdown="span">
-  ![Image title](assets/a2g_node_components.PNG){ width="400" }
-  <figcaption>Connection between the GPS and the host</figcaption>
-</figure>
-
-**DO NOT** use the port named `REC-USB` of the Septentrio gps.
+!!! success "Note"
+    DO NOT** use the port named `REC-USB` of the Septentrio gps.
 
 ## RFSoC to host connection
 
-Connect any of the RFSoC Ethernet ports to any of the Ethernet ports of the host computer, as indicated in the following Figure.
-
-<figure markdown="span">
-  ![Image title](assets/a2g_node_components.PNG){ width="400" }
-  <figcaption>Connection between the RFSoC and the host</figcaption>
-</figure>
+Connect any of the RFSoC Ethernet ports to any of the Ethernet ports of the host computer.
 
 Since each node uses both the Ethernet port (to communicate with each RFSoC) and the WiFi (to communicate with the other node), the host computer should be configured so that it supports both types of communication simultaneously. 
 

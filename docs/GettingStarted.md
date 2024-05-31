@@ -2,7 +2,7 @@
 
 ## Requirements Python
 
-Below is the list of required python packages with their respective versions:
+Below is a list of some of the required python packages with their respective versions:
 
 <div class="center-table" markdown>
 | Package name | Version | 
@@ -22,14 +22,12 @@ Below is the list of required python packages with their respective versions:
 
 </div>
 
-## Requirements Planning Tool
+To check the full list of required packages, open a terminal in any of the host computers (Raspberry Pi or Manifold) and type:
 
-1. 
 ```sh
-npm install --save fs-extra
+    conda list
 ```
 
 # Git
-In the ``.gitignore`` file the ``data`` folder is added to avoid uploading the measured files, since there can be synch troubles due to their size.
 
-Measurement files (in the receiver node) will still be saved in the ``data`` but won't be uploaded to the Github of the project, as stated before.
+Version control of the software is available. In any of the host computers the version control system is managed easily from Visual Studio Code. Also, any push request that updates this documentation (folder `docs` of the git repository) will automatically trigger deployment in the web page of the repository (https://jvvtt.github.io/a2gMeasurements/).
