@@ -97,7 +97,6 @@ nav:
       - Transition to web app: GimbalWebApp.md
   - Measurements:
       - Planning tool: PlanningMeasurements.md
-      - Flight plan: FlightPlan.md
       - Measurements methodology: MeasMethodology.md
       - Previous campaings: ReproducePrevMeasurements.md
   - API reference:
