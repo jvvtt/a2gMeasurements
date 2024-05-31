@@ -1,5 +1,15 @@
 # Setup window
-Here goes the setiup window.
+
+The following figure shows the Setup window that will pop-up when an user clicks on `Setup` > `Setup devices and more`.
+
+<figure markdown="span">
+  ![Image title](assets/setup_win.png){ width="400" }
+  <figcaption>Setup window of the A2GMeasurements app</figcaption>
+</figure>
+
+The higlighletd box with the number 1 is used only when GPS is available at the node and refers to the node following the *other* node either in azimuth, elevation or both.
+
+The highlighletd box with the number 2 is used when the option `Static` under the `Choose node mobility` label is chosen. In that case the user has the option to enter multiple coordinates that will become available next in the node [Gimbal panel of the main window](PanelsGUI.md#available-coordinates).
 
 # Main window
 
@@ -115,6 +125,24 @@ The actual rate at which the PAP changes depends on the rate at which the channe
 
 ## GPS visualization panel
 
+If the `Start GPS visualization` flag from the `Threads` menu is activated, the GPS visualization panel will plot the contents as threated in the `periodical_gps_display_callback` function of the `GUI_A2G_MEAS.py` file.
+
+<figure markdown="span">
+  ![Image title](assets/threads_menu.PNG){ width="400" }
+  <figcaption>Threads menu</figcaption>
+</figure>
+
 ## Control measurements panel
 
-## Terminal panel
+Enter a description for a measurement under the textbox available. 
+
+Press `START` to start a measurement.
+
+Press `STOP` to stop a measurement. You can press again `START`, if you want to continue a long measurement. 
+
+!!! success "Measurements"
+    Each time the `STOP` button is clicked a new measurement file will be created. The filename is the date (up to the seconds precission) when the user pressed the button. To change this behaviour check the `start_thread_receive_meas_data`, `stop_thread_receive_meas_data` and `finish_measurement` functions of the `a2gmeasurements.py` file.
+
+
+Press `FINISH` to finish a measurement. 
+
